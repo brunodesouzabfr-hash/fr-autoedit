@@ -1,0 +1,43 @@
+# Projetos reais e mídias pessoais
+Studio/
+FR_AUTOEDITE_*/_ENTRADA/
+FR_AUTOEDITE_*/originais/
+FR_AUTOEDITE_*/originais_organizados/
+FR_AUTOEDITE_*/proxies/
+FR_AUTOEDITE_*/miniaturas/
+FR_AUTOEDITE_*/contatos_visuais/
+FR_AUTOEDITE_*/cards_editaveis/
+FR_AUTOEDITE_*/entrega/
+projetos/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.zip
+
+# Dados gerados
+_CONTROLE/
+_HISTORICO/
+*.log
+*.partial
+*.tmp
+*.concat.txt
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Credenciais
+.env
+.env.*
+creds.json
+credentials.json
+token.json
+*.pem
+*.key
+
+# Ambientes locais
+.venv/
+venv/
+build/
+dist/
