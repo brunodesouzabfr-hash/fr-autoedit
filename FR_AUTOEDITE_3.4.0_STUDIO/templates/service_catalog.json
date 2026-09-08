@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "services": [
+    {
+      "key": "projetos_3d",
+      "label": "PROJETOS 3D",
+      "short_label": "3D",
+      "body": "Concepção, visualização e decisões antes da execução.",
+      "asset": "services/projetos_3d.png",
+      "layout": "blueprint",
+      "structure": "Concepção, leitura do projeto e comparação com execução.",
+      "context_help": "Use render, planta ou wireframe realmente anexado; identifique visualização 3D."
+    },
+    {
+      "key": "revestimentos",
+      "label": "REVESTIMENTOS",
+      "short_label": "REVESTIMENTOS",
+      "body": "Paginação, preparo, assentamento e acabamento.",
+      "asset": "services/revestimentos.png",
+      "layout": "pagination",
+      "structure": "Paginação, juntas e encontro de materiais.",
+      "context_help": "Priorize alinhamento e acabamento; linhas gráficas não são cotas."
+    },
+    {
+      "key": "alvenaria",
+      "label": "ALVENARIA",
+      "short_label": "ALVENARIA",
+      "body": "Estrutura, vedação, regularização e base técnica.",
+      "asset": "services/alvenaria.png",
+      "layout": "foundation",
+      "structure": "Base, etapas e acabamento.",
+      "context_help": "Registro visual não certifica desempenho estrutural."
+    },
+    {
+      "key": "producoes",
+      "label": "PRODUÇÕES",
+      "short_label": "PRODUÇÕES",
+      "body": "Registro visual, montagem e conteúdo de processo.",
+      "asset": "services/producoes.png",
+      "layout": "sequence",
+      "structure": "Sequência de processo e resultado.",
+      "context_help": "Associe cada momento a uma ação ou mudança observável."
+    },
+    {
+      "key": "pintura",
+      "label": "PINTURA",
+      "short_label": "PINTURA",
+      "body": "Preparação, correção, proteção e acabamento final.",
+      "asset": "services/pintura.png",
+      "layout": "layers",
+      "structure": "Preparo → camadas → acabamento.",
+      "context_help": "Mostre proteção, correção da base e uniformidade; não deduza número de demãos."
+    },
+    {
+      "key": "moveis",
+      "label": "MÓVEIS",
+      "short_label": "MÓVEIS",
+      "body": "Marcenaria, mobiliário e soluções sob medida.",
+      "asset": "services/moveis.png",
+      "layout": "joinery",
+      "structure": "Detalhe de encaixe, montagem e conjunto.",
+      "context_help": "Mostre ferragem ou encaixe documentado, sem inventar especificação."
+    },
+    {
+      "key": "textura",
+      "label": "TEXTURA",
+      "short_label": "TEXTURA",
+      "body": "Materialidade, relevo e expressão aplicada à superfície.",
+      "asset": "services/textura.png",
+      "layout": "material_macro",
+      "structure": "Material em destaque e luz rasante.",
+      "context_help": "Use macro legível; não troque textura real por ilustração de resultado."
+    },
+    {
+      "key": "criacoes",
+      "label": "CRIAÇÕES",
+      "short_label": "CRIAÇÕES",
+      "body": "Soluções autorais, protótipos e peças especiais.",
+      "asset": "services/criacoes.png",
+      "layout": "sequence",
+      "structure": "Ideia, protótipo e peça.",
+      "context_help": "Diferencie conceito, ensaio e peça concluída."
+    },
+    {
+      "key": "iluminacao",
+      "label": "ILUMINAÇÃO",
+      "short_label": "ILUMINAÇÃO",
+      "body": "Luz técnica, atmosfera, integração e acabamento.",
+      "asset": "services/iluminacao.png",
+      "layout": "light",
+      "structure": "Ponto de luz, integração e atmosfera.",
+      "context_help": "Evite antes/depois com exposição diferente sem informar a diferença."
+    }
+  ]
+}

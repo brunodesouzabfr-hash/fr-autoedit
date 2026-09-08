@@ -1,0 +1,53 @@
+{
+  "brand": "Franco Romeu",
+  "signature": "Arquitetura, interiores e execução",
+  "tone": [
+    "técnico",
+    "autoral",
+    "sofisticado",
+    "direto"
+  ],
+  "colors": {
+    "deep_green": "#0A2F26",
+    "petrol_green": "#123F34",
+    "orange": "#FC7016",
+    "orange_alt": "#FF6B00",
+    "gold": "#F6A700",
+    "bone": "#E6D6B5",
+    "charcoal": "#121318",
+    "border": "#1A6069"
+  },
+  "fonts": {
+    "display": "StardosStencil-Bold.ttf",
+    "body": "Rokkitt-Regular.ttf",
+    "body_bold": "Rokkitt-Bold.ttf",
+    "technical": "ShareTechMono-Regular.ttf"
+  },
+  "contacts": {
+    "whatsapp": "(11) 99002-1603",
+    "whatsapp_link": "https://wa.me/5511990021603",
+    "email": "romeudifranco@gmail.com",
+    "instagram": "@francoromeu.fr",
+    "pinterest": "@FrancoRomeu.FR",
+    "site": "francoromeu-app.vercel.app",
+    "site_link": "https://francoromeu-app.vercel.app/",
+    "region": "Toda a região de São Paulo, SP",
+    "region_short": "São Paulo, SP"
+  },
+  "rules": {
+    "title_style": "stencil vazado",
+    "preserve_logo_aspect": true,
+    "avoid_invented_claims": true,
+    "contact_only_on_cards": false,
+    "persistent_logo_on_branded_video": true,
+    "persistent_handle_on_branded_video": true,
+    "never_recreate_logo": true
+  },
+  "dna": {
+    "symbol": "ꟻR",
+    "meaning": "Forjada Resistência",
+    "core": ["arte e engenharia", "verdade material", "resistência", "autoria", "execução controlada"],
+    "purpose": "Forjar espaços, objetos e sistemas que resistam ao uso, ao tempo e à indiferença.",
+    "visual_direction": ["rocha", "metal", "couro", "madeira", "textura mineral", "luz recortada", "desenho técnico", "marcas de processo"]
+  }
+}

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fr_entry="${BASH_SOURCE[0]}"
+while [[ -L "$fr_entry" ]]; do
+  fr_link_dir="$(cd -P -- "$(dirname -- "$fr_entry")" && pwd)"
+  fr_entry="$(readlink -- "$fr_entry")"
+  [[ "$fr_entry" = /* ]] || fr_entry="$fr_link_dir/$fr_entry"
+done
+fr_script_dir="$(cd -P -- "$(dirname -- "$fr_entry")" && pwd)"
+exec python3 "$fr_script_dir/app/fr_autoedite.py" "$@"

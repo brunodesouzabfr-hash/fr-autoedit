@@ -1,0 +1,101 @@
+{
+  "schema_version": 3,
+  "description": "Sistema visual FR luxo 4K: mármore verde-petróleo/esmeralda, metal dourado acetinado, laranja térmico e precisão de desenho técnico. Altere os valores e execute fr-autoedite cards ou fr-autoedite render novamente.",
+  "palette": {
+    "background": "#061D18",
+    "surface": "#0A2F26",
+    "surface_dark": "#031812",
+    "orange": "#FC7016",
+    "orange_neon": "#FF7A00",
+    "gold": "#C8A034",
+    "technical_gold": "#F6A700",
+    "bone": "#E6D6B5",
+    "border": "#1A6069",
+    "charcoal": "#121318"
+  },
+  "fonts": {
+    "title": "StardosStencil-Bold.ttf",
+    "body": "Rokkitt-Regular.ttf",
+    "body_bold": "Rokkitt-Bold.ttf",
+    "technical": "ShareTechMono-Regular.ttf",
+    "emotion": "CormorantGaramond-Italic.ttf"
+  },
+  "color_lut": "",
+  "preset": "site_fr_luxo",
+  "brand_color_balance": {
+    "petroleum_green_percent": 70,
+    "orange_percent": 8,
+    "neutral_bone_gold_percent": 22,
+    "rule": "Petróleo e carvão estruturam; laranja é acento; osso e ouro asseguram contraste."
+  },
+  "logo": {
+    "file": "franco-romeu-logo-remaster-4k.png",
+    "persistent_on_branded_video": true,
+    "persistent_on_cards": true,
+    "position": "top_right",
+    "width_percent": 9.0,
+    "opacity_percent": 94,
+    "safe_margin_percent": 5.0,
+    "hero_on_intro_and_outro": true
+  },
+  "persistent_overlay": {
+    "enabled": true,
+    "show_instagram": true,
+    "show_stage": true,
+    "show_top_orange_line": true,
+    "background_opacity_percent": 72,
+    "position": "top",
+    "title_font": "StardosStencil-Bold.ttf",
+    "body_font": "Rokkitt-Regular.ttf",
+    "technical_font": "ShareTechMono-Regular.ttf",
+    "logo_alignment": "bubble_center",
+    "logo_without_bubble": true
+  },
+  "orange_details": {
+    "density": "high",
+    "top_bar": true,
+    "bottom_bar": true,
+    "corner_brackets": true,
+    "diagonal_band": true,
+    "technical_ticks": true,
+    "accent_width_percent": 0.9
+  },
+  "cards": {
+    "layout": "site_editorial",
+    "bubble_style": "glass",
+    "animation": "soft_zoom",
+    "intro_animation": "forge_reveal",
+    "outro_animation": "soft_zoom",
+    "service_animation": "forge_reveal",
+    "service_asset_mode": "integrated_symbol",
+    "service_symbol_shape": "perfect_circle",
+    "show_contact_icons": true,
+    "show_site": true,
+    "show_pinterest": true,
+    "title_hollow": true,
+    "show_phase_number": true,
+    "show_contacts_on_every_card": true,
+    "show_full_contacts_on_outro": true,
+    "max_title_lines": 4,
+    "max_body_lines": 7,
+    "texture_opacity_percent": 100,
+    "always_generate_4k_masters": true,
+    "material_backgrounds": {
+      "intro": "cards_4k/FR_CARD_INTRO_MASTER_4K.png",
+      "phase": "cards_4k/FR_CARD_PHASE_MASTER_4K.png",
+      "service": "cards_4k/FR_CARD_PHASE_MASTER_4K.png",
+      "outro": "cards_4k/FR_CARD_CONTACT_MASTER_4K.png"
+    },
+    "material_treatment": "dark_emerald_marble_satin_gold_chiaroscuro",
+    "final_tagline": "ARTE & ENGENHARIA — PROJETOS & REFORMAS",
+    "editable_content_location": "EDIT_PLAN.json > segments[type=card] > title/body",
+    "qr_code_on_outro": false,
+    "qr_code_target": "https://wa.me/5511990021603",
+    "service_adaptive_layout": true
+  },
+  "safe_area": {
+    "horizontal_percent": 5.0,
+    "top_percent": 4.0,
+    "bottom_percent": 9.0
+  }
+}

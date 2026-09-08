@@ -1,0 +1,277 @@
+{
+  "schema_version": 3,
+  "project": {
+    "name": "Novo projeto Franco Romeu",
+    "slug": "novo-projeto",
+    "client": "",
+    "location": "São Paulo, SP",
+    "zip_path": "~/FR-AutoEdite/Studio/novo-projeto/_ENTRADA/FR_AUTOEDITE_ENTRADA.zip",
+    "workspace_root": "~/FR-AutoEdite/Studio",
+    "context_file": ""
+  },
+  "context": {
+    "summary": "Documentar a transformação com verdade visual, método e identidade Franco Romeu.",
+    "content_pillar": "processo e transformação comprovável",
+    "desired_message": "Projeto, execução e acabamento formam um único sistema.",
+    "facts_confirmed": [],
+    "facts_to_confirm": [],
+    "cta": "Vamos dimensionar sua obra.",
+    "notes": ""
+  },
+  "story": {
+    "objective": "Documentar a transformação, evidenciando projeto, execução e resultado.",
+    "audience": "Clientes de projetos, reformas, interiores e execução.",
+    "priority": "A ordem selecionada no modo de edição prevalece; datas e nomes funcionam como evidências auxiliares.",
+    "must_include": [],
+    "must_avoid": [],
+    "chronology": [
+      {
+        "order": 1,
+        "title": "CONCEPÇÃO",
+        "description": "Projeto, referências, estudos e medidas.",
+        "keywords": [
+          "projeto",
+          "3d",
+          "medida",
+          "planta",
+          "model"
+        ]
+      },
+      {
+        "order": 2,
+        "title": "ANTES E PREPARAÇÃO",
+        "description": "Estado inicial, desmontagem, demolição e preparação.",
+        "keywords": [
+          "antes",
+          "quebra",
+          "demol",
+          "preparo",
+          "obra"
+        ]
+      },
+      {
+        "order": 3,
+        "title": "EXECUÇÃO",
+        "description": "Montagens, instalações e decisões técnicas.",
+        "keywords": [
+          "instala",
+          "montagem",
+          "exec",
+          "obra"
+        ]
+      },
+      {
+        "order": 4,
+        "title": "DETALHES",
+        "description": "Acabamentos, iluminação, ferragens e testes.",
+        "keywords": [
+          "detalhe",
+          "acabamento",
+          "led",
+          "teste"
+        ]
+      },
+      {
+        "order": 5,
+        "title": "RESULTADO",
+        "description": "Ambiente concluído e leitura geral do conjunto.",
+        "keywords": [
+          "pronto",
+          "final",
+          "resultado",
+          "depois"
+        ]
+      }
+    ]
+  },
+  "edition": {
+    "order_mode": "automatico",
+    "format": "vertical",
+    "width": 720,
+    "height": 1280,
+    "fps": 24,
+    "target_duration_sec": 360,
+    "average_clip_duration_sec": 6,
+    "max_video_excerpt_sec": 14,
+    "still_duration_sec": 4,
+    "phase_card_duration_sec": 4,
+    "max_media_segments": 80,
+    "create_branded_version": true,
+    "create_clean_version": true,
+    "preserve_original_audio": true,
+    "music_path": "",
+    "music_volume": 0.1,
+    "transition": "fade",
+    "technical_notes": true,
+    "render_source": "originals",
+    "quality_preset": "full_hd"
+  },
+  "social": {
+    "enabled": true,
+    "reels_enabled": true,
+    "reel_durations_sec": [
+      30,
+      60,
+      90
+    ],
+    "stories_enabled": true,
+    "story_source_duration_sec": 60,
+    "story_part_duration_sec": 15,
+    "carousel_enabled": true,
+    "carousel_slides": 8,
+    "carousel_width": 1080,
+    "carousel_height": 1350,
+    "create_reel_covers": true,
+    "persistent_branding": true,
+    "reel_sampling_mode": "beginning_middle_end",
+    "always_include_beginning": true,
+    "always_include_ending": true,
+    "minimum_source_coverage": 0.85,
+    "manual_plans_preserved": true
+  },
+  "service_intro": {
+    "enabled": false,
+    "service_key": "projetos_3d",
+    "duration_sec": 3.5,
+    "position": "after_intro",
+    "include_in_reels": true,
+    "custom_title": "",
+    "custom_body": ""
+  },
+  "external_intro_outro": {
+    "intro_enabled": false,
+    "intro_path": "",
+    "intro_duration_sec": 4.0,
+    "intro_mode": "before_card",
+    "intro_preserve_audio": true,
+    "intro_include_in_reels": true,
+    "outro_enabled": false,
+    "outro_path": "",
+    "outro_duration_sec": 4.0,
+    "outro_mode": "after_card",
+    "outro_preserve_audio": true,
+    "outro_include_in_reels": true,
+    "include_in_clean_version": false
+  },
+  "editing_brief": {
+    "auto_generate": true,
+    "overlay_title_font": "StardosStencil-Bold.ttf",
+    "overlay_body_font": "Rokkitt-Regular.ttf",
+    "overlay_technical_font": "ShareTechMono-Regular.ttf",
+    "publication_title": "",
+    "publication_caption": "",
+    "hashtags": [],
+    "complementary_information": "",
+    "scenario_name": "roteiro-principal"
+  },
+  "cards": {
+    "style_file": "CARD_STYLE.json",
+    "editable": true,
+    "generate_previews": true,
+    "style_preset": "site_fr_luxo",
+    "layout": "site_editorial",
+    "bubble_style": "glass",
+    "animation": "soft_zoom",
+    "intro_animation": "forge_reveal",
+    "outro_animation": "soft_zoom",
+    "service_animation": "forge_reveal",
+    "show_contact_icons": true,
+    "show_site": true,
+    "show_pinterest": true,
+    "palette_overrides": {},
+    "persistent_logo": true,
+    "persistent_bubble": true,
+    "show_contacts": true,
+    "qr_code_on_outro": false,
+    "qr_code_target": "https://wa.me/5511990021603"
+  },
+  "handoff": {
+    "chatgpt_lot_max_mb": 145,
+    "proxy_long_side": 720,
+    "proxy_fps": 24,
+    "include_all_proxies": true,
+    "include_context_sources": true,
+    "split_oversized_proxies": true,
+    "verify_archives_after_write": true
+  },
+  "local_analysis": {
+    "enabled": true,
+    "deduplicate_bursts": true,
+    "scene_detection": true,
+    "detect_stability": true,
+    "organize_by_phase": true,
+    "create_selects": true,
+    "minimum_quality_score": 30,
+    "scene_threshold": 0.34,
+    "minimum_scene_sec": 3.0,
+    "maximum_scene_sec": 8.0,
+    "max_scene_scan_sec": 180,
+    "max_scene_clips_per_video": 18
+  },
+  "random_mode": {
+    "enabled": false,
+    "seed": null,
+    "shuffle_media": true,
+    "min_clip_duration": 1.5,
+    "max_clip_duration": 8.0,
+    "prefer_video_over_image": 0.7,
+    "ken_burns_on_images": true
+  },
+  "visual_effects": {
+    "transitions": [
+      "fade",
+      "fade_black",
+      "dissolve",
+      "smooth_left",
+      "zoom_in"
+    ],
+    "transition_duration_sec": 0.45,
+    "enable_stabilization": false,
+    "stabilization_mode": "auto",
+    "stabilization_strength": "medium",
+    "color_lut": "",
+    "ken_burns_on_images": true,
+    "speed_ramping": false,
+    "editorial_timelapse": {
+      "enabled": false,
+      "speed_factor": 6.0,
+      "minimum_source_duration_sec": 18.0,
+      "output_duration_sec": 4.0,
+      "max_segments": 4,
+      "mute_original_audio": true
+    }
+  },
+  "audio_design": {
+    "auto_ducking": true,
+    "enable_sfx": true,
+    "sfx_volume": 0.3,
+    "tts_voiceover": false,
+    "tts_language": "pt-BR"
+  },
+  "export_quality": {
+    "draft_mode": true,
+    "parallel_workers": 2,
+    "max_lot_mb": 145,
+    "video_crf": 18,
+    "audio_bitrate_kbps": 192
+  },
+  "cloud_export": {
+    "enabled": false,
+    "provider": "google_drive_rclone",
+    "account_email": "blueprintsplam@gmail.com",
+    "rclone_remote": "gdrive",
+    "remote_folder": "FR-AutoEdite/Entregas",
+    "include_master": true,
+    "include_social": true,
+    "include_project_files": false,
+    "open_google_photos_after_export": false
+  },
+  "ai_copilot": {
+    "enabled": false,
+    "provider": "ollama",
+    "model": "llava",
+    "use_cache": true,
+    "auto_apply": false
+  },
+  "brand_profile": "fr_brand_profile.json"
+}

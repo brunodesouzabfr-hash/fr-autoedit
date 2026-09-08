@@ -1,0 +1,152 @@
+{
+  "schema_version": 3,
+  "project": {
+    "name": "Reforma Cozinha Carreira",
+    "slug": "cozinha-carreira",
+    "client": "Carreira",
+    "location": "São Paulo, SP",
+    "zip_path": "~/FR-AutoEdite/Studio/cozinha-carreira/_ENTRADA/FR_AUTOEDITE_ENTRADA.zip",
+    "workspace_root": "~/FR-AutoEdite/Studio",
+    "context_file": ""
+  },
+  "context": {
+    "summary": "Reforma integral da Cozinha Carreira, do projeto 3D ao ambiente entregue.",
+    "content_pillar": "processo e transformação comprovável",
+    "desired_message": "Compatibilização, execução e acabamento trabalham como um único sistema.",
+    "facts_confirmed": [
+      "Quartzo Calacatta nas bancadas e na ilha",
+      "Cuba Kokay Gourmet com instalação hidráulica e elétrica",
+      "Painel ripado com LED sequencial"
+    ],
+    "facts_to_confirm": [],
+    "cta": "Vamos dimensionar sua obra.",
+    "notes": ""
+  },
+  "story": {
+    "objective": "Apresentar com rigor técnico a evolução completa da reforma da cozinha, da concepção ao ambiente pronto.",
+    "audience": "Potenciais clientes da Franco Romeu interessados em projeto, interiores e execução.",
+    "priority": "A ordem narrativa abaixo prevalece sobre datas de modificação ou criação dos arquivos.",
+    "must_include": [
+      "pia da cozinha",
+      "pia da lavanderia",
+      "ilha do cooktop",
+      "cuba gourmet elétrica",
+      "painel ripado",
+      "LED sequencial",
+      "resultado final"
+    ],
+    "must_avoid": [
+      "afirmações técnicas não confirmadas",
+      "contatos diferentes dos oficiais Franco Romeu"
+    ],
+    "chronology": [
+      {
+        "order": 1,
+        "title": "PROJETO 3D DA PIA",
+        "description": "Concepção inicial da pia da cozinha, lavanderia e integração funcional.",
+        "keywords": ["3d", "model", "projeto", "render"]
+      },
+      {
+        "order": 2,
+        "title": "MEDIDAS E COMPATIBILIZAÇÃO",
+        "description": "Levantamento, conferência de medidas e preparação para execução.",
+        "keywords": ["medida", "imagemeter", "planta", "drive"]
+      },
+      {
+        "order": 3,
+        "title": "O AMBIENTE ANTES",
+        "description": "Cozinha no início da obra, revestimento antigo sendo removido e ambiente em transformação.",
+        "keywords": ["antes", "quebra", "demol", "revestimento"]
+      },
+      {
+        "order": 4,
+        "title": "QUARTZO CALACATTA",
+        "description": "Instalação das bancadas da cozinha e lavanderia e da ilha do cooktop.",
+        "keywords": ["quartzo", "calacatta", "pedra", "bancada", "pia"]
+      },
+      {
+        "order": 5,
+        "title": "MÓVEIS PLANEJADOS",
+        "description": "Início da montagem dos módulos, evolução da marcenaria e instalação das portas.",
+        "keywords": ["moveis", "móveis", "marcenaria", "porta", "armario"]
+      },
+      {
+        "order": 6,
+        "title": "ILHA E COOKTOP",
+        "description": "Posicionamento da ilha e integração do cooktop ao fluxo da cozinha.",
+        "keywords": ["ilha", "cooktop"]
+      },
+      {
+        "order": 7,
+        "title": "CUBA GOURMET ELÉTRICA",
+        "description": "Instalação hidráulica e elétrica da cuba gourmet Kokay.",
+        "keywords": ["cuba", "kokay", "hidraul", "elétr", "eletr"]
+      },
+      {
+        "order": 8,
+        "title": "PAINEL RIPADO",
+        "description": "Instalação do painel ripado integrado ao conjunto de portas.",
+        "keywords": ["painel", "ripado"]
+      },
+      {
+        "order": 9,
+        "title": "LED SEQUENCIAL",
+        "description": "Instalação, acionamento e leitura luminosa do painel ripado.",
+        "keywords": ["led", "sequencial", "luz", "ilumina"]
+      },
+      {
+        "order": 10,
+        "title": "COZINHA CONCLUÍDA",
+        "description": "Percurso final mostrando materiais, marcenaria, iluminação e integração do ambiente pronto.",
+        "keywords": ["pronto", "final", "resultado", "conclu"]
+      }
+    ]
+  },
+  "edition": {
+    "order_mode": "automatico",
+    "format": "vertical",
+    "width": 720,
+    "height": 1280,
+    "fps": 24,
+    "target_duration_sec": 420,
+    "average_clip_duration_sec": 7,
+    "max_video_excerpt_sec": 16,
+    "still_duration_sec": 4.5,
+    "phase_card_duration_sec": 4.5,
+    "create_branded_version": true,
+    "create_clean_version": true,
+    "preserve_original_audio": true,
+    "music_path": "",
+    "music_volume": 0.1,
+    "transition": "fade",
+    "technical_notes": true,
+    "render_source": "originals",
+    "max_media_segments": 80
+  },
+  "social": {
+    "enabled": true,
+    "reels_enabled": true,
+    "reel_durations_sec": [30, 60, 90],
+    "stories_enabled": true,
+    "story_source_duration_sec": 60,
+    "story_part_duration_sec": 15,
+    "carousel_enabled": true,
+    "carousel_slides": 8,
+    "carousel_width": 1080,
+    "carousel_height": 1350,
+    "create_reel_covers": true,
+    "persistent_branding": true
+  },
+  "cards": {
+    "style_file": "CARD_STYLE.json",
+    "editable": true,
+    "generate_previews": true
+  },
+  "handoff": {
+    "chatgpt_lot_max_mb": 145,
+    "proxy_long_side": 720,
+    "proxy_fps": 24,
+    "include_all_proxies": true
+  },
+  "brand_profile": "fr_brand_profile.json"
+}
