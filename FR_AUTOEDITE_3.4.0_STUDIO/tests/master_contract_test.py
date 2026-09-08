@@ -92,6 +92,23 @@ class MasterContract(unittest.TestCase):
         self.assertAlmostEqual(out["start_sec"],2.2)
         self.assertAlmostEqual(out["end_sec"],3.2)
 
+    def test_scene_clock_repairs_survive_contract_v2(self):
+        d=copy.deepcopy(self.base)
+        local=self.media("LOCAL",.5,2)
+        local.update(media_id="M0001C001")
+        stale=self.media("STALE",10,2)
+        stale.update(media_id="M0001C001",source_window_start_sec=9)
+        rounded=self.media("ROUND",0,.6)
+        rounded.update(media_id="M0001C001",playback_speed=6.667)
+        d["main_timeline"]["segments"]=[local,stale,rounded]
+        out=self.bundle(d)["main_timeline"]
+        self.assertEqual([s["start_sec"] for s in out["segments"]],[1.5,2.0,1.0])
+        self.assertEqual(out["segments"][2]["playback_speed"],6.666)
+        self.assertEqual(
+            {(item["segment"],item["field"]) for item in out["import_repairs"]},
+            {(1,"start_sec"),(2,"start_sec"),(3,"start_sec"),(3,"playback_speed")},
+        )
+
     def test_outside_window_is_rejected_without_writes(self):
         before=(self.project/"EDIT_PLAN.json").read_bytes()
         d=copy.deepcopy(self.base);d["main_timeline"]["segments"][0]["start_sec"]=99

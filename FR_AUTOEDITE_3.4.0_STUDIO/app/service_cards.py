@@ -139,5 +139,5 @@ def render_service_card(env, path, segment, plan, brand, style, project):
     text_fit(c,draw,footer,(m,h*.90,w-m,h*.955),mono,unit*.021,gold,2)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.convert("RGB").save(path,quality=96)
+    c.save_card_image(canvas, path)
     return True

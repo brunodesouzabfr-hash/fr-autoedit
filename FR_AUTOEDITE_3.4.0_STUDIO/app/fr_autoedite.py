@@ -12,6 +12,7 @@ import argparse
 import copy
 import csv
 import datetime as dt
+import functools
 import hashlib
 import json
 import math
@@ -2251,6 +2252,34 @@ def color_hex(value: str) -> str:
     return value if value.startswith("#") else "#" + value
 
 
+@functools.lru_cache(maxsize=6)
+def _material_card_background(
+    path_value: str, modified_ns: int, size_bytes: int, width: int, height: int,
+) -> Any:
+    """Carrega e dimensiona cada fundo uma vez por versão e resolução."""
+    del modified_ns, size_bytes  # Fazem parte da chave e invalidam o cache.
+    from PIL import Image, ImageEnhance, ImageOps
+
+    with Image.open(path_value) as opened:
+        material = ImageOps.exif_transpose(opened).convert("RGB")
+    material = ImageOps.fit(
+        material, (width, height), method=Image.Resampling.LANCZOS,
+        centering=(0.5, 0.5),
+    )
+    return ImageEnhance.Color(material).enhance(0.94)
+
+
+def save_card_image(canvas: Any, path: Path) -> None:
+    """Salva cards rapidamente; PNG continua lossless em compressão leve."""
+    path = Path(path)
+    output = canvas.convert("RGB")
+    if path.suffix.lower() == ".png":
+        output.save(path, format="PNG", compress_level=1)
+    else:
+        output.save(path, quality=96)
+
+
+@functools.lru_cache(maxsize=512)
 def font(name: str, size: int) -> Any:
     from PIL import ImageFont
     return ImageFont.truetype(str(FONTS / name), max(8, size))
@@ -2506,7 +2535,7 @@ def card_image(
     from service_cards import render_service_card
     if render_service_card(globals(), path, segment, plan, brand, style, project_dir):
         return
-    from PIL import Image, ImageDraw, ImageEnhance, ImageOps
+    from PIL import Image, ImageDraw
     width, height = int(plan["output"]["width"]), int(plan["output"]["height"])
     palette = style.get("palette", {})
     bg = color_hex(palette.get("background", brand["colors"]["deep_green"]))
@@ -2531,16 +2560,12 @@ def card_image(
         material_path = project_material if project_dir and project_material.is_file() else ASSETS / material_relative
     material_enabled = bool(material_relative and material_path.is_file())
     if material_enabled:
-        with Image.open(material_path) as opened:
-            material = ImageOps.exif_transpose(opened).convert("RGB")
-        material = ImageOps.fit(
-            material, (width, height), method=Image.Resampling.LANCZOS,
-            centering=(0.5, 0.5),
-        )
-        # Mantém o mármore e o metal visíveis, com saturação controlada para
-        # preservar legibilidade e o chiaroscuro de luxo da identidade FR.
-        material = ImageEnhance.Color(material).enhance(0.94)
-        canvas = material
+        material_stat = material_path.stat()
+        # Cada card recebe uma cópia: o desenho posterior nunca altera o cache.
+        canvas = _material_card_background(
+            str(material_path.resolve()), material_stat.st_mtime_ns,
+            material_stat.st_size, width, height,
+        ).copy()
     else:
         canvas = Image.new("RGB", (width, height), bg)
     draw = ImageDraw.Draw(canvas, "RGBA")
@@ -2747,7 +2772,7 @@ def card_image(
         signature_y = min(height - margin - footer_font.size, footer_y + 8)
         draw.text(((width - (sig_box[2] - sig_box[0])) // 2, signature_y), signature, font=footer_font, fill=orange)
     path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.convert("RGB").save(path, quality=96)
+    save_card_image(canvas, path)
 
 
 def hex_rgb(value: str) -> tuple[int, int, int]:
@@ -3420,13 +3445,17 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
     output_dir = project_dir / "cards_editaveis" / namespace
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
-    for segment in plan.get("segments", []):
-        if segment.get("type") != "card":
-            continue
+    card_segments = [segment for segment in plan.get("segments", []) if segment.get("type") == "card"]
+    make_masters = bool(style.get("cards", {}).get("always_generate_4k_masters", True))
+    total = len(card_segments) * (2 if make_masters else 1)
+    completed = 0
+    for segment in card_segments:
         target = output_dir / f"{segment['segment_id']}.png"
+        info(f"Cards {completed + 1}/{total}: gerando {target.name}")
         card_image(target, segment, plan, brand, style, project_dir)
         outputs.append(target)
-    if style.get("cards", {}).get("always_generate_4k_masters", True):
+        completed += 1
+    if make_masters:
         source_width = int(plan.get("output", {}).get("width") or 1920)
         source_height = int(plan.get("output", {}).get("height") or 1080)
         if source_width > source_height * 1.05:
@@ -3442,12 +3471,12 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
         })
         master_dir = output_dir / "4K_MASTERS"
         master_dir.mkdir(parents=True, exist_ok=True)
-        for segment in plan.get("segments", []):
-            if segment.get("type") != "card":
-                continue
+        for segment in card_segments:
             target = master_dir / f"{segment['segment_id']}_4K.png"
+            info(f"Cards {completed + 1}/{total}: gerando {target.name}")
             card_image(target, segment, master_plan, brand, style, project_dir)
             outputs.append(target)
+            completed += 1
     guide = f"""# Cards editáveis — FR AutoEdite {APP_VERSION}
 
 - Conteúdo: altere `title` e `body` nos segmentos `type: card` do plano JSON.

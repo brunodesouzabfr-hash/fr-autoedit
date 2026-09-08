@@ -212,7 +212,7 @@ class StudioState:
                     "percent": round(min(100.0, current * 100.0 / total), 1),
                     "label": clean[:240],
                 }
-            item = re.search(r"\b(?:M\d{4}(?:C\d{3})?|[SR]\d{4})\b", clean)
+            item = re.search(r"\b(?:M\d{4}(?:C\d{3})?|[PSR]\d{4})\b", clean)
             if item:
                 job["current_item"] = item.group(0)
         job["heartbeat_at"] = time.time()

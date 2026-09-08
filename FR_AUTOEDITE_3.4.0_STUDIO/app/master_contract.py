@@ -157,15 +157,68 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
             s.update(start_sec=0.0, playback_speed=1.0, editorial_timelapse=False)
             continue
         speed = number(c, s.get("playback_speed", 1.0), p + ".playback_speed", 0.25, 30)
-        start = number(c, s.get("start_sec", 0), p + ".start_sec")
+        raw_start = number(c, s.get("start_sec", 0), p + ".start_sec")
         basis = s.get("start_time_basis", "absolute_parent_media")
         if basis not in {"absolute_parent_media", "scene_local"}:
             fail(c, p + ".start_time_basis: use scene_local ou absolute_parent_media.")
         window_start = float(row.get("scene_start_sec") or row.get("source_window_start_sec") or 0)
         window_end = float(row.get("scene_end_sec") or row.get("source_window_end_sec") or row.get("duration_sec") or row.get("source_duration_sec") or 0)
+        window_length = max(0.0, window_end - window_start)
+        span = duration * speed
+        if speed > 1 and span > window_length + 0.000001:
+            maximum_speed = window_length / duration if duration > 0 else 0.0
+            small_rounding_overflow = (
+                maximum_speed >= 1.25
+                and span <= window_length + max(0.25, window_length * 0.01)
+            )
+            if small_rounding_overflow:
+                repaired_speed = math.floor(maximum_speed * 1000.0) / 1000.0
+                repairs.append({
+                    "label": label, "segment": index, "media_id": mid,
+                    "field": "playback_speed", "before": speed,
+                    "after": repaired_speed,
+                    "reason": "ajuste de arredondamento ao limite real da cena",
+                })
+                speed = repaired_speed
+                span = duration * speed
+        start = raw_start
         if basis == "scene_local":
             start += window_start
-        span = duration * speed
+        else:
+            absolute_valid = (
+                start >= window_start - 0.000001
+                and start + span <= window_end + 0.001
+            )
+            local_valid = (
+                raw_start >= -0.000001
+                and raw_start + span <= window_length + 0.001
+            )
+            if not absolute_valid and local_valid:
+                start = window_start + max(0.0, raw_start)
+                repairs.append({
+                    "label": label, "segment": index, "media_id": mid,
+                    "field": "start_sec", "before": raw_start,
+                    "after": round(start, 6),
+                    "reason": "tempo local da cena convertido para o vídeo-pai",
+                })
+            elif not absolute_valid:
+                try:
+                    declared_window_start = float(s.get("source_window_start_sec"))
+                except (TypeError, ValueError):
+                    declared_window_start = window_start
+                declared_relative = raw_start - declared_window_start
+                stale_window_valid = (
+                    declared_relative >= -0.000001
+                    and declared_relative + span <= window_length + 0.001
+                )
+                if stale_window_valid:
+                    start = window_start + max(0.0, declared_relative)
+                    repairs.append({
+                        "label": label, "segment": index, "media_id": mid,
+                        "field": "start_sec", "before": raw_start,
+                        "after": round(start, 6),
+                        "reason": "deslocamento preservado após atualização da janela de cena",
+                    })
         if start < window_start - 0.000001 or start + span > window_end + 0.001:
             fail(c, f"{p}: {mid} usa {start:.3f}–{start + span:.3f}s; janela disponível {window_start:.3f}–{window_end:.3f}s. Reduza duração/velocidade ou escolha outro recorte.")
         if "end_sec" in s and abs(number(c, s["end_sec"], p + ".end_sec") - (start + span)) > 0.002:

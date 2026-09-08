@@ -87,6 +87,7 @@ def main() -> int:
             state.start_job(project, "cards")
             card_job = wait_for_job(state, project)
             assert card_job["returncode"] == 0, "\n".join(card_job.get("log", []))
+            assert any("Cards 1/" in line for line in card_job.get("log", []))
             assert (project / "CARD_PREVIEW_PLAN.json").is_file()
             assert not (project / "EDIT_PLAN.json").exists()
             assert len(list((project / "cards_editaveis").rglob("*.png"))) >= 3

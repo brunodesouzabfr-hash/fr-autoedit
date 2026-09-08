@@ -1,4 +1,4 @@
-"""Frame-aware joins. Long masters render only two transition inputs at a time."""
+"""Frame-aware joins. Masters render only two transition inputs at a time."""
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,8 +8,9 @@ def join_segments(env, segments, target, definitions=None, transition_duration=.
     target = Path(target)
     if not segments:
         raise c.AutoEditeError("Não há segmentos para unir.")
-    # Explicit fast draft or legacy caller without segment definitions.
-    if len(segments) > 24 and transition_duration <= .20 and (draft is True or draft is None and not any("transition" in s for s in definitions or [])):
+    # Todo draft explícito privilegia resposta rápida e previsível. Chamadas
+    # legadas sem transições mantêm o atalho apenas para timelines longas.
+    if draft is True or (len(segments) > 24 and transition_duration <= .20 and draft is None and not any("transition" in s for s in definitions or [])):
         c._concat_copy_segments_with_progress(segments, target)
         return
     if len(segments) < 2 or not definitions or len(definitions) != len(segments):
@@ -37,55 +38,58 @@ def join_segments(env, segments, target, definitions=None, transition_duration=.
         for p in inputs:
             cmd += ["-i", str(p)]
         try:
-            c.run([*cmd, "-filter_complex", graph, "-map", "[v]", "-map", "[a]", *codec, str(partial)])
+            command = [
+                *cmd, "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+                *codec, str(partial),
+            ]
+            for attempt in range(2):
+                partial.unlink(missing_ok=True)
+                result = c.run(
+                    command, capture=True, check=False,
+                    operation="junção de segmentos",
+                )
+                if result.returncode == 0:
+                    break
+                details = (result.stderr or result.stdout or "").strip()
+                retryable = (
+                    "Could not open encoder before EOF" in details
+                    or "Nothing was written into output file" in details
+                )
+                if attempt == 0 and retryable:
+                    c.warning(f"Junção curta sem saída completa; repetindo {dest.name} uma vez.")
+                    continue
+                raise c.AutoEditeError(
+                    f"Falha ao executar ffmpeg (código {result.returncode}).\n{details[-1800:]}"
+                )
             c.validate_rendered_media(partial)
             partial.replace(dest)
         finally:
             partial.unlink(missing_ok=True)
-    if len(segments) <= 12:
-        filters = []
-        for i in range(len(segments)):
-            filters.extend([f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS,format=yuv420p[v{i}]",
-                            f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]"])
-        v,a,total = "v0","a0",durations[0]
-        for i in range(1,len(segments)):
-            nv,na = f"jv{i}",f"ja{i}"
-            d = overlaps[i]
-            if d <= 0:
-                filters.append(f"[{v}][{a}][v{i}][a{i}]concat=n=2:v=1:a=1[{nv}][{na}]")
-            else:
-                effect = c.TRANSITION_MAP[definitions[i].get("transition","fade")]
-                filters.extend([f"[{v}][v{i}]xfade=transition={effect}:duration={d:.6f}:offset={total-d:.6f}[{nv}]",
-                                f"[{a}][a{i}]acrossfade=d={d:.6f}:c1=tri:c2=tri[{na}]"])
-            v,a,total=nv,na,total+durations[i]-d
-        filters.extend([f"[{v}]null[v]",f"[{a}]anull[a]"])
-        encode(segments,";".join(filters),target)
-    else:
-        # Bodies plus overlapping tails/heads; bounded memory, O(n) decoding.
-        root = target.parent / ("." + target.stem + "_joins")
-        chunks=[]
-        for i,p in enumerate(segments):
-            head = overlaps[i]
-            tail = overlaps[i+1] if i+1 < len(segments) else 0
-            end = durations[i]-tail
-            body = root/f"{i:05d}_body.mp4"
-            graph=(f"[0:v]trim=start={head:.6f}:end={end:.6f},settb=AVTB,setpts=PTS-STARTPTS[v];"
-                   f"[0:a]atrim=start={head:.6f}:end={end:.6f},asetpts=PTS-STARTPTS[a]")
-            encode([p],graph,body)
-            chunks.append(body)
-            if tail:
-                effect=c.TRANSITION_MAP[definitions[i+1].get("transition","fade")]
-                boundary=root/f"{i:05d}_transition.mp4"
-                graph=(f"[0:v]trim=start={end:.6f}:end={durations[i]:.6f},settb=AVTB,setpts=PTS-STARTPTS[x];"
-                       f"[1:v]trim=start=0:end={tail:.6f},settb=AVTB,setpts=PTS-STARTPTS[y];"
-                       f"[x][y]xfade=transition={effect}:duration={tail:.6f}:offset=0[v];"
-                       f"[0:a]atrim=start={end:.6f}:end={durations[i]:.6f},asetpts=PTS-STARTPTS[ax];"
-                       f"[1:a]atrim=start=0:end={tail:.6f},asetpts=PTS-STARTPTS[ay];"
-                       f"[ax][ay]acrossfade=d={tail:.6f}:c1=tri:c2=tri[a]")
-                encode([p,segments[i+1]],graph,boundary)
-                chunks.append(boundary)
-            c.info(f"Junções da master {i+1}/{len(segments)}")
-        c._concat_copy_segments(chunks,target)
+    # Bodies plus overlapping tails/heads; bounded memory, O(n) decoding.
+    root = target.parent / ("." + target.stem + "_joins")
+    chunks=[]
+    for i,p in enumerate(segments):
+        head = overlaps[i]
+        tail = overlaps[i+1] if i+1 < len(segments) else 0
+        end = durations[i]-tail
+        body = root/f"{i:05d}_body.mp4"
+        graph=(f"[0:v]trim=start={head:.6f}:end={end:.6f},settb=AVTB,setpts=PTS-STARTPTS,fps={fps:.6f}[v];"
+               f"[0:a]apad=pad_dur={durations[i]:.6f},atrim=start={head:.6f}:end={end:.6f},asetpts=PTS-STARTPTS[a]")
+        encode([p],graph,body)
+        chunks.append(body)
+        if tail:
+            effect=c.TRANSITION_MAP[definitions[i+1].get("transition","fade")]
+            boundary=root/f"{i:05d}_transition.mp4"
+            graph=(f"[0:v]trim=start={end:.6f}:end={durations[i]:.6f},settb=AVTB,setpts=PTS-STARTPTS,fps={fps:.6f}[x];"
+                   f"[1:v]trim=start=0:end={tail:.6f},settb=AVTB,setpts=PTS-STARTPTS,fps={fps:.6f}[y];"
+                   f"[x][y]xfade=transition={effect}:duration={tail:.6f}:offset=0[v];"
+                   f"[0:a]apad=pad_dur={durations[i]:.6f},atrim=start={end:.6f}:end={durations[i]:.6f},asetpts=PTS-STARTPTS[ax];"
+                   f"[1:a]apad=pad_dur={durations[i+1]:.6f},atrim=start=0:end={tail:.6f},asetpts=PTS-STARTPTS[ay];"
+                   f"[ax][ay]acrossfade=d={tail:.6f}:c1=tri:c2=tri[a]")
+            encode([p,segments[i+1]],graph,boundary)
+            chunks.append(boundary)
+        c.info(f"Junções da master {i+1}/{len(segments)}")
+    c._concat_copy_segments(chunks,target)
     expected=sum(durations)-sum(overlaps)
     measured=float(c.parse_probe(target,c.ffprobe(target)).get("duration_sec") or 0)
     if abs(measured-expected) > max(.35, len(segments)*.03):
