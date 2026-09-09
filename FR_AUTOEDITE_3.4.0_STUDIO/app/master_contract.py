@@ -13,6 +13,32 @@ import project_scope as scope
 CARD_KINDS = {"intro", "service", "phase", "outro", "detail", "comparison"}
 ANIMATIONS = {"none", "soft_zoom", "forge_reveal", "zoom_out", "fade"}
 PROTECTED = {"ai_copilot", "cloud_export", "handoff", "local_analysis"}
+CARD_MODES = {"none", "common", "service"}
+SERVICE_ALIASES = {
+    "projeto_3d": "projetos_3d", "project_3d": "projetos_3d",
+    "mobilia": "moveis", "marcenaria": "moveis", "mobilia_marcenaria": "moveis",
+    "producoes_eventos": "producoes", "eventos": "producoes",
+}
+SUPPORTED_SEGMENT_FIELDS = {
+    "segment_id", "type", "enabled", "include_in", "duration_sec", "transition",
+    "transition_duration_sec", "image_animation", "card_animation", "stabilization",
+    "force_stabilization", "editorial_timelapse", "external_asset", "lower_third",
+    "title", "body", "on_screen_text", "technical_note", "phase_title",
+    "decision_reason", "card_kind", "card_mode", "service_key", "service_asset",
+    "service_layout", "service_family", "associated_card_id", "media_id", "media_type",
+    "source_path", "proxy_path", "thumbnail_path", "has_audio", "start_sec", "end_sec",
+    "start_time_basis", "source_window_start_sec", "source_window_end_sec",
+    "source_duration_sec", "playback_speed", "freeze_frame", "visual", "comparison",
+    "coverage_role", "phase_order", "quality_score", "external_role", "include_in_reels",
+    "narration", "narration_text", "subtitles", "cta", "cut_style", "keyframes", "unsupported_requests",
+    "service_id", "service_name", "service_confidence", "service_card_enabled",
+    "card_type", "card_family", "balloon_family", "visual_motif", "overlay_text",
+    "voiceover_text", "caption_text", "transition_in", "transition_out", "balloon_texts",
+}
+AI_FILLER_PREFIXES = (
+    "aqui está", "aqui esta", "claro!", "certamente!", "como solicitado",
+    "observação:", "observacao:", "nota técnica:", "nota tecnica:",
+)
 
 
 def fail(c, message):
@@ -38,6 +64,156 @@ def check_booleans(c, value, reference, prefix="configuration"):
             check_booleans(c, item, original, prefix + "." + key)
         if isinstance(item, float) and not math.isfinite(item):
             fail(c, f"{prefix}.{key}: número não finito.")
+
+
+def clean_editorial_text(c, value, label, *, allow_empty=True):
+    if not isinstance(value, str):
+        fail(c, f"{label}: esperado texto.")
+    text = " ".join(value.replace("\r", "\n").split())
+    if not text and not allow_empty:
+        fail(c, f"{label}: escreva um texto específico sustentado pelo projeto.")
+    lowered = text.casefold()
+    if any(lowered.startswith(prefix) for prefix in AI_FILLER_PREFIXES):
+        fail(c, f"{label}: remova comentários da IA como ‘aqui está’, explicações ou notas fora do conteúdo final.")
+    if len(text) > 4000:
+        fail(c, f"{label}: limite o texto a 4000 caracteres.")
+    return text
+
+
+def validate_script_block(c, value, label):
+    if value in (None, ""):
+        return {"enabled": False, "text": ""}
+    if isinstance(value, str):
+        value = {"enabled": bool(value.strip()), "text": value}
+    if not isinstance(value, dict):
+        fail(c, f"{label}: use um objeto com enabled e text.")
+    result = copy.deepcopy(value)
+    enabled = result.get("enabled", bool(result.get("text")))
+    if not isinstance(enabled, bool):
+        fail(c, f"{label}.enabled: use true ou false.")
+    result["enabled"] = enabled
+    result["text"] = clean_editorial_text(c, result.get("text", ""), label + ".text")
+    if enabled and not result["text"]:
+        fail(c, f"{label}.text: texto obrigatório quando enabled=true.")
+    return result
+
+
+def clean_metadata(c, value, label):
+    """Valida texto editorial aninhado sem executar metadados estratégicos."""
+    if isinstance(value, str):
+        return clean_editorial_text(c, value, label)
+    if isinstance(value, list):
+        if len(value) > 500:
+            fail(c, f"{label}: limite a lista a 500 itens.")
+        return [clean_metadata(c, item, f"{label}[{index}]") for index, item in enumerate(value)]
+    if isinstance(value, dict):
+        return {str(key): clean_metadata(c, item, f"{label}.{key}") for key, item in value.items()}
+    if value is None or isinstance(value, (bool, int, float)):
+        if isinstance(value, float) and not math.isfinite(value):
+            fail(c, f"{label}: número não finito.")
+        return value
+    fail(c, f"{label}: tipo de metadado não suportado.")
+
+
+def validate_strategy(c, value):
+    if not isinstance(value, dict):
+        fail(c, "strategy: esperado objeto.")
+    result = clean_metadata(c, copy.deepcopy(value), "strategy")
+    editorial = result.get("editorial", {})
+    if editorial and not isinstance(editorial, dict):
+        fail(c, "strategy.editorial: esperado objeto.")
+    funnel = str(editorial.get("funnel_stage") or "")
+    if funnel and funnel not in {"awareness", "consideration", "conversion", "relacionamento"}:
+        fail(c, "strategy.editorial.funnel_stage: use awareness, consideration, conversion ou relacionamento.")
+    intent = str(editorial.get("primary_intent") or "")
+    allowed_intents = {"educar", "inspirar", "provar_tecnica", "vender", "gerar_lead",
+                       "fortalecer_marca", "mostrar_bastidor", "mostrar_antes_depois"}
+    if intent and intent not in allowed_intents:
+        fail(c, "strategy.editorial.primary_intent: escolha um valor de allowed_values.primary_intents.")
+    return result
+
+
+def normalize_segment_contract(c, segment, label, warnings):
+    """Converte nomes estratégicos da Fase 2.1 para o contrato usado pelo render."""
+    services = c.load_service_catalog()
+    raw_service = str(segment.get("service_id") or segment.get("service_key") or "")
+    service_key = SERVICE_ALIASES.get(raw_service, raw_service)
+    if raw_service and service_key != raw_service:
+        warnings.append({"level":"info", "block":label + ".service_id",
+            "message":f"Alias de serviço `{raw_service}` normalizado para `{service_key}`.",
+            "effect":"A família visual canônica será usada sem perder o trecho."})
+    if service_key:
+        segment["service_key"] = service_key
+        segment["service_id"] = service_key
+    confidence = segment.get("service_confidence")
+    if confidence not in (None, ""):
+        segment["service_confidence"] = number(c, confidence, label + ".service_confidence", 0, 1)
+    if "service_card_enabled" in segment and not isinstance(segment["service_card_enabled"], bool):
+        fail(c, f"{label}.service_card_enabled: use true ou false.")
+    if "service_card_enabled" in segment:
+        segment["card_mode"] = (
+            "service" if segment["service_card_enabled"]
+            else "common" if segment.get("type") == "card" else "none"
+        )
+    card_type = str(segment.get("card_type") or "")
+    if card_type:
+        if card_type in CARD_MODES:
+            segment["card_mode"] = card_type
+        elif card_type in CARD_KINDS:
+            segment["card_kind"] = card_type
+        elif card_type not in CARD_MODES | CARD_KINDS:
+            warnings.append({"level":"warning", "block":label + ".card_type",
+                "message":f"Tipo de card `{card_type}` não reconhecido.",
+                "effect":"O valor foi preservado como pedido não executável; o trecho continua válido."})
+            segment.setdefault("unsupported_requests", {})["card_type"] = card_type
+    for alias, target in (("overlay_text", "on_screen_text"),
+                          ("voiceover_text", "narration"), ("caption_text", "subtitles")):
+        if alias not in segment:
+            continue
+        value = clean_editorial_text(c, segment[alias], label + "." + alias)
+        segment[alias] = value
+        if target in {"narration", "subtitles"}:
+            if value:
+                segment[target] = {"enabled": bool(value), "text": value}
+            elif target in segment and isinstance(segment[target], dict):
+                segment[alias] = str(segment[target].get("text") or "")
+        elif value:
+            segment[target] = value
+        elif target in segment:
+            segment[alias] = str(segment[target] or "")
+    if str(segment.get("transition_in") or ""):
+        segment["transition"] = segment["transition_in"]
+    else:
+        segment["transition_in"] = str(segment.get("transition") or "cut")
+    transition_out = str(segment.get("transition_out") or "")
+    if transition_out:
+        if transition_out not in c.TRANSITION_MAP:
+            warnings.append({"level":"warning", "block":label + ".transition_out",
+                "message":f"Transição de saída `{transition_out}` não reconhecida.",
+                "effect":"Foi preservada como metadado; a entrada do próximo trecho continua válida."})
+        else:
+            warnings.append({"level":"info", "block":label + ".transition_out",
+                "message":"transition_out é metadado nesta versão do renderizador.",
+                "effect":"Defina também transition_in no trecho seguinte para executar a passagem."})
+        segment.setdefault("unsupported_requests", {})["transition_out"] = transition_out
+    for field in ("service_name", "card_family", "balloon_family", "visual_motif"):
+        if field in segment:
+            segment[field] = clean_editorial_text(c, segment[field], label + "." + field)
+    if "balloon_texts" in segment:
+        if not isinstance(segment["balloon_texts"], list):
+            fail(c, label + ".balloon_texts: use uma lista de textos finais.")
+        segment["balloon_texts"] = clean_metadata(c, segment["balloon_texts"], label + ".balloon_texts")
+        if segment["balloon_texts"]:
+            warnings.append({"level":"info", "block":label + ".balloon_texts",
+                "message":"Textos de balão foram validados e preservados como metadados.",
+                "effect":"O overlay persistente atual não alterna múltiplos balões por trecho; revise na Etapa 06."})
+    if service_key in services:
+        profile = services[service_key]
+        segment["service_name"] = profile.get("label", service_key)
+        segment["card_family"] = profile.get("visual_family", profile.get("layout", "editorial"))
+        segment["balloon_family"] = profile.get("balloon_family", "fr_tecnico")
+        segment["visual_motif"] = profile.get("visual_motif", profile.get("visual_family", ""))
+    return service_key
 
 
 def media_ref(c, ref, manifest, label):
@@ -75,6 +251,7 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
     if not 1 <= len(segments) <= 10000:
         fail(c, f"{label}.segments: use entre 1 e 10000 segmentos.")
     repairs = []
+    warnings = []
     if legacy:
         # Preserve the R4 compatibility rules, then enforce the current contract.
         plan = c._validate_imported_plan_v1(plan, manifest, label, trusted_external=trusted)
@@ -88,6 +265,19 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
         p = f"{label}.segments[{index}]"
         if not isinstance(s, dict) or s.get("type") not in {"media", "card"}:
             fail(c, p + ": type deve ser media ou card.")
+        normalized_service_key = normalize_segment_contract(c, s, p, warnings)
+        unknown = sorted(set(s) - SUPPORTED_SEGMENT_FIELDS)
+        if unknown:
+            preserved = s.setdefault("unsupported_requests", {})
+            if not isinstance(preserved, dict):
+                preserved = s["unsupported_requests"] = {"original_value": preserved}
+            for key in unknown:
+                preserved[key] = s.pop(key)
+            warnings.append({
+                "level": "warning", "block": p,
+                "message": "Campos ainda não executados foram preservados: " + ", ".join(unknown) + ".",
+                "effect": "O restante do segmento será aplicado; revise estes pedidos manualmente.",
+            })
         s["duration_sec"] = duration = number(c, s.get("duration_sec"), p + ".duration_sec", 0.04, 3600)
         for field in ("enabled", "force_stabilization", "editorial_timelapse", "external_asset", "lower_third"):
             if field in s and not isinstance(s[field], bool):
@@ -98,19 +288,64 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
             fail(c, p + ".include_in: escolha branded, clean ou ambos.")
         s.setdefault("transition", "cut")
         if s["transition"] not in c.TRANSITION_MAP:
-            fail(c, p + ".transition: transição desconhecida.")
+            warnings.append({"level":"warning","block":p+".transition",
+                "message":f"Transição `{s['transition']}` ainda não é executada; foi substituída por corte seco.",
+                "effect":"O segmento e seus tempos permanecem válidos."})
+            s.setdefault("unsupported_requests", {})["transition"] = s["transition"]
+            s["transition"] = "cut"
         if "transition_duration_sec" in s:
             number(c, s["transition_duration_sec"], p + ".transition_duration_sec", 0, 3)
         s["image_animation"] = "zoom_in" if s.get("image_animation") == "soft_zoom" else s.get("image_animation") or "none"
         if s["image_animation"] not in {"none", "zoom_in", "zoom_out"}:
-            fail(c, p + ".image_animation: use none, zoom_in ou zoom_out.")
+            warnings.append({"level":"warning","block":p+".image_animation",
+                "message":"Animação de imagem indisponível; foi desativada.","effect":"O restante do trecho será aplicado."})
+            s.setdefault("unsupported_requests", {})["image_animation"] = s["image_animation"]
+            s["image_animation"] = "none"
         if (s.get("card_animation") or "none") not in ANIMATIONS:
-            fail(c, p + ".card_animation: animação indisponível.")
+            warnings.append({"level":"warning","block":p+".card_animation",
+                "message":"Animação de card indisponível; foi desativada.","effect":"O card continuará no plano."})
+            s.setdefault("unsupported_requests", {})["card_animation"] = s.get("card_animation")
+            s["card_animation"] = "none"
         if "stabilization" in s and s["stabilization"] not in {"off", "auto", "on"}:
-            fail(c, p + ".stabilization: use off, auto ou on.")
-        for text_key in ("title", "body", "on_screen_text", "technical_note", "phase_title", "decision_reason"):
+            warnings.append({"level":"warning","block":p+".stabilization",
+                "message":"Modo de estabilização indisponível; foi usado auto.","effect":"O recorte continuará válido."})
+            s.setdefault("unsupported_requests", {})["stabilization"] = s["stabilization"]
+            s["stabilization"] = "auto"
+        for text_key in ("title", "body", "on_screen_text", "technical_note", "phase_title", "decision_reason", "cta"):
             if text_key in s and not isinstance(s[text_key], str):
                 fail(c, p + "." + text_key + ": esperado texto.")
+            if text_key in s:
+                s[text_key] = clean_editorial_text(c, s[text_key], p + "." + text_key)
+        if "narration" in s:
+            s["narration"] = validate_script_block(c, s["narration"], p + ".narration")
+        if "subtitles" in s:
+            s["subtitles"] = validate_script_block(c, s["subtitles"], p + ".subtitles")
+            if s["subtitles"]["enabled"]:
+                if s.get("overlay_text"):
+                    s["on_screen_text"] = s["overlay_text"]
+                    warnings.append({
+                        "level": "info", "block": p + ".caption_text",
+                        "message": "Legenda e overlay distintos foram preservados.",
+                        "effect": "Nesta versão, o render local exibe overlay_text; caption_text permanece como metadado para legendagem futura.",
+                    })
+                else:
+                    s["on_screen_text"] = s["subtitles"]["text"]
+        if "keyframes" in s:
+            if not isinstance(s["keyframes"], list) or len(s["keyframes"]) > 100:
+                fail(c, p + ".keyframes: use uma lista de até 100 instruções.")
+            if s["keyframes"]:
+                warnings.append({
+                    "level": "warning", "block": p + ".keyframes",
+                    "message": "Keyframes arbitrários ainda não são executados pelo renderizador.",
+                    "effect": "As instruções foram preservadas; cortes, velocidade e animações suportadas continuam válidos.",
+                })
+        if "cut_style" in s and s["cut_style"] not in {"hard", "match", "jump", "j_cut", "l_cut"}:
+            warnings.append({
+                "level": "warning", "block": p + ".cut_style",
+                "message": f"Estilo de corte `{s['cut_style']}` não reconhecido; será tratado como corte normal.",
+                "effect": "A transição e os tempos válidos permanecem preservados.",
+            })
+            s["cut_style"] = "hard"
         sid = str(s.get("segment_id") or f"S{index:04d}")
         # IDs identify occurrences, not source videos. Duplicates get stable new IDs.
         if sid in seen or not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", sid):
@@ -122,15 +357,33 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
         if s["type"] == "card":
             s.setdefault("card_kind", "phase")
             if s["card_kind"] not in CARD_KINDS:
-                fail(c, p + ".card_kind: categoria de card desconhecida.")
-            key = str(s.get("service_key") or "")
+                warnings.append({"level":"warning","block":p+".card_kind",
+                    "message":f"Categoria `{s['card_kind']}` indisponível; o card foi preservado como phase.",
+                    "effect":"Título, corpo e duração continuam válidos."})
+                s.setdefault("unsupported_requests", {})["card_kind"] = s["card_kind"]
+                s["card_kind"] = "phase"
+            key = normalized_service_key
             if key and key not in services:
-                fail(c, p + ".service_key: serviço não cadastrado.")
+                warnings.append({"level":"warning","block":p+".service_key",
+                    "message":f"Serviço `{key}` não cadastrado; o card foi mantido como comum.",
+                    "effect":"Escolha uma família visual disponível na Etapa 06."})
+                s.setdefault("unsupported_requests", {})["service_key"] = key
+                key = ""
+                s.pop("service_key", None)
             if key:
                 s["service_asset"] = services[key]["asset"]
                 s["service_layout"] = services[key].get("layout", "editorial")
+                s["service_family"] = services[key].get("visual_family", s["service_layout"])
+                s["card_mode"] = "service"
+                s["service_card_enabled"] = True
             else:
                 s.pop("service_asset", None)
+                s.pop("service_family", None)
+                s["card_mode"] = "common"
+                s["service_card_enabled"] = False
+            narration = s.get("narration", {})
+            if narration.get("enabled"):
+                s["narration_text"] = narration["text"]
             if s.get("visual"):
                 s["visual"] = media_ref(c, s["visual"], manifest, p + ".visual")
             if s.get("comparison"):
@@ -145,6 +398,43 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
             fail(c, p + f": media_id `{mid}` não pertence às mídias disponíveis.")
         for field in ("source_path", "proxy_path", "thumbnail_path", "media_type", "has_audio"):
             s[field] = copy.deepcopy(row.get(field, False if field == "has_audio" else ""))
+        service_key = normalized_service_key
+        if service_key and service_key not in services:
+            warnings.append({
+                "level": "warning", "block": p + ".service_key",
+                "message": f"Serviço `{service_key}` não existe no catálogo e foi removido deste trecho.",
+                "effect": "O recorte de mídia continuará válido e poderá ser reclassificado no Studio.",
+            })
+            service_key = ""
+            s.setdefault("unsupported_requests", {})["service_key"] = str(s.get("service_key") or "")
+            s.pop("service_key", None)
+        if service_key:
+            s["service_family"] = services[service_key].get("visual_family", services[service_key].get("layout", "editorial"))
+        card_mode = str(s.get("card_mode") or ("service" if service_key else "none"))
+        if card_mode not in CARD_MODES:
+            warnings.append({
+                "level": "warning", "block": p + ".card_mode",
+                "message": f"Modo de card `{card_mode}` indisponível; nenhum card automático será presumido.",
+                "effect": "O recorte permanece no plano.",
+            })
+            s.setdefault("unsupported_requests", {})["card_mode"] = card_mode
+            card_mode = "none"
+        if card_mode == "service" and not service_key:
+            warnings.append({
+                "level": "warning", "block": p + ".card_mode",
+                "message": "Card de serviço solicitado sem service_key.",
+                "effect": "O trecho foi mantido como card comum até a classificação no Studio.",
+            })
+            card_mode = "common"
+        s["card_mode"] = card_mode
+        s["service_card_enabled"] = card_mode == "service"
+        narration = s.get("narration", {})
+        if narration.get("enabled"):
+            warnings.append({
+                "level": "warning", "block": p + ".narration",
+                "message": "Locução em trecho de mídia foi validada e preservada, mas o motor local ainda não sintetiza TTS sobre vídeo.",
+                "effect": "O vídeo, a legenda e os demais campos serão aplicados normalmente.",
+            })
         if s.get("freeze_frame") is not None:
             if s.get("external_asset"):
                 fail(c, p + ": extraia frames somente das mídias do inventário.")
@@ -229,7 +519,7 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
                  end_sec=round(start + span, 6))
     if not any(s.get("enabled", True) and s["type"] == "media" for s in segments):
         fail(c, label + ": mantenha pelo menos um trecho de mídia ativo.")
-    plan.update(contract_version=2, segments=segments, import_repairs=repairs,
+    plan.update(contract_version=2, segments=segments, import_repairs=repairs, import_warnings=warnings,
                 review_status="AI_BRIEF_APPLIED_REQUIRES_VISUAL_REVIEW")
     return plan
 
@@ -309,6 +599,7 @@ def review(c, bundle):
     if bundle.get("stories", {}).get("timeline"):
         all_plans["stories"] = bundle["stories"]["timeline"]
     for name, p in all_plans.items():
+        notices.extend(copy.deepcopy(p.get("import_warnings", [])))
         selected = [s for s in p["segments"] if s.get("enabled", True) and "branded" in s.get("include_in", [])]
         media = [s for s in selected if s["type"] == "media"]
         refs = [s["media_id"] for s in media]
@@ -328,6 +619,8 @@ def review(c, bundle):
                 notices.append({"level": "info", "block": block, "message": "Câmera lenta por repetição de quadros.", "effect": "Vídeos com poucos fps podem ficar entrecortados; não há interpolação óptica automática."})
             if s.get("stabilization") == "on" or s.get("force_stabilization"):
                 notices.append({"level": "info", "block": block, "message": "Estabilização local com deshake.", "effect": "Pode criar bordas espelhadas; confira linhas retas e detalhes de acabamento."})
+            if s.get("type") == "media" and s.get("card_mode") == "service" and not s.get("associated_card_id"):
+                notices.append({"level": "suggestion", "block": block, "message": "Trecho classificado para card de serviço sem associated_card_id.", "effect": "Associe um card existente ou transforme/crie o card na Etapa 06."})
     return {"valid": True, "totals": totals, "carousel_slides": len(bundle.get("carousel", {}).get("slides", [])),
             "notices": notices, "strategy": bundle.get("strategy", {}), "executive_summary": bundle.get("executive_summary", [])}
 
@@ -339,6 +632,13 @@ def prepare_bundle(env, project, payload):
     version = payload.get("schema_version", 1)
     if version not in (1, 2):
         fail(c, "schema_version incompatível. Gere um novo Markdown nesta versão do Studio.")
+    supported_top = {"schema_version","application","roteiro","configuration","main_timeline","reels",
+                     "carousel","stories","card_style","publication","strategy","executive_summary",
+                     "media_inventory","allowed_values"}
+    top_warnings = [{"level":"warning","block":key,
+        "message":"Bloco ainda não executado foi ignorado nesta versão.",
+        "effect":"Filme, planos e configurações reconhecidos continuam válidos."}
+        for key in sorted(set(payload)-supported_top)]
     current = c.normalize_answers(c.read_json(project / "QUESTIONARIO_RESPONDIDO.json"))
     incoming = payload.get("configuration", {})
     baseline = c.read_json(c.TEMPLATES / "questionario_base.json")
@@ -376,6 +676,11 @@ def prepare_bundle(env, project, payload):
     publication = copy.deepcopy(payload.get("publication", {}))
     if not isinstance(publication, dict) or not isinstance(publication.get("hashtags", []), list):
         fail(c, "publication: use objeto; hashtags deve ser uma lista de textos.")
+    for key in ("video_title", "caption", "complementary_information", "social_caption_suggestion"):
+        if key in publication:
+            publication[key] = clean_editorial_text(c, publication[key], "publication." + key)
+    if any(not isinstance(item, str) for item in publication.get("hashtags", [])):
+        fail(c, "publication.hashtags: use somente textos.")
     typography = publication.get("overlay_typography", {})
     for key, target in (("title_font", "overlay_title_font"), ("body_font", "overlay_body_font"), ("technical_font", "overlay_technical_font")):
         chosen = typography.get(key, config.get("editing_brief", {}).get(target))
@@ -437,14 +742,21 @@ def prepare_bundle(env, project, payload):
         carousel_enabled=carousel["enabled"], carousel_slides=len(carousel.get("slides", [])),
         stories_enabled=stories.get("enabled", False), story_part_duration_sec=stories.get("part_duration_sec", 15),
         story_source_duration_sec=stories.get("source_reel_sec", 60))
-    strategy = payload.get("strategy", {})
+    strategy = validate_strategy(c, payload.get("strategy", {}))
     executive = payload.get("executive_summary", [])
-    if not isinstance(strategy, dict) or not isinstance(executive, list):
-        fail(c, "strategy deve ser objeto; executive_summary deve ser lista de decisões.")
+    if not isinstance(executive, list):
+        fail(c, "executive_summary deve ser lista de decisões.")
     result = {"schema_version": 2, "roteiro": meta, "configuration": config, "card_style": style,
               "main_timeline": main, "reels": validated_reels, "carousel": carousel,
               "stories": stories, "publication": publication, "strategy": strategy, "executive_summary": executive}
     result["review"] = review(c, result)
+    result["review"]["notices"] = top_warnings + result["review"]["notices"]
+    if any(strategy.get(key) for key in ("retention", "ethical_marketing_growth", "ethical_neuromarketing", "final_copy")):
+        result["review"]["notices"].append({
+            "level": "info", "block": "strategy",
+            "message": "Estratégia, growth e neuromarketing ético foram aceitos como metadados editoriais.",
+            "effect": "O render executa apenas os campos de timeline suportados; o restante permanece em ESTRATEGIA_IA.json para revisão humana.",
+        })
     return result
 
 
@@ -459,8 +771,19 @@ def apply_file(env, project, path):
     with scope.project_lock(project):
         bundle = inspect_file(env, project, path)
         report = bundle["review"]
+        source_sha256 = __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+        active = scope.read(project / "_CONTROLE/ROTEIRO_ATIVO.json", {})
+        if active.get("source_sha256") == source_sha256:
+            report = copy.deepcopy(bundle["review"])
+            report.update(status="already_applied_no_changes", roteiro=active)
+            report.setdefault("notices", []).append({
+                "level": "info", "block": "roteiro",
+                "message": "Esta resposta da IA já foi aplicada anteriormente.",
+                "effect": "Nenhum arquivo foi sobrescrito e nenhum anexo duplicado foi criado.",
+            })
+            return report
         before = scope.snapshot_decisions(project, "antes-da-ia")
-        meta = bundle["roteiro"] | {"applied_at": scope.timestamp()}
+        meta = bundle["roteiro"] | {"applied_at": scope.timestamp(), "source_sha256": source_sha256}
         config = bundle["configuration"]
         files = {"QUESTIONARIO_RESPONDIDO.json": config, "_EDITAR/01_CONFIGURACOES_DO_PROJETO.json": config,
                  "EDIT_PLAN.json": bundle["main_timeline"], "_EDITAR/02_PLANO_DA_EDICAO.json": bundle["main_timeline"],
@@ -469,13 +792,13 @@ def apply_file(env, project, path):
                  "social/planos/CARROSSEL_PLAN.json": bundle["carousel"], "social/planos/STORIES_PLAN.json": bundle["stories"],
                  "SOCIAL_PLAN.json": {"enabled": config["social"]["enabled"], "contract_version": 2,
                                      "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]},
-                 "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md": path.read_bytes()}
+                 "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md": path.read_bytes(),
+                 "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md": path.read_bytes()}
         for key, plan in bundle["reels"].items():
             files[f"social/planos/REEL_{key}S.json"] = plan
         deletes = [p.relative_to(project).as_posix() for p in (project / "social/planos").glob("REEL_*S.json")
                    if p.relative_to(project).as_posix() not in files]
-        for target in c.editing_brief_paths(project):
-            files[target.relative_to(project).as_posix()] = path.read_bytes()
+        # O roteiro-base continua imutável; a resposta recebida tem arquivo próprio.
         pub = bundle["publication"]
         files["PUBLICACAO_SOCIAL.md"] = "# Publicação sugerida\n\n" + str(pub.get("video_title", "")) + "\n\n" + str(pub.get("caption", "")) + "\n\n" + " ".join(map(str, pub.get("hashtags", []))) + "\n"
         summary = executive_markdown(bundle)
@@ -540,6 +863,41 @@ def generate(env, project, answers=None, plan=None, manifest=None):
                 s["start_time_basis"] = "absolute_parent_media"
                 s.setdefault("stabilization", "auto")
                 s.setdefault("decision_reason", "")
+                s.setdefault("cut_style", "hard")
+                s.setdefault("keyframes", [])
+                s.setdefault("narration", {"enabled": False, "text": ""})
+                s.setdefault("subtitles", {"enabled": False, "text": ""})
+                s.setdefault("cta", "")
+                service_id = str(s.get("service_key") or "")
+                profile = c.load_service_catalog().get(service_id, {})
+                s.setdefault("service_id", service_id)
+                s.setdefault("service_name", profile.get("label", ""))
+                s.setdefault("service_confidence", 0.0)
+                s.setdefault("card_family", profile.get("visual_family", ""))
+                s.setdefault("balloon_family", profile.get("balloon_family", ""))
+                s.setdefault("visual_motif", profile.get("visual_motif", ""))
+                s.setdefault("overlay_text", str(s.get("on_screen_text") or ""))
+                s.setdefault("voiceover_text", str(s.get("narration", {}).get("text") or ""))
+                s.setdefault("caption_text", str(s.get("subtitles", {}).get("text") or ""))
+                s.setdefault("transition_in", str(s.get("transition") or "cut"))
+                s.setdefault("transition_out", "")
+                s.setdefault("balloon_texts", [])
+                if s.get("type") == "card":
+                    s.setdefault("card_mode", "service" if s.get("service_key") else "common")
+                    s.setdefault("card_type", str(s.get("card_kind") or "phase"))
+                    s.setdefault("service_card_enabled", s.get("card_mode") == "service")
+                else:
+                    s.setdefault("service_key", "")
+                    s.setdefault("service_family", "")
+                    s.setdefault("card_mode", "none")
+                    s.setdefault("card_type", s.get("card_mode"))
+                    s.setdefault("service_card_enabled", s.get("card_mode") == "service")
+                    s.setdefault("associated_card_id", "")
+                    s.setdefault("playback_speed", 1.0)
+                    s["end_sec"] = round(
+                        float(s.get("start_sec") or 0)
+                        + float(s.get("duration_sec") or 0) * float(s.get("playback_speed") or 1), 6,
+                    )
         safe_config = copy.deepcopy(answers)
         for field in ("ai_copilot", "cloud_export"):
             safe_config.pop(field, None)
@@ -556,13 +914,55 @@ def generate(env, project, answers=None, plan=None, manifest=None):
             "configuration": safe_config, "main_timeline": plan, "reels": reels,
             "carousel": carousel, "stories": scope.read(plans / "STORIES_PLAN.json", {"enabled": bool(social.get("stories_enabled") and reels), "source_reel_sec": int(default_story), "part_duration_sec": social.get("story_part_duration_sec", 15)}),
             "card_style": style, "publication": publication,
-            "strategy": {"service_key": answers.get("service_intro", {}).get("service_key", ""), "audience": "",
-                "objective": "", "hook": "", "promise_and_payoff": "", "evidence": [], "facts_to_confirm": [],
-                "attention_beats": [], "cta": "", "keywords": [], "ab_test": {"variable": "gancho", "hypothesis": "", "primary_metric": "retenção inicial", "guardrail": "contatos qualificados"}},
+            "strategy": {
+                "service_key": answers.get("service_intro", {}).get("service_key", ""),
+                "editorial": {
+                    "video_objective": "", "target_audience": "", "platform": "",
+                    "funnel_stage": "", "primary_intent": "",
+                    "narrative_arc": {"hook": "", "development": "", "proof_process": "", "climax": "", "cta": ""},
+                },
+                "retention": {
+                    "hook_0_3_sec": "", "first_strong_image": "", "visual_promise": "",
+                    "implicit_question": "", "pattern_breaks": [], "partial_reveals": [],
+                    "best_moments": [], "acceleration_timelapse": [], "selective_slow_motion": [],
+                    "fade_to_black": [], "chapter_transitions": [], "visual_climax": "", "final_cta": "",
+                },
+                "ethical_marketing_growth": {
+                    "primary_cta": "", "secondary_cta": "",
+                    "funnel_cta": {"awareness": "", "consideration": "", "conversion": "", "relacionamento": ""},
+                    "social_caption_suggestion": "", "save_prompt": "", "comment_prompt": "",
+                    "quote_request_prompt": "", "profile_site_whatsapp_prompt": "",
+                    "hook_ab_variations": [], "cta_ab_variations": [], "lead_objective": "",
+                },
+                "ethical_neuromarketing": {
+                    "curiosity": "", "before_after_contrast": "", "process_based_authority": "",
+                    "material_proof": "", "visual_clarity": "", "identity_repetition": "",
+                    "real_revelation_reward": "", "primacy_recency": "", "figure_ground": "",
+                    "proximity": "", "similarity": "", "visual_hierarchy": "", "motion_attention": "",
+                },
+                "brand_franco_romeu": {
+                    "brand": "Franco Romeu", "signature": "Arte & Engenharia", "scope": "projetos e reformas",
+                    "principles": ["verdade material", "método", "autoria", "resistência", "execução controlada"],
+                    "positioning": "luxo conceitual e alto padrão sem exagero artificial",
+                    "palette": {"predominant": "verde-petróleo", "accent": "laranja", "support": ["ouro", "osso"]},
+                    "logo_rule": "fixa, simétrica e sem deformação", "typography_rule": "tipografia FR quando aplicável",
+                },
+                "final_copy": {"voiceover_final": "", "caption_final": "", "card_texts": [], "balloon_texts": [], "cta_final": ""},
+                "evidence": [], "facts_to_confirm": [], "attention_beats": [], "narrative_order": [],
+                "rhythm": "", "aesthetic": "", "ihc_notes": [], "growth_hypothesis": "",
+                "keywords": [], "ab_test": {"variable": "", "hypothesis": "", "primary_metric": "", "guardrail": ""},
+            },
             "executive_summary": [], "media_inventory": c._brief_media_inventory(manifest),
-            "allowed_values": {"transitions": sorted(c.TRANSITION_MAP), "card_kinds": sorted(CARD_KINDS), "card_animations": sorted(ANIMATIONS),
+            "allowed_values": {"transitions": sorted(c.TRANSITION_MAP), "card_kinds": sorted(CARD_KINDS), "card_modes": sorted(CARD_MODES), "card_animations": sorted(ANIMATIONS),
                 "service_profiles": c.load_service_catalog(), "fonts": sorted(p.name for p in c.FONTS.glob("*.ttf")),
-                "playback_speed": [0.25, 30], "time_basis": ["absolute_parent_media", "scene_local"]}}
+                "playback_speed": [0.25, 30], "time_basis": ["absolute_parent_media", "scene_local"],
+                "cut_styles": ["hard", "match", "jump", "j_cut", "l_cut"],
+                "funnel_stages": ["awareness", "consideration", "conversion", "relacionamento"],
+                "primary_intents": ["educar", "inspirar", "provar_tecnica", "vender", "gerar_lead",
+                    "fortalecer_marca", "mostrar_bastidor", "mostrar_antes_depois"],
+                "service_aliases": SERVICE_ALIASES,
+                "unknown_fact_placeholder": "[DADO A CONFIRMAR]",
+                "script_block": {"enabled": True, "text": "Texto final limpo, sem comentários da IA"}}}
         context_path = project / "_ENTRADA/CONTEXTO_PROJETO.md"
         context = context_path.read_text(encoding="utf-8") if context_path.is_file() else ""
         prompt = (c.TEMPLATES / "ROTEIRO_MESTRE_PROMPT.md").read_text(encoding="utf-8")
@@ -573,5 +973,6 @@ def generate(env, project, answers=None, plan=None, manifest=None):
         document += "\n## Resumo Executivo da IA\n\nA IA deve preencher executive_summary no JSON e resumir aqui as decisões finais. O JSON é a fonte executável.\n"
         for p in c.editing_brief_paths(project):
             c.write_text(p, document)
+        c.refresh_ai_package_documents(project, answers, manifest, document)
         c.info("Markdown completo gerado: " + str(c.editing_brief_paths(project)[1]))
         return c.editing_brief_paths(project)[1]

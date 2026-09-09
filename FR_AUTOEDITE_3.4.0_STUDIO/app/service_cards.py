@@ -76,6 +76,39 @@ def render_service_card(env, path, segment, plan, brand, style, project):
             draw.line((x, h*.18, x, h*.80), fill=line_color, width=1)
         for y in range(int(h*.18), int(h*.80), step):
             draw.line((m, y, w-m, y), fill=line_color, width=1)
+    elif layout == "electrical":
+        copper = c.hex_rgb(pal.get("orange", "#FC7016")) + (185,)
+        points = [(m, int(h*.25)), (int(w*.34), int(h*.25)), (int(w*.44), int(h*.42)),
+                  (int(w*.67), int(h*.42)), (w-m, int(h*.62))]
+        draw.line(points, fill=copper, width=max(2, unit//260), joint="curve")
+        radius = max(5, unit//95)
+        for x, y in points:
+            draw.ellipse((x-radius, y-radius, x+radius, y+radius), outline=gold, width=max(1, unit//420))
+    elif layout == "hydraulic":
+        pipe = c.hex_rgb(pal.get("border", "#1A6069")) + (235,)
+        width = max(5, unit//95)
+        pipe_path = [(m, int(h*.30)), (int(w*.38), int(h*.30)), (int(w*.38), int(h*.58)),
+                     (int(w*.72), int(h*.58)), (int(w*.72), int(h*.75)), (w-m, int(h*.75))]
+        draw.line(pipe_path, fill=pipe, width=width, joint="curve")
+        for x, y in pipe_path[1:-1]:
+            r = width + 3
+            draw.ellipse((x-r, y-r, x+r, y+r), outline=bone, width=max(1, unit//450))
+    elif layout == "installation":
+        cx, cy, r = int(w*.73), int(h*.48), int(unit*.16)
+        draw.ellipse((cx-r, cy-r, cx+r, cy+r), outline=gold, width=max(2, unit//320))
+        draw.line((cx-r-int(unit*.06), cy, cx+r+int(unit*.06), cy), fill=orange, width=max(1, unit//420))
+        draw.line((cx, cy-r-int(unit*.06), cx, cy+r+int(unit*.06)), fill=orange, width=max(1, unit//420))
+        for offset in (-r, r):
+            draw.line((cx+offset, cy-r//3, cx+offset, cy+r//3), fill=bone, width=max(1, unit//500))
+    elif layout == "maintenance":
+        x, y, gap = int(w*.61), int(h*.29), max(20, int(unit*.075))
+        for index in range(4):
+            yy = y + index*gap
+            size = max(8, int(unit*.022))
+            draw.rectangle((x, yy, x+size, yy+size), outline=gold, width=max(1, unit//420))
+            if index < 3:
+                draw.line((x+2, yy+size//2, x+size//2, yy+size-2, x+size+5, yy-3), fill=orange, width=max(2, unit//360))
+            draw.line((x+size+int(unit*.025), yy+size//2, w-m, yy+size//2), fill=line_color, width=max(1, unit//520))
     if vertical:
         title_box = (m, h*.18, w-m, h*.31)
         panel = (m, h*.345, w-m, h*.66)

@@ -3111,7 +3111,11 @@ def render_card_segment(
     tts_enabled = bool(plan.get("audio", {}).get("tts_voiceover"))
     tts_binary = shutil.which("espeak-ng") or shutil.which("espeak")
     if tts_enabled and tts_binary:
-        tts_text = f"{segment.get('title', '')}. {segment.get('body', '')}".strip()
+        tts_text = str(
+            segment.get("narration_text")
+            or segment.get("narration", {}).get("text")
+            or f"{segment.get('title', '')}. {segment.get('body', '')}"
+        ).strip()
         voice = "pt-br" if Path(tts_binary).name == "espeak-ng" else "pt"
         result = run(
             [tts_binary, "-v", voice, "-s", "150", "-w", str(tts_path), tts_text],
@@ -3911,6 +3915,7 @@ def editing_brief_paths(project_dir: Path) -> tuple[Path, ...]:
         project_dir / "_ENVIAR_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md",
         project_dir / "_EDITAR" / "04_ROTEIRO_MESTRE_PARA_IA.md",
         project_dir / "_ENVIAR_CHATGPT" / "03_ROTEIRO_MESTRE_PARA_IA.md",
+        project_dir / "PACOTE_PARA_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
     )
 
 
@@ -4784,7 +4789,7 @@ Este pacote foi preparado pelo **FR AutoEdite {APP_VERSION} Universal** para o p
 ## Roteiro único para qualquer IA
 
 - Gere: `fr-autoedite gerar-roteiro-ia --projeto "{project_dir}"`.
-- Envie `_ENVIAR_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md` junto dos vídeos/proxies.
+- Envie `PACOTE_PARA_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md` junto dos lotes de proxies.
 - Aplique a resposta: `fr-autoedite aplicar-roteiro-ia --projeto "{project_dir}" --arquivo RESPOSTA.md`.
 - O importador valida o JSON, cria backup e nunca exige que a IA execute o programa.
 
@@ -4802,6 +4807,136 @@ Este pacote foi preparado pelo **FR AutoEdite {APP_VERSION} Universal** para o p
 - O modo de ordem selecionado é `{answers.get('edition', {}).get('order_mode', 'automatico')}`.
 """
     write_text(project_dir / "00_LEIA_PRIMEIRO.md", guide)
+
+
+def external_ai_package_prompt(answers: dict[str, Any]) -> str:
+    project_name = str(answers.get("project", {}).get("name") or "Projeto Franco Romeu")
+    return f"""# INSTRUÇÕES PARA A IA EXTERNA — FR AUTOEDITE {APP_VERSION}
+
+Copie esta instrução para o chat da IA depois de anexar todos os arquivos desta pasta e
+todos os lotes de proxies. O projeto é **{project_name}**.
+
+O FR AutoEdite transforma registros simples de obra, reforma, projeto e processo em uma
+montagem executável. O Roteiro Mestre é um contrato declarativo: a ordem das listas define
+a montagem e o aplicativo valida cada mídia, janela de tempo e escolha antes de renderizar.
+
+Leia primeiro `00_NAO_EDITAR_CONTEXTO_PROJETO.md`, depois
+`02_NAO_EDITAR_MANIFESTO_MEDIA.json`, e assista a todos os proxies contidos em
+`03_NAO_EDITAR_LOTES_DE_PROXIES/`. Use o contexto escrito pelo usuário como intenção e os
+proxies como evidência. Não deduza conteúdo apenas pelo nome do arquivo e não invente fatos.
+Anexe ao chat os arquivos 00, 01, 02 e 04 e todos os lotes da pasta 03. O arquivo 05 é o
+destino local para salvar e importar a sua resposta; não o use como fonte editorial.
+
+Edite exclusivamente `01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md`. Decida a narrativa, seleção
+e ordem das cenas; start_sec, duration_sec, end_sec e playback_speed; cortes, transições,
+cards, balões, serviço e família visual por trecho; mudanças de serviço ao longo do filme;
+locução, legendas, CTA, intro, outro, filme, Reels, Stories, time-lapse, ritmo, estética e
+configurações técnicas disponíveis no contrato. Para trocar de serviço, classifique cada
+trecho com `service_id`/`service_key` e use cards `card_kind=service` nos pontos exatos da
+mudança. Preencha também confiança, tipo/família do card, família do balão, motivo visual,
+texto sobreposto, locução, legenda e transições de entrada/saída por segmento.
+
+Aplique o DNA Franco Romeu: luxo conceitual, precisão técnica, verde-petróleo predominante,
+laranja como acento, ouro/osso de apoio, tipografia do contrato, respiro e evidência real.
+Use IHC para legibilidade e controle do usuário; marketing e neuromarketing sem alegações
+pseudocientíficas; retenção por clareza, contraste e recompensa visual; growth por CTA
+mensurável, geração ética de leads e hipóteses testáveis. Viralização é potencial, nunca
+promessa.
+
+Estruture objetivo, público, plataforma, etapa do funil, intenção e arco narrativo. Planeje
+hook 0–3 s, imagem forte, promessa visual, pergunta implícita, quebras de padrão, revelações
+reais, melhores momentos, time-lapse, câmera lenta, capítulos, clímax e CTA. Crie variações
+A/B apenas como hipóteses e proponha chamadas éticas para salvar, comentar, orçamento e canais
+confirmados. Não invente métricas, prova social, urgência, escassez, preço, desconto, cliente,
+depoimento ou resultado. Não use pressão psicológica, manipulação enganosa ou dark patterns.
+Quando faltar um fato necessário, use `[DADO A CONFIRMAR]` no metadado estratégico e não
+transforme a lacuna em afirmação publicável.
+
+Locução e legenda devem ser texto final específico para estas imagens. Não escreva “aqui
+está”, “como solicitado”, notas técnicas soltas, comentários sobre sua resposta, conteúdo
+genérico ou texto pré-pronto. Não use placeholders, reticências executáveis, NaN, comandos,
+URLs de download, tokens ou credenciais.
+
+Na resposta, não acrescente apresentação, explicação, cercas externas ou comentários.
+Devolva somente o Markdown completo editado, preservando exatamente os marcadores
+`FR_AUTOEDITE_JSON_BEGIN` e `FR_AUTOEDITE_JSON_END` e um JSON válido entre eles. O arquivo
+devolvido deve poder ser salvo diretamente como `05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md`.
+"""
+
+
+def refresh_ai_package_documents(
+    project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any], document: str,
+) -> Path:
+    """Atualiza os documentos canônicos sem tocar na resposta já recebida nem nas mídias."""
+    package = project_dir / "PACOTE_PARA_IA"
+    lots = package / "03_NAO_EDITAR_LOTES_DE_PROXIES"
+    lots.mkdir(parents=True, exist_ok=True)
+    context_paths = (
+        project_dir / "_ENTRADA" / "CONTEXTO_PROJETO.md",
+        project_dir / "CONTEXTO_PROJETO.md",
+    )
+    context = next((p.read_text(encoding="utf-8", errors="replace") for p in context_paths if p.is_file()), "")
+    project_data = answers.get("project", {})
+    context_doc = (
+        "# CONTEXTO DO PROJETO — NÃO EDITAR NESTE PACOTE\n\n"
+        f"Projeto: {project_data.get('name', '')}\n\n"
+        f"Cliente: {project_data.get('client', '')}\n\n"
+        f"Local: {project_data.get('location', '')}\n\n"
+        "## Contexto escrito pelo usuário\n\n"
+        + (context.strip() or "Nenhum contexto adicional foi informado; use somente fatos visíveis nas mídias.")
+        + "\n"
+    )
+    write_text(package / "00_NAO_EDITAR_CONTEXTO_PROJETO.md", context_doc)
+    write_text(package / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md", document)
+    write_json(package / "02_NAO_EDITAR_MANIFESTO_MEDIA.json", manifest)
+    write_text(package / "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md", external_ai_package_prompt(answers))
+    response = package / "05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md"
+    if not response.exists():
+        write_text(response, (
+            "# RESPOSTA DA IA — IMPORTE AQUI\n\n"
+            "Substitua este conteúdo pelo Markdown completo devolvido pela IA. "
+            "O Studio validará antes de aplicar e preservará o roteiro-base.\n"
+        ))
+    return package
+
+
+def _file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _same_generated_files(left: Path, right: Path) -> bool:
+    def inventory(root: Path) -> dict[str, tuple[int, str]]:
+        return {
+            p.relative_to(root).as_posix(): (p.stat().st_size, _file_digest(p))
+            for p in root.rglob("*") if p.is_file()
+        }
+    return left.is_dir() and right.is_dir() and inventory(left) == inventory(right)
+
+
+def _publish_generated_directory(project_dir: Path, staged: Path, target: Path, policy: str, label: str) -> str:
+    if policy not in {"replace", "version", "history", "cancel"}:
+        raise AutoEditeError("Conflito inválido: use replace, version, history ou cancel.")
+    if target.is_dir() and _same_generated_files(staged, target):
+        shutil.rmtree(staged)
+        return "reused_identical"
+    if target.is_dir() and not any(target.iterdir()):
+        target.rmdir()
+    if target.exists():
+        if policy == "cancel":
+            shutil.rmtree(staged)
+            raise AutoEditeError(f"{label} já existe. Escolha substituir ou criar nova versão.")
+        if policy in {"version", "history"}:
+            history = project_dir / "_HISTORICO" / f"{slugify(label)}_{dt.datetime.now().strftime('%Y%m%d-%H%M%S-%f')}"
+            history.parent.mkdir(parents=True, exist_ok=True)
+            target.replace(history)
+        else:
+            shutil.rmtree(target)
+    staged.replace(target)
+    return "versioned" if policy in {"version", "history"} else "replaced"
 
 
 def partition_by_size(paths: list[Path], max_bytes: int) -> list[list[Path]]:
@@ -4902,14 +5037,22 @@ def _write_chatgpt_archive(
     target: Path, metadata: list[Path], fonts: list[Path], payloads: list[Path],
     project_dir: Path,
 ) -> None:
+    def add_file(archive: zipfile.ZipFile, source: Path, arcname: str) -> None:
+        # Metadados fixos tornam o lote reproduzível: conteúdo igual gera hash igual.
+        entry = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+        entry.compress_type = zipfile.ZIP_DEFLATED
+        entry.external_attr = 0o100644 << 16
+        with source.open("rb") as input_stream, archive.open(entry, "w", force_zip64=True) as output_stream:
+            shutil.copyfileobj(input_stream, output_stream, length=1024 * 1024)
+
     temporary = target.with_suffix(".zip.tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3, allowZip64=True) as archive:
         for path in metadata:
-            archive.write(path, _chatgpt_arcname(path, project_dir))
+            add_file(archive, path, _chatgpt_arcname(path, project_dir))
         for path in fonts:
-            archive.write(path, f"assets/fonts/{path.name}")
+            add_file(archive, path, f"assets/fonts/{path.name}")
         for path in payloads:
-            archive.write(path, _chatgpt_arcname(path, project_dir))
+            add_file(archive, path, _chatgpt_arcname(path, project_dir))
     with zipfile.ZipFile(temporary) as archive:
         bad = archive.testzip()
         if bad:
@@ -4917,15 +5060,22 @@ def _write_chatgpt_archive(
     temporary.replace(target)
 
 
-def create_chatgpt_package(project_dir: Path, answers: dict[str, Any]) -> list[Path]:
+def create_chatgpt_package(
+    project_dir: Path, answers: dict[str, Any], conflict_policy: str = "replace",
+) -> list[Path]:
     answers = normalize_answers(answers)
+    manifest = read_json(project_dir / "MANIFESTO_MEDIA.json")
+    if not (project_dir / "PROMPT_PRONTO_PARA_CHATGPT.md").is_file():
+        write_handoff_files(project_dir, answers, manifest)
+    canonical_brief = project_dir / "PACOTE_PARA_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md"
+    if not canonical_brief.is_file():
+        generate_ai_editing_brief(project_dir, answers=answers, manifest=manifest)
+    document = canonical_brief.read_text(encoding="utf-8")
+    package_root = refresh_ai_package_documents(project_dir, answers, manifest, document)
     configured_mb = float(answers.get("handoff", {}).get("chatgpt_lot_max_mb", 145))
     max_mb = min(149.0, max(10.0, configured_mb))
     max_bytes = int(max_mb * 1024 * 1024)
-    staging_dir = project_dir / "_PACOTE_CHATGPT_NOVO"
-    if staging_dir.exists():
-        shutil.rmtree(staging_dir)
-    staging_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(tempfile.mkdtemp(prefix=".PACOTE_CHATGPT_NOVO_", dir=project_dir))
     metadata_names = [
         "00_LEIA_PRIMEIRO.md", "PROMPT_PRONTO_PARA_CHATGPT.md", "QUESTIONARIO_RESPONDIDO.json",
         "MANIFESTO_MEDIA.json", "MANIFESTO_MEDIA.csv", "EDIT_PLAN.json", "EDIT_PLAN_AUTO.json",
@@ -4935,6 +5085,14 @@ def create_chatgpt_package(project_dir: Path, answers: dict[str, Any]) -> list[P
         "RELATORIO_ANALISE_LOCAL.json", "RELATORIO_ORGANIZACAO.json", "CONTATO_GERAL_CODEX.jpg"
     ]
     metadata = [project_dir / name for name in metadata_names if (project_dir / name).is_file()]
+    metadata += [
+        package_root / name for name in (
+            "00_NAO_EDITAR_CONTEXTO_PROJETO.md",
+            "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
+            "02_NAO_EDITAR_MANIFESTO_MEDIA.json",
+            "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md",
+        ) if (package_root / name).is_file()
+    ]
     metadata += sorted((project_dir / "contatos_visuais").glob("*.jpg"))
     metadata += sorted((project_dir / "social" / "planos").glob("*.json"))
     metadata += sorted(path for path in (project_dir / "fontes_contexto").glob("*") if path.is_file())
@@ -4969,21 +5127,32 @@ def create_chatgpt_package(project_dir: Path, answers: dict[str, Any]) -> list[P
             continue
         staged.append(target)
         index += 1
+    staged_names = [path.name for path in staged]
     package_dir = project_dir / "pacote_chatgpt"
-    if package_dir.exists():
-        history = project_dir / "_HISTORICO" / f"pacote_chatgpt_{dt.datetime.now().strftime('%Y%m%d-%H%M%S-%f')}"
-        history.parent.mkdir(parents=True, exist_ok=True)
-        package_dir.replace(history)
-    staging_dir.replace(package_dir)
-    outputs = [package_dir / path.name for path in staged]
+    legacy_result = _publish_generated_directory(
+        project_dir, staging_dir, package_dir, conflict_policy, "pacote_chatgpt",
+    )
+    outputs = [package_dir / name for name in staged_names]
+    canonical_staging = Path(tempfile.mkdtemp(prefix=".LOTES_IA_NOVOS_", dir=package_root))
+    for source in outputs:
+        target = canonical_staging / source.name
+        try:
+            os.link(source, target)
+        except OSError:
+            shutil.copy2(source, target)
+    lots_dir = package_root / "03_NAO_EDITAR_LOTES_DE_PROXIES"
+    canonical_result = _publish_generated_directory(
+        project_dir, canonical_staging, lots_dir, conflict_policy, "PACOTE_PARA_IA_LOTES",
+    )
+    canonical_outputs = [lots_dir / name for name in staged_names]
     upload_lines = [
         "# ANEXE TODOS OS LOTES ABAIXO NA MESMA CONVERSA DO CHATGPT",
         "# Cada arquivo foi validado e possui menos de 150 MB.",
         "",
-        *(f"{path}  |  {path.stat().st_size / 1024**2:.1f} MB" for path in outputs),
+        *(f"{path}  |  {path.stat().st_size / 1024**2:.1f} MB" for path in canonical_outputs),
         "",
         f"# Depois envie o conteúdo deste arquivo:",
-        str(project_dir / "PROMPT_PRONTO_PARA_CHATGPT.md"),
+        str(package_root / "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md"),
     ]
     write_text(project_dir / "UPLOAD_LIST.txt", "\n".join(upload_lines) + "\n")
     shutil.copy2(project_dir / "UPLOAD_LIST.txt", package_dir / "UPLOAD_LIST.txt")
@@ -4997,7 +5166,7 @@ def create_chatgpt_package(project_dir: Path, answers: dict[str, Any]) -> list[P
         "2. Anexe TODOS os lotes indicados na mesma conversa, sem extrair os ZIPs.",
         "3. Aguarde os anexos terminarem de carregar.",
         "4. Envie o conteúdo de `02_PROMPT_PARA_ENVIAR.md`.",
-        "5. Para edição integral por qualquer IA, envie também `03_ROTEIRO_MESTRE_PARA_IA.md` e peça a devolução do mesmo Markdown preenchido.",
+        "5. Para edição integral por qualquer IA, use `PACOTE_PARA_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md` e peça a devolução do mesmo Markdown preenchido.",
         "6. Importe o Markdown respondido no Studio; ele atualiza filme, Reels e publicação com backup.", "",
         f"Pasta dos lotes: `{package_dir}`", "",
         "Os lotes são múltiplos arquivos ZIP independentes; não são pedaços binários que precisem ser reconstruídos.",
@@ -5006,7 +5175,7 @@ def create_chatgpt_package(project_dir: Path, answers: dict[str, Any]) -> list[P
     ai_dir = project_dir / "_ENVIAR_IA"
     ai_dir.mkdir(parents=True, exist_ok=True)
     ai_guide = [
-        "# CENTRAL ÚNICA — ARQUIVOS PARA QUALQUER IA", "",
+        "# ATALHOS LEGADOS — O PACOTE CANÔNICO É `../PACOTE_PARA_IA/`", "",
         "## EDITE E DEVOLVA", "",
         "- `01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md` — este é o ÚNICO arquivo que a IA deve alterar.", "",
         "## APENAS ENVIE; NÃO EDITE", "",
@@ -5020,8 +5189,17 @@ def create_chatgpt_package(project_dir: Path, answers: dict[str, Any]) -> list[P
     write_text(ai_dir / "00_COMECE_AQUI_O_QUE_EDITAR_E_ENVIAR.md", "\n".join(ai_guide) + "\n")
     shutil.copy2(project_dir / "PROMPT_PRONTO_PARA_CHATGPT.md", ai_dir / "02_NAO_EDITAR_APENAS_ENVIAR_PROMPT.md")
     shutil.copy2(project_dir / "UPLOAD_LIST.txt", ai_dir / "03_NAO_EDITAR_LISTA_DE_LOTES.txt")
+    write_json(project_dir / "_CONTROLE" / "PACOTE_IA.json", {
+        "generated_at": now_iso(), "conflict_policy": conflict_policy,
+        "legacy_result": legacy_result, "canonical_result": canonical_result,
+        "files": [
+            {"path": rel(path, project_dir), "size_bytes": path.stat().st_size, "sha256": _file_digest(path)}
+            for path in canonical_outputs
+        ],
+        "max_mb": max_mb, "all_below_150_mb": all(path.stat().st_size < 150 * 1024 * 1024 for path in canonical_outputs),
+    })
     info(f"Pacote ChatGPT: {len(outputs)} lote(s), máximo real {max_mb:.1f} MB; todos abaixo de 150 MB")
-    return outputs
+    return canonical_outputs
 
 
 def context_keywords(value: str) -> list[str]:
@@ -5289,15 +5467,17 @@ def prepare(zip_path: Path, project_dir: Path, answers: dict[str, Any]) -> tuple
 - Configurações: `{project_dir / '_EDITAR' / '01_CONFIGURACOES_DO_PROJETO.json'}`
 - Timeline/plano: `{project_dir / '_EDITAR' / '02_PLANO_DA_EDICAO.json'}`
 - Design: `{project_dir / '_EDITAR' / '03_DESIGN_DOS_CARDS.json'}`
-- Roteiro único para qualquer IA: `{project_dir / '_ENVIAR_IA' / '01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md'}`
+- Roteiro único para qualquer IA: `{project_dir / 'PACOTE_PARA_IA' / '01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md'}`
 - Intro personalizada: `{project_dir / '_ENTRADA' / 'INTRO_PERSONALIZADA.*'}`
 - Outro personalizado: `{project_dir / '_ENTRADA' / 'OUTRO_PERSONALIZADO.*'}`
 
 ## Você envia a qualquer IA — tudo centralizado
-- Comece aqui: `{project_dir / '_ENVIAR_IA' / '00_COMECE_AQUI_O_QUE_EDITAR_E_ENVIAR.md'}`
-- EDITE E DEVOLVA: `{project_dir / '_ENVIAR_IA' / '01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md'}`
-- NÃO EDITE, apenas envie: `{project_dir / '_ENVIAR_IA' / '02_NAO_EDITAR_APENAS_ENVIAR_PROMPT.md'}`
-- NÃO EDITE, lista de lotes: `{project_dir / '_ENVIAR_IA' / '03_NAO_EDITAR_LISTA_DE_LOTES.txt'}`
+- Contexto: `{project_dir / 'PACOTE_PARA_IA' / '00_NAO_EDITAR_CONTEXTO_PROJETO.md'}`
+- EDITE E DEVOLVA: `{project_dir / 'PACOTE_PARA_IA' / '01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md'}`
+- Manifesto: `{project_dir / 'PACOTE_PARA_IA' / '02_NAO_EDITAR_MANIFESTO_MEDIA.json'}`
+- Lotes: `{project_dir / 'PACOTE_PARA_IA' / '03_NAO_EDITAR_LOTES_DE_PROXIES'}`
+- Prompt para copiar: `{project_dir / 'PACOTE_PARA_IA' / '04_NAO_EDITAR_INSTRUCOES_PARA_IA.md'}`
+- Resposta para importar: `{project_dir / 'PACOTE_PARA_IA' / '05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md'}`
 
 ## Você revisa e entrega
 - Rascunhos e masters: `{project_dir / 'entrega'}`
@@ -5317,12 +5497,15 @@ def status(project_dir: Path) -> None:
         "EDIT_PLAN.json", "CARD_STYLE.json", "SOCIAL_PLAN.json",
         "ROTEIRO_MESTRE_PARA_IA.md", "PUBLICACAO_SOCIAL.md",
         "PROMPT_PRONTO_PARA_CHATGPT.md", "UPLOAD_LIST.txt",
+        "PACOTE_PARA_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
+        "PACOTE_PARA_IA/04_NAO_EDITAR_INSTRUCOES_PARA_IA.md",
     ):
         path = project_dir / name
         print(f"  {'OK' if path.is_file() else '--'}  {name}")
     for folder in (
         "originais", "proxies", "miniaturas", "contatos_visuais", "cards_editaveis",
         "pacote_chatgpt", "social", "entrega",
+        "PACOTE_PARA_IA",
     ):
         path = project_dir / folder
         count = sum(1 for p in path.rglob("*") if p.is_file()) if path.is_dir() else 0
@@ -5775,6 +5958,10 @@ def parser() -> argparse.ArgumentParser:
     replan.add_argument("--recriar-social", action="store_true")
     pack = commands.add_parser("pacote-chatgpt", help="refazer apenas os lotes de upload")
     pack.add_argument("--projeto", required=True)
+    pack.add_argument(
+        "--conflito", choices=("replace", "version", "history", "cancel"), default="replace",
+        help="ao encontrar lotes existentes: substituir, versionar/preservar histórico ou cancelar",
+    )
     stat = commands.add_parser("status", help="mostrar o estado do projeto")
     stat.add_argument("--projeto", required=True)
     audit = commands.add_parser("auditar", help="validar timeline, fontes, ZIPs e limites antes da entrega")
@@ -5986,7 +6173,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "pacote-chatgpt":
             project_dir = expand_path(args.projeto)
             answers = normalize_answers(read_json(project_dir / "QUESTIONARIO_RESPONDIDO.json"))
-            create_chatgpt_package(project_dir, answers)
+            create_chatgpt_package(project_dir, answers, conflict_policy=args.conflito)
             return 0
         if args.command == "status":
             status(expand_path(args.projeto))

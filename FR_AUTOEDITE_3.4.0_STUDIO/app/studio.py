@@ -24,6 +24,7 @@ import time
 import webbrowser
 import zipfile
 import functools
+import hashlib
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -302,6 +303,7 @@ class StudioState:
             ("STUDIO EDITA · plano", "EDIT_PLAN.json", "Prefira editar pela timeline"),
             ("STUDIO EDITA · design", "CARD_STYLE.json", "Prefira editar em Cards e marca"),
             ("IA EDITA E DEVOLVE · roteiro", "_ENVIAR_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md", "Único Markdown que a IA deve alterar"),
+            ("PACOTE PARA IA · pasta canônica", "PACOTE_PARA_IA", "Contexto, roteiro, manifesto, lotes, instruções e resposta"),
             ("Intro personalizada", "_ENTRADA/INTRO_PERSONALIZADA", "Foto ou vídeo opcional"),
             ("Outro personalizado", "_ENTRADA/OUTRO_PERSONALIZADO", "Foto ou vídeo opcional"),
             ("Manifesto das mídias", "MANIFESTO_MEDIA.json", "Gerado automaticamente"),
@@ -327,20 +329,21 @@ class StudioState:
 
     def ai_files(self, project: Path) -> list[dict[str, Any]]:
         """Uma única lista, com ação inequívoca, para o fluxo manual com IA."""
-        canonical = project / "_ENVIAR_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md"
-        legacy = project / "_EDITAR" / "04_ROTEIRO_MESTRE_PARA_IA.md"
+        canonical = project / "PACOTE_PARA_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md"
+        legacy = project / "_ENVIAR_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md"
         editable_relative = (
             str(canonical.relative_to(project)) if canonical.is_file()
             else str(legacy.relative_to(project)) if legacy.is_file()
             else str(canonical.relative_to(project))
         )
         rows: list[tuple[str, str, str]] = [
-            ("COMECE AQUI", "_ENVIAR_IA/00_COMECE_AQUI_O_QUE_EDITAR_E_ENVIAR.md", "read_only"),
+            ("NÃO EDITAR · CONTEXTO", "PACOTE_PARA_IA/00_NAO_EDITAR_CONTEXTO_PROJETO.md", "read_only"),
             ("EDITAR E DEVOLVER", editable_relative, "edit_return"),
-            ("NÃO EDITAR · APENAS ENVIAR", "_ENVIAR_IA/02_NAO_EDITAR_APENAS_ENVIAR_PROMPT.md", "read_only"),
-            ("NÃO EDITAR · LISTA DOS LOTES", "_ENVIAR_IA/03_NAO_EDITAR_LISTA_DE_LOTES.txt", "read_only"),
+            ("NÃO EDITAR · MANIFESTO", "PACOTE_PARA_IA/02_NAO_EDITAR_MANIFESTO_MEDIA.json", "read_only"),
+            ("NÃO EDITAR · INSTRUÇÕES", "PACOTE_PARA_IA/04_NAO_EDITAR_INSTRUCOES_PARA_IA.md", "read_only"),
+            ("RESPOSTA · IMPORTAR AQUI", "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md", "response"),
         ]
-        package = project / "pacote_chatgpt"
+        package = project / "PACOTE_PARA_IA" / "03_NAO_EDITAR_LOTES_DE_PROXIES"
         if package.is_dir():
             for path in sorted(package.glob("FR_AUTOEDITE_LOTE_*.zip")):
                 rows.append(("NÃO EDITAR · ANEXAR À IA", str(path.relative_to(project)), "media_lot"))
@@ -353,6 +356,44 @@ class StudioState:
                 "size_bytes": path.stat().st_size if path.is_file() else 0,
             })
         return result
+
+    @staticmethod
+    def _sha256(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def artifact_conflicts(self, project: Path) -> dict[str, Any]:
+        """Auditoria somente leitura dos pontos onde versões podem se acumular."""
+        warnings: list[dict[str, Any]] = []
+        choices = ["replace", "version", "history", "cancel"]
+
+        def add(kind: str, count: int, message: str) -> None:
+            if count:
+                warnings.append({"kind": kind, "count": count, "message": message, "choices": choices})
+
+        history = project / "_HISTORICO"
+        add("zip", len(list(history.glob("FR_AUTOEDITE_ENTRADA_*.zip"))) if history.is_dir() else 0,
+            "Há ZIPs de entrada anteriores preservados no histórico.")
+        add("markdown", len(list(history.glob("ROTEIRO_MESTRE_RESPONDIDO_*.md"))) if history.is_dir() else 0,
+            "Há respostas anteriores da IA; uma resposta idêntica não será reaplicada.")
+        add("render", len(list((project / "_RENDERIZACOES").glob("*/RENDER_RUN.json"))) if (project / "_RENDERIZACOES").is_dir() else 0,
+            "Há renderizações versionadas; cada nova renderização usa pasta própria.")
+        plan = project_scope.read(project / "EDIT_PLAN.json", {})
+        cards = [s for s in plan.get("segments", []) if isinstance(s, dict) and s.get("type") == "card"]
+        signatures = [tuple(str(s.get(key) or "") for key in ("card_kind", "service_key", "title", "body")) for s in cards]
+        add("card", len(signatures) - len(set(signatures)), "Há cards idênticos na timeline; revise antes de renderizar.")
+        lots = list((project / "PACOTE_PARA_IA" / "03_NAO_EDITAR_LOTES_DE_PROXIES").glob("*.zip"))
+        package_registry = project_scope.read(project / "_CONTROLE" / "PACOTE_IA.json", {})
+        registered = {Path(item.get("path", "")).name: item.get("sha256", "")
+                      for item in package_registry.get("files", []) if isinstance(item, dict)}
+        lot_hashes = [registered.get(path.name) or f"{path.name}:{path.stat().st_size}" for path in lots]
+        add("proxy_lot", len(lot_hashes) - len(set(lot_hashes)), "Há lotes de proxies binariamente repetidos.")
+        pending = [p for p in (project / "_ENTRADA").glob("*") if "RECEBENDO" in p.name or p.name.startswith("UPLOAD_")]
+        add("attachment", len(pending), "Há anexos temporários/sobrepostos de uma tarefa interrompida.")
+        return {"has_conflicts": bool(warnings), "warnings": warnings, "safe_choices": choices}
 
     def project_state(self, project: Path) -> dict[str, Any]:
         config = self.load_config(project)
@@ -411,6 +452,7 @@ class StudioState:
             "service_catalog": service_catalog,
             "files": self.important_files(project),
             "ai_files": self.ai_files(project),
+            "artifact_conflicts": self.artifact_conflicts(project),
             "card_previews": card_previews,
             "capabilities": {
                 "rclone": bool(shutil.which("rclone")),
@@ -522,6 +564,9 @@ class StudioState:
             "QUESTIONARIO_RESPONDIDO.json", "FR_AUTOEDITE_PROJECT.json", "MANIFESTO_MEDIA.json",
             "MANIFESTO_MEDIA.csv", "EDIT_PLAN.json", "CARD_STYLE.json", "SOCIAL_PLAN.json",
             "PUBLICACAO_SOCIAL.json", "PUBLICACAO_SOCIAL.md", "ROTEIRO_MESTRE_PARA_IA.md",
+            "00_NAO_EDITAR_CONTEXTO_PROJETO.md", "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
+            "02_NAO_EDITAR_MANIFESTO_MEDIA.json", "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md",
+            "05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md",
         }
         return relative.startswith(protected_prefixes) or Path(relative).name in protected_names
 
@@ -554,6 +599,7 @@ class StudioState:
             ("render/segmentos", "cache_render", "segmento intermediário regenerável"),
             ("cards_editaveis", "previas_cards", "prévia de card regenerável"),
             ("pacote_chatgpt", "lotes_ia", "lote de envio regenerável"),
+            ("PACOTE_PARA_IA/03_NAO_EDITAR_LOTES_DE_PROXIES", "lotes_ia", "lote de proxy regenerável"),
             ("_ENVIAR_CHATGPT", "lotes_ia", "cópia de envio regenerável"),
             ("contatos_visuais", "previas_midias", "prancha visual regenerável"),
         ):
@@ -787,7 +833,8 @@ class StudioState:
             "storage": self.storage_summary(project),
         }
 
-    def _command_for(self, project: Path, action: str) -> list[str]:
+    def _command_for(self, project: Path, action: str, options: dict[str, Any] | None = None) -> list[str]:
+        options = options or {}
         questionnaire = project / "QUESTIONARIO_RESPONDIDO.json"
         zip_path = project / "_ENTRADA" / "FR_AUTOEDITE_ENTRADA.zip"
         config: dict[str, Any] = {}
@@ -812,7 +859,10 @@ class StudioState:
                 command.append("--usar-proxies")
             return command
         if action == "package":
-            return [str(self.launcher), "pacote-chatgpt", "--projeto", str(project)]
+            policy = str(options.get("conflict_policy") or "replace")
+            if policy not in {"replace", "version", "history", "cancel"}:
+                raise StudioError("Escolha substituir, criar nova versão/manter histórico ou cancelar.")
+            return [str(self.launcher), "pacote-chatgpt", "--projeto", str(project), "--conflito", policy]
         if action == "cards":
             return [str(self.launcher), "cards", "--projeto", str(project)]
         if action == "audit":
@@ -851,10 +901,14 @@ class StudioState:
             ]
         raise StudioError(f"Ação desconhecida: {action}")
 
-    def start_job(self, project: Path, action: str) -> None:
+    def start_job(self, project: Path, action: str, options: dict[str, Any] | None = None) -> None:
         # Valide pré-condições antes de marcar a tarefa como ativa. Uma falha
         # imediata não pode deixar o projeto preso em "PROCESSANDO".
-        command = self._command_for(project, action)
+        command = (
+            self._command_for(project, action, options)
+            if options and "conflict_policy" in options
+            else self._command_for(project, action)
+        )
         with self.lock:
             current = self.jobs.get(project.name)
             if current and current.get("running"):
@@ -1327,6 +1381,11 @@ class StudioHandler(BaseHTTPRequestHandler):
                 if remaining or not zipfile.is_zipfile(temporary):
                     temporary.unlink(missing_ok=True)
                     raise StudioError("O arquivo enviado não é um ZIP íntegro.")
+                if target.is_file() and self.state._sha256(temporary) == self.state._sha256(target):
+                    temporary.unlink(missing_ok=True)
+                    self._json({"ok": True, "path": str(target), "size_bytes": target.stat().st_size,
+                                "duplicate": True, "message": "Este ZIP já estava anexado; nenhuma cópia foi criada."})
+                    return
                 if target.is_file():
                     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
                     target.replace(project / "_HISTORICO" / f"FR_AUTOEDITE_ENTRADA_{stamp}.zip")
@@ -1346,6 +1405,11 @@ class StudioHandler(BaseHTTPRequestHandler):
                     incoming.unlink(missing_ok=True)
                     raise StudioError("O arquivo enviado não é um ZIP íntegro do Google Takeout.")
                 target = takeout_dir / "00_NAO_EDITAR_GOOGLE_TAKEOUT_ORIGINAL.zip"
+                if target.is_file() and self.state._sha256(incoming) == self.state._sha256(target):
+                    incoming.unlink(missing_ok=True)
+                    self._json({"ok": True, "path": str(target), "size_bytes": target.stat().st_size,
+                                "duplicate": True, "message": "Este Takeout já estava anexado; nenhuma cópia foi criada."})
+                    return
                 if target.is_file():
                     target.replace(project / "_HISTORICO" / f"GOOGLE_TAKEOUT_ORIGINAL_{stamp}.zip")
                 incoming.replace(target)
@@ -1378,7 +1442,15 @@ class StudioHandler(BaseHTTPRequestHandler):
                 if probe.returncode != 0:
                     incoming.unlink(missing_ok=True)
                     raise StudioError("O arquivo enviado não pôde ser reconhecido como foto ou vídeo íntegro.")
-                for old in (project / "_ENTRADA").glob(f"{stem}.*"):
+                existing_assets = list((project / "_ENTRADA").glob(f"{stem}.*"))
+                duplicate = next((old for old in existing_assets if self.state._sha256(old) == self.state._sha256(incoming)), None)
+                if duplicate:
+                    incoming.unlink(missing_ok=True)
+                    self._json({"ok": True, "path": str(duplicate), "size_bytes": duplicate.stat().st_size,
+                                "config": self.state.load_config(project), "duplicate": True,
+                                "message": "Este anexo já estava configurado; nenhuma cópia foi criada."})
+                    return
+                for old in existing_assets:
                     old.replace(project / "_HISTORICO" / f"{stem}_{stamp}{old.suffix.lower()}")
                 target = project / "_ENTRADA" / f"{stem}{suffix}"
                 incoming.replace(target)
@@ -1412,6 +1484,18 @@ class StudioHandler(BaseHTTPRequestHandler):
                     incoming.unlink(missing_ok=True)
                     project_scope.write(project / "_CONTROLE/REVISAO_ROTEIRO.json", {"valid": False, "error": str(exc)})
                     raise StudioError(str(exc)) from exc
+                if target.is_file() and self.state._sha256(incoming) == self.state._sha256(target):
+                    incoming.unlink(missing_ok=True)
+                    review = copy.deepcopy(review)
+                    review.setdefault("notices", []).append({
+                        "level": "info", "block": "roteiro",
+                        "message": "Esta resposta já estava importada; nenhuma cópia foi criada.",
+                        "effect": "Você pode revisar ou aplicar a resposta existente.",
+                    })
+                    project_scope.write(project / "_CONTROLE/REVISAO_ROTEIRO.json", review)
+                    self._json({"ok": True, "path": str(target), "size_bytes": target.stat().st_size,
+                                "duplicate": True, "review": review})
+                    return
                 if target.is_file():
                     shutil.copy2(target, project / "_HISTORICO" / f"ROTEIRO_MESTRE_RESPONDIDO_{stamp}.md")
                 incoming.replace(target)
@@ -1445,7 +1529,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "config": config})
                 return
             if parsed.path == "/api/action":
-                self.state.start_job(project, str(data.get("action") or ""))
+                self.state.start_job(project, str(data.get("action") or ""), data)
                 self._json({"ok": True})
                 return
             if parsed.path == "/api/cancel":

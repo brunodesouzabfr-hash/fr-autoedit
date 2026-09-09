@@ -218,7 +218,102 @@ class MasterContract(unittest.TestCase):
             fr.card_image(path,{"type":"card","card_kind":"service","service_key":service,"title":"SERVIÇO","body":"Demonstração do layout."},
                           {"output":{"width":540,"height":675}},fr.load_brand(),style,self.project)
             hashes.append(hashlib.sha256(Image.open(path).tobytes()).hexdigest())
-        self.assertEqual(len(set(hashes)),9)
+        self.assertEqual(len(set(hashes)),len(fr.load_service_catalog()))
+        self.assertGreaterEqual(len(hashes),13)
+
+    def test_phase2_segment_fields_are_validated_and_preserved(self):
+        d=copy.deepcopy(self.base)
+        segment=self.media("FASE2",0,1)
+        segment.update({
+            "service_key":"eletrica", "card_mode":"service", "associated_card_id":"CARD-ELETRICA",
+            "narration":{"enabled":True,"text":"A infraestrutura organiza o percurso visível."},
+            "subtitles":{"enabled":True,"text":"Infraestrutura organizada por trecho."},
+            "keyframes":[{"time_sec":.5,"scale":1.05}], "efeito_futuro":{"intensity":.4},
+        })
+        d["main_timeline"]["segments"]=[segment]
+        bundle=self.bundle(d);out=bundle["main_timeline"]["segments"][0]
+        self.assertEqual(out["service_family"],"cobre_linhas_tecnicas_energia_controlada")
+        self.assertEqual(out["on_screen_text"],"Infraestrutura organizada por trecho.")
+        self.assertIn("efeito_futuro",out["unsupported_requests"])
+        messages=" ".join(item["message"] for item in bundle["review"]["notices"])
+        self.assertIn("Keyframes",messages)
+        self.assertIn("Locução",messages)
+
+    def test_phase21_segment_aliases_are_executable_and_metadata_survives(self):
+        d=copy.deepcopy(self.base)
+        segment=self.media("FASE21",0,1)
+        segment.update({
+            "service_id":"projeto_3d", "service_confidence":.82,
+            "service_card_enabled":True, "card_type":"service",
+            "card_family":"valor livre substituído pelo catálogo",
+            "balloon_family":"valor livre substituído pelo catálogo",
+            "visual_motif":"valor livre substituído pelo catálogo",
+            "overlay_text":"Projeto validado visualmente neste trecho.",
+            "voiceover_text":"A visualização orienta as decisões antes da execução.",
+            "caption_text":"Projeto 3D usado como visualização.",
+            "transition_in":"fade", "transition_out":"transicao_futura",
+        })
+        d["main_timeline"]["segments"]=[segment]
+        bundle=self.bundle(d);out=bundle["main_timeline"]["segments"][0]
+        self.assertEqual(out["service_id"],"projetos_3d")
+        self.assertEqual(out["service_key"],"projetos_3d")
+        self.assertEqual(out["service_name"],"PROJETOS 3D")
+        self.assertEqual(out["card_mode"],"service")
+        self.assertTrue(out["service_card_enabled"])
+        self.assertEqual(out["transition"],"fade")
+        self.assertEqual(out["on_screen_text"],segment["overlay_text"])
+        self.assertEqual(out["narration"]["text"],segment["voiceover_text"])
+        self.assertEqual(out["subtitles"]["text"],segment["caption_text"])
+        self.assertIn("transition_out",out["unsupported_requests"])
+        messages=" ".join(item["message"] for item in bundle["review"]["notices"])
+        self.assertIn("não reconhecida",messages)
+
+    def test_phase21_strategy_is_validated_and_preserved_as_metadata(self):
+        d=copy.deepcopy(self.base)
+        d["strategy"]={
+            "editorial":{"video_objective":"Mostrar o processo registrado.","target_audience":"",
+                         "platform":"Instagram","funnel_stage":"consideration","primary_intent":"provar_tecnica",
+                         "narrative_arc":{"hook":"Detalhe real.","development":"Processo.",
+                                          "proof_process":"Registro visual.","climax":"Resultado visível.","cta":"Salvar."}},
+            "retention":{"hook_0_3_sec":"Detalhe real do acabamento."},
+            "ethical_marketing_growth":{"primary_cta":"Salve como referência."},
+            "ethical_neuromarketing":{"curiosity":"Revelação gradual do resultado real."},
+            "final_copy":{"voiceover_final":"Execução registrada por etapas.","caption_final":"Processo e resultado.",
+                          "card_texts":[],"balloon_texts":[],"cta_final":"Salve como referência."},
+        }
+        bundle=self.bundle(d)
+        self.assertEqual(bundle["strategy"]["editorial"]["funnel_stage"],"consideration")
+        self.assertTrue(any(item["block"]=="strategy" for item in bundle["review"]["notices"]))
+        d["strategy"]["editorial"]["funnel_stage"]="urgencia_falsa"
+        with self.assertRaises(fr.AutoEditeError):self.bundle(d)
+
+    def test_ai_filler_is_rejected_from_narration_and_subtitles(self):
+        for field in ("narration","subtitles"):
+            d=copy.deepcopy(self.base);segment=self.media("TXT",0,1)
+            segment[field]={"enabled":True,"text":"Aqui está uma legenda genérica."}
+            d["main_timeline"]["segments"]=[segment]
+            with self.assertRaises(fr.AutoEditeError):self.bundle(d)
+
+    def test_service_can_change_inside_the_same_timeline(self):
+        d=copy.deepcopy(self.base)
+        services=("projetos_3d","eletrica","manutencao")
+        d["main_timeline"]["segments"]=[]
+        for index,key in enumerate(services):
+            segment=self.media(f"T{index}",index*2,2)
+            segment.update(service_key=key,card_mode="service",associated_card_id=f"C{index}")
+            d["main_timeline"]["segments"].append(segment)
+        out=self.bundle(d)["main_timeline"]["segments"]
+        self.assertEqual([item["service_key"] for item in out],list(services))
+        self.assertEqual(len({item["service_family"] for item in out}),3)
+
+    def test_same_ai_response_is_not_applied_twice(self):
+        path=self.markdown()
+        first=fr.apply_ai_editing_brief(self.project,path)
+        versions=len(scope.list_versions(self.project))
+        second=fr.apply_ai_editing_brief(self.project,path)
+        self.assertEqual(first["status"],"applied_requires_visual_review")
+        self.assertEqual(second["status"],"already_applied_no_changes")
+        self.assertEqual(len(scope.list_versions(self.project)),versions)
 
 
 if __name__=="__main__":

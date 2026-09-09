@@ -69,6 +69,9 @@ def main() -> int:
             assert "Time-lapse" in html and "clip-path:circle" in html
             assert "Galeria" in html and "Gerenciar" in html
             assert 'id="reviewPlayer"' in html and 'class="log-rail"' in html
+            assert 'id="reviewModal"' in html and 'id="reviewTimeline"' in html
+            assert "Gerar/atualizar PACOTE_PARA_IA" in html
+            assert "Transformar em serviço" in html
 
             created = request(
                 base + "/api/project",
@@ -142,11 +145,21 @@ def main() -> int:
                 {"Content-Type": "application/zip"},
             )
             assert uploaded_zip["ok"] is True
+            repeated_zip = request(
+                base + "/api/upload?" + project_query,
+                state.token,
+                zipped.getvalue(),
+                {"Content-Type": "application/zip"},
+            )
+            assert repeated_zip["duplicate"] is True
             state.start_job(project, "brief-generate")
             brief_job = wait_for_job(state, project, timeout=90.0)
             assert brief_job["returncode"] == 0, "\n".join(brief_job.get("log", []))
             generated_brief = project / "_ENVIAR_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md"
             assert generated_brief.is_file()
+            canonical_package = project / "PACOTE_PARA_IA"
+            assert (canonical_package / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md").is_file()
+            assert (canonical_package / "03_NAO_EDITAR_LOTES_DE_PROXIES").is_dir()
             downloaded_brief = request(
                 base + "/api/file?" + urlencode({
                     "token": state.token,
@@ -188,6 +201,13 @@ def main() -> int:
                 {"Content-Type": "text/markdown"},
             )
             assert response["ok"] is True
+            repeated_response = request(
+                base + "/api/editing-brief-upload?" + project_query,
+                state.token,
+                brief,
+                {"Content-Type": "text/markdown"},
+            )
+            assert repeated_response["duplicate"] is True
 
             plan = {
                 "segments": [{
@@ -238,9 +258,10 @@ def main() -> int:
                 base + "/api/state?" + urlencode({"token": state.token, "project": slug})
             )
             assert snapshot["application_version"] == "3.4.0"
-            assert len(snapshot["service_catalog"]) == 9
+            assert len(snapshot["service_catalog"]) >= 13
             assert snapshot["config"]["cards"]["style_preset"] == "site_fr_luxo"
             assert any(item["role"] == "edit_return" and item["exists"] for item in snapshot["ai_files"])
+            assert "artifact_conflicts" in snapshot
             assert "30" in snapshot["reel_plans"]
             assert (project / "_ENTRADA" / "INTRO_PERSONALIZADA.png").is_file()
             assert (project / "_ENTRADA" / "ROTEIRO_MESTRE_RESPONDIDO.md").is_file()
