@@ -1,99 +1,135 @@
-# Instalar o FR AutoEdite em outro computador
+# Leia primeiro — instalar em outro computador
 
-Este pacote contém o **FR AutoEdite Studio 3.4.0** completo. Ele foi preparado
-para **Parrot OS, Debian e Ubuntu** em computadores de 64 bits com acesso a um
-terminal e permissão para instalar programas.
+O FR AutoEdite Studio 3.4.0 foi preparado para Linux da família Parrot OS,
+Debian ou Ubuntu. A instalação principal é local; projetos reais não devem ser
+versionados nem enviados ao GitHub.
 
-## Instalação mais fácil
+## Opção recomendada: clonar o GitHub
 
-1. Copie o ZIP completo para o outro computador.
-2. Descompacte o ZIP.
-3. Abra a pasta extraída `FR_AUTOEDITE_3.4.0_STUDIO`.
-4. Clique com o botão direito numa área vazia e escolha **Abrir no terminal**.
-5. Execute exatamente:
+No computador novo, abra o terminal e execute:
 
 ```bash
-chmod +x INSTALAR_EM_OUTRO_COMPUTADOR.sh
-./INSTALAR_EM_OUTRO_COMPUTADOR.sh
+sudo apt update
+sudo apt install -y git python3 python3-pil ffmpeg unzip zip xdg-utils
+git clone https://github.com/brunodesouzabfr-hash/fr-autoedit.git
+cd fr-autoedit
+git switch main
+cd FR_AUTOEDITE_3.4.0_STUDIO
+chmod +x install.sh fr-autoedite
+./install.sh
 ```
 
-O instalador verifica dependências, instala o programa, preserva uma versão
-anterior, testa a geração de cards e abre o Studio no navegador.
-
-Na lateral do painel deve aparecer:
-
-```text
-STUDIO 3.4.0 · ROTEIRO ISOLADO
-```
-
-## Instalar também os recursos opcionais
-
-Para instalar QR Code, narração local, cofre de credenciais, integração por
-`rclone` e gravação de datas do Google Takeout com ExifTool, use:
+Confira:
 
 ```bash
-./INSTALAR_EM_OUTRO_COMPUTADOR.sh --com-opcionais
-```
-
-## Executar uma validação completa
-
-O teste completo cria mídias sintéticas temporárias e valida preparação,
-cards circulares, Google Takeout, time-lapse, renderizações, Reels, lotes e
-auditoria:
-
-```bash
-./INSTALAR_EM_OUTRO_COMPUTADOR.sh --teste-completo
-```
-
-Ele demora mais que o teste rápido. Não usa fotos ou vídeos pessoais.
-
-## Instalar sem abrir o navegador
-
-```bash
-./INSTALAR_EM_OUTRO_COMPUTADOR.sh --sem-abrir
-```
-
-Para abrir posteriormente:
-
-```bash
+fr-autoedite --versao
 fr-autoedite studio
 ```
 
-Se o terminal não reconhecer `fr-autoedite`, use:
+Se `fr-autoedite` ainda não estiver no `PATH`:
 
 ```bash
 ~/.local/bin/fr-autoedite studio
 ```
 
+O instalador:
+
+- verifica `python3`, Pillow, FFmpeg e FFprobe;
+- preserva uma instalação anterior como backup;
+- instala em `~/.local/share/fr-autoedite/`;
+- cria `~/.local/bin/fr-autoedite`;
+- não apaga projetos em `~/FR-AutoEdite/Studio/`.
+
+## Instalação guiada do pacote portátil
+
+Se você recebeu a pasta completa por um meio autorizado:
+
+```bash
+cd FR_AUTOEDITE_3.4.0_STUDIO
+chmod +x INSTALAR_EM_OUTRO_COMPUTADOR.sh
+./INSTALAR_EM_OUTRO_COMPUTADOR.sh
+```
+
+Opções disponíveis:
+
+```bash
+./INSTALAR_EM_OUTRO_COMPUTADOR.sh --sem-abrir
+./INSTALAR_EM_OUTRO_COMPUTADOR.sh --com-opcionais
+./INSTALAR_EM_OUTRO_COMPUTADOR.sh --teste-completo
+```
+
+- `--sem-abrir`: instala sem abrir o navegador;
+- `--com-opcionais`: instala QR Code, TTS, cofre, rclone e ExifTool;
+- `--teste-completo`: executa o smoke test com mídias sintéticas.
+
+## Atualizar posteriormente
+
+Na cópia clonada:
+
+```bash
+cd /CAMINHO/PARA/fr-autoedit
+git status --short
+git switch main
+git pull --ff-only origin main
+cd FR_AUTOEDITE_3.4.0_STUDIO
+./install.sh
+fr-autoedite --versao
+```
+
+Se `git status --short` mostrar alterações pessoais, não continue até entender
+e preservar essas mudanças. O `git pull --ff-only` evita criar um merge
+acidental durante uma atualização comum.
+
 ## Onde ficam os arquivos
 
-- Programa instalado: `~/.local/share/fr-autoedite/`
-- Comando: `~/.local/bin/fr-autoedite`
-- Projetos: `~/FR-AutoEdite/Studio/`
-- Contexto para auditoria por IA:
-  `~/.local/share/fr-autoedite/CONTEXTO_PARA_IA_AUDITORIA_E_AUTOMACAO.md`
-- Versões anteriores: `~/.local/share/fr-autoedite.backup.DATA-HORA/`
+- instalação: `~/.local/share/fr-autoedite/`;
+- comando: `~/.local/bin/fr-autoedite`;
+- projetos: `~/FR-AutoEdite/Studio/`;
+- backups da instalação:
+  `~/.local/share/fr-autoedite.backup.DATA-HORA/`;
+- log local do instalador guiado:
+  `~/.local/state/fr-autoedite/studio-3.4.0.log`.
 
-## Requisitos e limites reais
+O log é local e não deve ser enviado ao GitHub. Caso precise pedir suporte,
+revise o conteúdo e compartilhe somente o trecho necessário, sem dados pessoais
+ou credenciais.
 
-- Sistema suportado automaticamente: Parrot OS, Debian ou Ubuntu.
-- Espaço livre recomendado: pelo menos duas vezes o tamanho do ZIP de mídias,
-  além do espaço das renderizações.
-- O funcionamento principal é local e gratuito.
-- APIs são opcionais e podem gerar cobrança se o usuário ativá-las.
-- O Google Drive exige autorização própria pelo `rclone`.
-- O Google Takeout deve ser solicitado e baixado pelo usuário; o Studio recebe
-  esse ZIP, lê os JSONs e cria um ZIP normalizado sem alterar o original.
-- Nenhuma automação substitui assistir integralmente à master e aos Reels.
+## Projetos reais e GitHub
 
-## Entregar o projeto a uma IA técnica
+Nunca envie ao GitHub:
 
-Envie à IA:
+- `Studio/`;
+- vídeos ou fotos;
+- proxies;
+- ZIPs;
+- originais;
+- renders reais;
+- `.env`;
+- tokens;
+- chaves;
+- credenciais;
+- logs pessoais.
 
-1. o ZIP desta aplicação;
-2. `CONTEXTO_PARA_IA_AUDITORIA_E_AUTOMACAO.md`;
-3. se houver um erro real, o texto completo exibido no Studio e o log técnico;
-4. somente mídias sintéticas ou um projeto autorizado para testes.
+O diretório `Studio/` é ignorado pelo repositório, mas confira sempre:
 
-Peça que a IA siga integralmente o contexto e devolva um novo ZIP testado,
-sem apagar originais, sem enfraquecer testes e sem inserir chaves de API.
+```bash
+git status --short
+```
+
+Não use `git add -f` para forçar a inclusão desses arquivos. Se possível,
+mantenha projetos reais apenas no diretório padrão da instalação, sem copiar
+seu conteúdo para outras pastas do repositório.
+
+## Fluxo após instalar
+
+1. Execute `fr-autoedite studio`.
+2. Crie o projeto e envie o ZIP de mídias.
+3. Gere proxies e manifesto.
+4. Gere o `PACOTE_PARA_IA`.
+5. Envie o Roteiro Mestre e os lotes para a IA escolhida.
+6. Salve e importe a resposta.
+7. Leia a validação.
+8. Revise o rascunho.
+9. Renderize a master pelos originais.
+
+Consulte [GUIA_RAPIDO_3_4.md](GUIA_RAPIDO_3_4.md) para instruções detalhadas.

@@ -1,5 +1,49 @@
 # Alterações
 
+## 3.4.0 Fase 2 — Roteiro Mestre Estratégico e Pacote IA
+
+### Correções de auditoria — commit `8571235`
+
+- torna a concatenação do rascunho leve para qualquer draft explícito, reduzindo
+  risco de congelamento em timelines longas;
+- normaliza `start_sec` e janelas de cenas antes de validar recortes;
+- mantém timebase consistente nas junções, completa áudio quando necessário e
+  repete uma junção após falha transitória;
+- melhora cache, progresso e tempo de geração dos cards;
+- amplia regressões do contrato, draft e Studio HTTP.
+
+### Pacote IA e roteiro estratégico — commit `7b7694c`
+
+- gera automaticamente os seis componentes canônicos de
+  `PACOTE_PARA_IA/`;
+- transforma o Roteiro Mestre em contrato para estratégia editorial, retenção,
+  funil, growth ético, CTA, locução, legenda, cards, balões e decisões técnicas;
+- permite classificar e trocar serviço por trecho, com famílias visuais e
+  aliases compatíveis com o render existente;
+- preserva metadados ainda não executáveis e registra avisos sem descartar o
+  restante válido;
+- adiciona políticas seguras contra ZIP, lote, resposta, card, anexo e render
+  duplicados;
+- atualiza a ETAPA 06 e a prévia em modal com timeline clicável;
+- proíbe instruções de falsa urgência, escassez, prova social, preço, cliente,
+  depoimento, métrica ou resultado inventado.
+
+### Validação
+
+- `python -m pytest tests`: 24 testes aprovados;
+- `bash tests/smoke_test.sh`: aprovado com mídias sintéticas;
+- inclui testes de pacote, limite inferior a 150 MB, contrato estratégico,
+  famílias por serviço, histórico não destrutivo e importação tolerante.
+
+### Limitações
+
+- locução sobre vídeo, keyframes arbitrários, múltiplos balões temporizados,
+  legenda independente do overlay e parte das transições avançadas ainda são
+  preservados como metadados;
+- publicação e medição de retenção/conversão permanecem externas;
+- algumas famílias visuais ainda usam composição procedural ou símbolos
+  existentes em vez de assets exclusivos.
+
 ## 3.4.0 — 2026-09-08
 
 - substitui o briefing v1 por contrato **ROTEIRO MESTRE v2**, com autonomia
