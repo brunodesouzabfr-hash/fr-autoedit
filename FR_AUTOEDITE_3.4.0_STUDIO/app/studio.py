@@ -274,10 +274,23 @@ class StudioState:
                         service = fr.load_service_catalog()[key]
                         for segment in item.get("segments", []):
                             if segment.get("card_kind") == "service" or segment.get("service_key") == base.get("service_intro", {}).get("service_key"):
-                                segment.update(service_key=key, service_asset=service["asset"], service_layout=service.get("layout"))
+                                family = service.get("visual_family") or service.get("layout") or ""
+                                segment.update(
+                                    service_key=key, service_id=key,
+                                    service_name=service.get("label", ""), service_confidence=1.0,
+                                    service_asset=service["asset"], service_layout=service.get("layout"),
+                                    service_family=family, card_family=family,
+                                    balloon_family=service.get("balloon_family", ""),
+                                    visual_motif=service.get("visual_motif", ""),
+                                    motion_hint=service.get("motion_hint", ""),
+                                )
                                 if segment.get("card_kind") == "service":
+                                    segment.update(
+                                        service_card_enabled=True, card_type="service", card_mode="service",
+                                    )
                                     segment["title"] = merged["service_intro"].get("custom_title") or service["label"]
                                     segment["body"] = merged["service_intro"].get("custom_body") or service["body"]
+                                    segment["overlay_text"] = segment["title"]
                     files[relative] = item
                 files["_EDITAR/02_PLANO_DA_EDICAO.json"] = files["EDIT_PLAN.json"]
                 if any(merged.get(k) != base.get(k) for k in ("cards", "editing_brief", "visual_effects")):
@@ -433,10 +446,33 @@ class StudioState:
         if job.get("started_at"):
             ended = float(job.get("finished_at") or time.time())
             job["elapsed_sec"] = max(0, round(ended - float(job["started_at"]), 1))
-        card_previews = []
+        card_previews: list[dict[str, Any]] = []
         preview_root = project / "cards_editaveis"
-        if preview_root.is_dir():
-            card_previews = [str(path.relative_to(project)) for path in sorted(preview_root.rglob("*.png"))[-24:]]
+        preview_registry = project_scope.read(project / "_CONTROLE/CARD_PREVIEWS.json", {})
+        if "previews" in preview_registry:
+            for record in preview_registry["previews"]:
+                if not isinstance(record, dict):
+                    continue
+                try:
+                    path = self._safe_project_target(project, str(record.get("relative") or ""))
+                except (StudioError, ValueError):
+                    continue
+                if not path.is_file() or path.suffix.lower() != ".png":
+                    continue
+                current = copy.deepcopy(record)
+                stat = path.stat()
+                current.setdefault("version", f"{stat.st_mtime_ns:x}-{stat.st_size:x}")
+                current["generation_id"] = preview_registry.get("generation_id", "")
+                card_previews.append(current)
+        elif preview_root.is_dir():
+            # Compatibilidade com projetos anteriores ao registro de geração.
+            for path in sorted(preview_root.rglob("*.png"))[-24:]:
+                stat = path.stat()
+                card_previews.append({
+                    "relative": str(path.relative_to(project)),
+                    "version": f"legacy-{stat.st_mtime_ns:x}-{stat.st_size:x}",
+                    "generation_id": "legacy",
+                })
         return {
             "application_version": self.app_version,
             "roteiro_versions": project_scope.list_versions(project),
@@ -484,9 +520,30 @@ class StudioState:
         """Catálogo visual sem duplicar cenas virtuais do mesmo vídeo."""
         items: dict[str, dict[str, Any]] = {}
 
+        active_plan = project_scope.read(project / "EDIT_PLAN.json", {})
+        active_media = {
+            str(segment.get("media_id")) for segment in active_plan.get("segments", [])
+            if segment.get("type") == "media" and segment.get("media_id")
+        }
+        selected_media = {
+            str(segment.get("media_id")) for segment in active_plan.get("segments", [])
+            if segment.get("type") == "media" and segment.get("media_id") and segment.get("enabled", True)
+        }
+        rendered_media: set[str] = set()
+        last_render = project_scope.read(project / "_CONTROLE/ULTIMA_RENDERIZACAO.json", {})
+        render_directory_value = str(last_render.get("directory") or "")
+        render_directory = Path(render_directory_value) if render_directory_value else project / "_CONTROLE/__SEM_RENDER__"
+        if render_directory_value and render_directory.is_dir():
+            rendered_plan = project_scope.read(render_directory / "EDIT_PLAN.json", {})
+            rendered_media = {
+                str(segment.get("media_id")) for segment in rendered_plan.get("segments", [])
+                if segment.get("type") == "media" and segment.get("media_id") and segment.get("enabled", True)
+            }
+
         def add(
             relative: str, category: str, *, preview: str | None = None,
             thumbnail: str | None = None, label: str | None = None,
+            metadata: dict[str, Any] | None = None,
         ) -> None:
             try:
                 source = self._safe_project_target(project, relative)
@@ -511,6 +568,7 @@ class StudioState:
                 "kind": self._kind_for(source),
                 "size_bytes": stat.st_size,
                 "modified_at": stat.st_mtime,
+                **(metadata or {}),
             }
 
         manifest_path = project / "MANIFESTO_MEDIA.json"
@@ -529,7 +587,24 @@ class StudioState:
                 seen_sources.add(source)
                 proxy = str(row.get("proxy_path") or source)
                 thumbnail = str(row.get("thumbnail_path") or "")
-                add(source, "originais", preview=proxy, thumbnail=thumbnail, label=str(row.get("filename") or ""))
+                media_id = str(row.get("id") or "")
+                selection_status = (
+                    "selected" if media_id in selected_media else
+                    "not_used" if media_id in active_media else
+                    "not_planned"
+                )
+                add(
+                    source, "originais", preview=proxy, thumbnail=thumbnail,
+                    label=str(row.get("filename") or ""),
+                    metadata={
+                        "media_id": media_id,
+                        "exists_in_project": True,
+                        "selected_in_plan": media_id in selected_media,
+                        "visible_in_review": media_id in selected_media,
+                        "used_in_last_render": media_id in rendered_media,
+                        "selection_status": selection_status,
+                    },
+                )
 
         roots = (
             ("entrega", "entregas"), ("social", "social"),

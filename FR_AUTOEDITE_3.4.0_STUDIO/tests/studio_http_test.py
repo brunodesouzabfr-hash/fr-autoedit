@@ -72,6 +72,9 @@ def main() -> int:
             assert 'id="reviewModal"' in html and 'id="reviewTimeline"' in html
             assert "Gerar/atualizar PACOTE_PARA_IA" in html
             assert "Transformar em serviço" in html
+            assert "persistMainPlan(true)" in html
+            assert "&v=" in html
+            assert "NÃO USADA" in html
 
             created = request(
                 base + "/api/project",
@@ -95,6 +98,10 @@ def main() -> int:
             assert not (project / "EDIT_PLAN.json").exists()
             assert len(list((project / "cards_editaveis").rglob("*.png"))) >= 3
             assert len(list((project / "_HISTORICO").glob("CARD_STYLE_INVALIDO_*.json"))) == 1
+            preview_state = state.project_state(project)
+            assert preview_state["card_previews"]
+            assert all(item.get("version") for item in preview_state["card_previews"])
+            assert len({item.get("generation_id") for item in preview_state["card_previews"]}) == 1
 
             image = (app_root / "assets" / "services" / "iluminacao.png").read_bytes()
 

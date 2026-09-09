@@ -40,11 +40,102 @@ def text_fit(c, draw, text, box, font_name, max_size, color, max_lines=6):
     raise c.AutoEditeError("O texto não cabe no card sem perder leitura. Reduza title/body ou divida em dois cards.")
 
 
+def draw_service_motif(c, draw, layout, box, palette, unit, *, subtle=False):
+    """Desenha uma camada técnica sóbria e específica do serviço.
+
+    A camada é deliberadamente estática. O render atual pode animar o card
+    completo, mas ainda não possui composição temporal independente por
+    elemento; `motion_hint` no catálogo prepara essa evolução sem prometer uma
+    animação que o arquivo PNG não executa.
+    """
+    x0, y0, x1, y1 = map(int, box)
+    if x1 <= x0 or y1 <= y0:
+        return
+    orange = c.hex_rgb(palette.get("orange", "#FC7016")) + ((42 if subtle else 125),)
+    gold = c.hex_rgb(palette.get("gold", "#C8A034")) + ((36 if subtle else 105),)
+    border = c.hex_rgb(palette.get("border", "#1A6069")) + ((45 if subtle else 145),)
+    bone = c.hex_rgb(palette.get("bone", "#E6D6B5")) + ((28 if subtle else 90),)
+    weight = max(1, int(unit / (520 if subtle else 360)))
+    width, height = x1 - x0, y1 - y0
+
+    if layout in {"blueprint", "pagination", "foundation"}:
+        step = max(22, int(unit * .045))
+        for x in range(x0, x1 + 1, step):
+            draw.line((x, y0, x, y1), fill=border, width=weight)
+        for y in range(y0, y1 + 1, step):
+            draw.line((x0, y, x1, y), fill=border, width=weight)
+        draw.arc((x0 + width*.14, y0 + height*.12, x0 + width*.72, y0 + height*.82), 205, 350, fill=gold, width=weight)
+        draw.line((x0 + width*.18, y0 + height*.72, x0 + width*.78, y0 + height*.28), fill=orange, width=weight)
+    elif layout == "electrical":
+        points = [(x0, y0 + height*.28), (x0 + width*.27, y0 + height*.28),
+                  (x0 + width*.39, y0 + height*.50), (x0 + width*.70, y0 + height*.50),
+                  (x1, y0 + height*.72)]
+        draw.line(points, fill=orange, width=max(weight, int(unit*.005)), joint="curve")
+        radius = max(4, int(unit*.012))
+        for index, (x, y) in enumerate(points):
+            draw.ellipse((x-radius, y-radius, x+radius, y+radius), outline=gold,
+                         fill=orange if index in {0, len(points)-1} else None, width=weight)
+        for offset in (.12, .84):
+            draw.arc((x0 + width*offset - unit*.06, y0 + height*.12,
+                      x0 + width*offset + unit*.06, y0 + height*.88), 70, 290, fill=border, width=weight)
+    elif layout == "hydraulic":
+        pipe_w = max(weight * 2, int(unit*.007))
+        pipe = [(x0, y0 + height*.30), (x0 + width*.34, y0 + height*.30),
+                (x0 + width*.34, y0 + height*.65), (x0 + width*.72, y0 + height*.65),
+                (x0 + width*.72, y0 + height*.40), (x1, y0 + height*.40)]
+        draw.line(pipe, fill=border, width=pipe_w, joint="curve")
+        for x, y in pipe[1:-1]:
+            radius = pipe_w + 3
+            draw.ellipse((x-radius, y-radius, x+radius, y+radius), outline=bone, width=weight)
+        for index in range(4):
+            x = x0 + width*(.44 + index*.08)
+            y = y0 + height*(.57 - (index % 2)*.04)
+            draw.ellipse((x-unit*.006, y-unit*.010, x+unit*.006, y+unit*.010), fill=gold)
+    elif layout == "installation":
+        cx, cy, radius = x0 + width*.67, y0 + height*.50, min(width, height)*.27
+        draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=gold, width=max(weight, 2))
+        draw.ellipse((cx-radius*.55, cy-radius*.55, cx+radius*.55, cy+radius*.55), outline=border, width=weight)
+        draw.line((cx-radius*1.30, cy, cx+radius*1.30, cy), fill=orange, width=weight)
+        draw.line((cx, cy-radius*1.30, cx, cy+radius*1.30), fill=orange, width=weight)
+        for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+            draw.line((cx+dx*radius*.82, cy+dy*radius*.82,
+                       cx+dx*radius*1.06, cy+dy*radius*.82), fill=bone, width=weight)
+    elif layout == "maintenance":
+        gap = height / 5
+        size = max(8, int(unit*.020))
+        for index in range(4):
+            x, y = x0 + width*.52, y0 + gap*(index+1)
+            draw.rounded_rectangle((x, y, x+size, y+size), radius=max(2, size//5), outline=gold, width=weight)
+            if index < 3:
+                draw.line((x+size*.18, y+size*.52, x+size*.43, y+size*.78,
+                           x+size*1.08, y-size*.10), fill=orange, width=max(2, weight))
+            draw.line((x+size*1.55, y+size*.50, x1, y+size*.50), fill=border, width=weight)
+    elif layout in {"layers", "material_macro"}:
+        for index, color in enumerate((border, gold, orange)):
+            y = y0 + height*(.35 + index*.11)
+            draw.line((x0 + width*.08, y, x1 - width*.08, y-height*.10),
+                      fill=color, width=max(weight, int(unit*(.006 + index*.002))))
+        for index in range(9):
+            x = x0 + width*(.12 + (index % 5)*.17)
+            y = y0 + height*(.16 + (index // 5)*.62)
+            r = max(2, int(unit*(.004 + (index % 3)*.002)))
+            draw.ellipse((x-r, y-r, x+r, y+r), fill=orange if index % 2 else gold)
+    elif layout == "light":
+        cx, cy = x0 + width*.68, y0 + height*.30
+        for spread, alpha in ((.46, border), (.31, gold), (.17, orange)):
+            draw.polygon(((cx, cy), (cx-width*spread, y1), (cx+width*spread, y1)), fill=alpha)
+    elif layout in {"joinery", "sequence"}:
+        for index in range(4):
+            inset = index * min(width, height) * .055
+            draw.rounded_rectangle((x0+inset, y0+inset, x1-inset, y1-inset),
+                                   radius=max(3, int(unit*.009)), outline=gold if index == 1 else border, width=weight)
+
+
 def render_service_card(env, path, segment, plan, brand, style, project):
     c = SimpleNamespace(**env)
     from PIL import Image, ImageDraw, ImageOps
     from media_frames import extract_reference
-    key = str(segment.get("service_key") or "")
+    key = str(segment.get("service_key") or segment.get("service_id") or "")
     visual = segment.get("visual")
     comparison = segment.get("comparison")
     if not (visual or comparison or key and style.get("cards", {}).get("service_adaptive_layout", True)):
@@ -62,61 +153,51 @@ def render_service_card(env, path, segment, plan, brand, style, project):
     unit = min(w, h)
     fonts = style["fonts"]
     title_font, body_font, mono = fonts["title"], fonts["body"], fonts["technical"]
-    draw.rectangle((m, int(h*.085), m+max(3,w*.005), int(h*.16)), fill=orange)
     heading = service.get("label", "FR / PROCESSO")
-    text_fit(c, draw, heading, (m*1.25, h*.085, w*.77, h*.14), mono, unit*.025, gold, 2)
+    bubble_style = str(style.get("cards", {}).get("bubble_style") or "glass")
+    heading_box = (m, int(h*.075), int(w*.76), int(h*.155))
+    bubble_fill = None
+    bubble_outline = None
+    if bubble_style == "solid":
+        bubble_fill = c.hex_rgb(pal.get("surface", "#123F34")) + (248,)
+    elif bubble_style == "glass":
+        bubble_fill = c.hex_rgb(pal.get("surface", "#123F34")) + (176,)
+        bubble_outline = c.hex_rgb(pal.get("border", "#1A6069")) + (175,)
+    elif bubble_style == "outline":
+        bubble_outline = c.hex_rgb(pal.get("gold", "#C8A034")) + (155,)
+    if bubble_fill or bubble_outline:
+        draw.rounded_rectangle(
+            heading_box, radius=max(7, int(unit*.018)), fill=bubble_fill,
+            outline=bubble_outline, width=max(1, int(unit*.002)),
+        )
+    draw.rounded_rectangle(
+        (m, int(h*.075), m+max(4,int(w*.008)), int(h*.155)),
+        radius=max(2, int(unit*.004)), fill=orange,
+    )
+    text_fit(c, draw, heading, (m*1.28, h*.092, w*.72, h*.145), mono, unit*.025, gold, 2)
     if style.get("logo", {}).get("persistent_on_cards", True):
         c.paste_logo_at(canvas, c.logo_path_for(project, style), int(unit*.10), int(unit*.10),
                         (w-m, int(h*.075)), anchor="ra", opacity=245)
-    # Material motifs are editorial structure, never fabricated measurement data.
-    line_color = c.hex_rgb(pal.get("surface", "#123F34")) + (180,)
-    if layout in {"blueprint", "pagination", "foundation"}:
-        step = max(24, unit//12)
-        for x in range(m, w-m, step):
-            draw.line((x, h*.18, x, h*.80), fill=line_color, width=1)
-        for y in range(int(h*.18), int(h*.80), step):
-            draw.line((m, y, w-m, y), fill=line_color, width=1)
-    elif layout == "electrical":
-        copper = c.hex_rgb(pal.get("orange", "#FC7016")) + (185,)
-        points = [(m, int(h*.25)), (int(w*.34), int(h*.25)), (int(w*.44), int(h*.42)),
-                  (int(w*.67), int(h*.42)), (w-m, int(h*.62))]
-        draw.line(points, fill=copper, width=max(2, unit//260), joint="curve")
-        radius = max(5, unit//95)
-        for x, y in points:
-            draw.ellipse((x-radius, y-radius, x+radius, y+radius), outline=gold, width=max(1, unit//420))
-    elif layout == "hydraulic":
-        pipe = c.hex_rgb(pal.get("border", "#1A6069")) + (235,)
-        width = max(5, unit//95)
-        pipe_path = [(m, int(h*.30)), (int(w*.38), int(h*.30)), (int(w*.38), int(h*.58)),
-                     (int(w*.72), int(h*.58)), (int(w*.72), int(h*.75)), (w-m, int(h*.75))]
-        draw.line(pipe_path, fill=pipe, width=width, joint="curve")
-        for x, y in pipe_path[1:-1]:
-            r = width + 3
-            draw.ellipse((x-r, y-r, x+r, y+r), outline=bone, width=max(1, unit//450))
-    elif layout == "installation":
-        cx, cy, r = int(w*.73), int(h*.48), int(unit*.16)
-        draw.ellipse((cx-r, cy-r, cx+r, cy+r), outline=gold, width=max(2, unit//320))
-        draw.line((cx-r-int(unit*.06), cy, cx+r+int(unit*.06), cy), fill=orange, width=max(1, unit//420))
-        draw.line((cx, cy-r-int(unit*.06), cx, cy+r+int(unit*.06)), fill=orange, width=max(1, unit//420))
-        for offset in (-r, r):
-            draw.line((cx+offset, cy-r//3, cx+offset, cy+r//3), fill=bone, width=max(1, unit//500))
-    elif layout == "maintenance":
-        x, y, gap = int(w*.61), int(h*.29), max(20, int(unit*.075))
-        for index in range(4):
-            yy = y + index*gap
-            size = max(8, int(unit*.022))
-            draw.rectangle((x, yy, x+size, yy+size), outline=gold, width=max(1, unit//420))
-            if index < 3:
-                draw.line((x+2, yy+size//2, x+size//2, yy+size-2, x+size+5, yy-3), fill=orange, width=max(2, unit//360))
-            draw.line((x+size+int(unit*.025), yy+size//2, w-m, yy+size//2), fill=line_color, width=max(1, unit//520))
+    # Estrutura procedural específica por serviço, sem dados técnicos fictícios.
+    draw_service_motif(c, draw, layout, (m, h*.17, w-m, h*.84), pal, unit, subtle=True)
     if vertical:
-        title_box = (m, h*.18, w-m, h*.31)
-        panel = (m, h*.345, w-m, h*.66)
-        body_box = (m, h*.70, w-m, h*.84)
+        title_box = (m, h*.17, w-m, h*.285)
+        panel = (m, h*.29, w-m, h*.70)
+        body_box = (m, h*.725, w-m, h*.85)
     else:
         title_box = (m, h*.25, w*.46, h*.53)
         body_box = (m, h*.57, w*.46, h*.80)
         panel = (w*.52, h*.23, w-m, h*.79)
+    if str(segment.get("body") or "").strip() and bubble_style != "minimal":
+        bx0, by0, bx1, by1 = map(int, body_box)
+        pad = max(5, int(unit*.012))
+        body_fill = c.hex_rgb(pal.get("surface", "#123F34")) + ((225 if bubble_style == "solid" else 138),)
+        body_outline = c.hex_rgb(pal.get("gold" if bubble_style == "outline" else "border", "#1A6069")) + (145,)
+        draw.rounded_rectangle(
+            (bx0-pad, by0-pad, bx1+pad, by1+pad), radius=max(8, int(unit*.018)),
+            fill=None if bubble_style == "outline" else body_fill,
+            outline=body_outline, width=max(1, int(unit*.002)),
+        )
     text_fit(c, draw, segment.get("title") or service.get("label") or "FRANCO ROMEU", title_box,
              title_font, unit*.064, bone, 4)
     text_fit(c, draw, segment.get("body") or "", body_box, body_font, unit*.035, bone, 6)
@@ -146,9 +227,16 @@ def render_service_card(env, path, segment, plan, brand, style, project):
     else:
         # Official service asset acts only as an illustration of the category.
         x,y,right,bottom = panel
-        size = int(min(right-x,bottom-y)*.80)
+        # O serviço é a âncora visual do card, com presença maior que os
+        # elementos decorativos e sem invadir título, corpo ou rodapé.
+        size = int(min(right-x,bottom-y)*.94)
         asset = c.ASSETS / service.get("asset", "")
         if asset.is_file():
+            shadow = max(5, int(unit*.012))
+            cx, cy = int((x+right)/2), int((y+bottom)/2)
+            draw.ellipse((cx-size//2-shadow, cy-size//2-shadow,
+                          cx+size//2+shadow, cy+size//2+shadow),
+                         fill=(0, 0, 0, 72), outline=gold, width=max(1, int(unit*.003)))
             c.paste_service_symbol(canvas, asset, (int((x+right)/2), int((y+bottom)/2)), size,
                                    orange, gold, pal.get("border", "#123F34"))
         if layout == "layers":

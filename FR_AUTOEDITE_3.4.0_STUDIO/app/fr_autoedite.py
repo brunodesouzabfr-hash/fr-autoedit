@@ -2785,6 +2785,8 @@ def branded_overlay_image(
     style: dict[str, Any], project_dir: Path, show_lower_third: bool
 ) -> None:
     from PIL import Image, ImageDraw
+    from service_cards import draw_service_motif, text_fit
+    from types import SimpleNamespace
     width, height = int(plan["output"]["width"]), int(plan["output"]["height"])
     palette = style.get("palette", {})
     colors = {
@@ -2802,17 +2804,41 @@ def branded_overlay_image(
 
     overlay_cfg = style.get("persistent_overlay", {})
     logo_cfg = style.get("logo", {})
+    service_key = str(segment.get("service_key") or segment.get("service_id") or "")
+    service = load_service_catalog().get(service_key, {})
+    service_layout = str(service.get("layout") or "editorial")
+    balloon_family = str(segment.get("balloon_family") or service.get("balloon_family") or "fr_tecnico")
     header_top = int(height * 0.035)
     header_height = max(70, int(height * 0.085))
     if overlay_cfg.get("enabled", True):
         opacity = int(255 * float(overlay_cfg.get("background_opacity_percent", 72)) / 100)
+        header_right = width - margin
+        radius = max(8, width // (78 if "hud" in balloon_family else 54))
+        # Sombra, contorno e motivo técnico formam uma única faixa; a leitura
+        # continua dominante sobre a ornamentação.
         draw.rounded_rectangle(
-            (margin, header_top, width - margin, header_top + header_height),
-            radius=max(10, width // 50), fill=(*hex_rgb(colors["deep_green"]), opacity),
+            (margin + max(2, width//420), header_top + max(3, height//320),
+             header_right + max(2, width//420), header_top + header_height + max(3, height//320)),
+            radius=radius, fill=(0, 0, 0, 70),
+        )
+        draw.rounded_rectangle(
+            (margin, header_top, header_right, header_top + header_height),
+            radius=radius, fill=(*hex_rgb(colors["deep_green"]), opacity),
             outline=(*hex_rgb(colors["border"]), 205), width=max(1, width // 360),
         )
+        draw_service_motif(
+            SimpleNamespace(**globals()), draw, service_layout,
+            (width*.60, header_top+4, header_right-4, header_top+header_height-4),
+            {
+                "orange": colors["orange"], "gold": colors["gold"],
+                "border": colors["border"], "bone": colors["bone"],
+            }, min(width, height), subtle=True,
+        )
         accent = max(5, width // 110)
-        draw.rectangle((margin, header_top, margin + accent, header_top + header_height), fill=color_hex(colors["orange"]))
+        draw.rounded_rectangle(
+            (margin, header_top, margin + accent, header_top + header_height),
+            radius=max(2, accent//2), fill=color_hex(colors["orange"]),
+        )
         if overlay_cfg.get("show_top_orange_line", True):
             draw.rectangle((margin, header_top, width - margin, header_top + max(3, height // 320)), fill=color_hex(colors["orange"]))
 
@@ -2832,6 +2858,26 @@ def branded_overlay_image(
         if overlay_cfg.get("show_stage", True):
             stage = str(segment.get("phase_title") or "PROCESSO FR")
             draw.text((text_x, header_top + int(header_height * 0.46)), stage, font=stage_font, fill=color_hex(colors["bone"]))
+        if service:
+            service_label = str(segment.get("service_name") or service.get("short_label") or service.get("label") or "")
+            service_font = font(
+                overlay_cfg.get("technical_font") or fonts.get("technical", "ShareTechMono-Regular.ttf"),
+                max(11, width // 58),
+            )
+            label_box = draw.textbbox((0, 0), service_label, font=service_font)
+            label_width = label_box[2] - label_box[0] + max(20, width//45)
+            label_right = header_right - max(68, int(header_height*.88))
+            label_left = max(text_x, label_right-label_width)
+            draw.rounded_rectangle(
+                (label_left, header_top+header_height*.56, label_right, header_top+header_height*.86),
+                radius=max(5, width//120), fill=(*hex_rgb(colors["surface"]), 225),
+                outline=(*hex_rgb(colors["gold"]), 150), width=max(1, width//520),
+            )
+            draw.text(
+                ((label_left+label_right-label_box[2]+label_box[0])/2,
+                 header_top+header_height*.60),
+                service_label, font=service_font, fill=color_hex(colors["gold"]),
+            )
 
     if logo_cfg.get("persistent_on_branded_video", True):
         safe = int(width * float(logo_cfg.get("safe_margin_percent", 5)) / 100)
@@ -2851,16 +2897,39 @@ def branded_overlay_image(
             )
 
     if show_lower_third:
-        from service_cards import text_fit
-        from types import SimpleNamespace
-        top, bottom = int(height * 0.64), int(height * 0.82)
-        draw.rounded_rectangle((margin, top, width-margin, bottom), radius=max(8,width//50), fill=(*hex_rgb(colors["deep_green"]),230))
-        draw.rectangle((margin,top,margin+max(3,width//160),bottom),fill=color_hex(colors["orange"]))
+        top, bottom = int(height * 0.665), int(height * 0.815)
+        right = min(width-margin, int(width*.84))
+        lower_radius = max(10, width // (82 if "hud" in balloon_family else 48))
+        draw.rounded_rectangle(
+            (margin+max(2,width//420), top+max(3,height//320), right+max(2,width//420), bottom+max(3,height//320)),
+            radius=lower_radius, fill=(0,0,0,78),
+        )
+        draw.rounded_rectangle(
+            (margin, top, right, bottom), radius=lower_radius,
+            fill=(*hex_rgb(colors["deep_green"]),232),
+            outline=(*hex_rgb(colors["border"]),205), width=max(1,width//360),
+        )
+        accent = max(5,width//125)
+        draw.rounded_rectangle((margin,top,margin+accent,bottom),radius=max(2,accent//2),fill=color_hex(colors["orange"]))
+        if service:
+            tag_font = font(
+                overlay_cfg.get("technical_font") or fonts.get("technical","ShareTechMono-Regular.ttf"),
+                max(10,width//62),
+            )
+            tag = str(segment.get("service_name") or service.get("short_label") or service.get("label") or "")
+            tag_box = draw.textbbox((0,0),tag,font=tag_font)
+            tag_right = margin*1.35 + (tag_box[2]-tag_box[0]) + width*.035
+            draw.rounded_rectangle(
+                (margin*1.28,top-height*.027,tag_right,top+height*.012),
+                radius=max(5,width//120),fill=(*hex_rgb(colors["surface"]),245),
+                outline=(*hex_rgb(colors["gold"]),180),width=max(1,width//520),
+            )
+            draw.text((margin*1.45,top-height*.019),tag,font=tag_font,fill=color_hex(colors["gold"]))
         body = str(segment.get("on_screen_text") or segment.get("technical_note", ""))
         text_fit(SimpleNamespace(**globals()), draw, body,
-                 (margin*1.4, top+height*.018, width-margin*1.4, bottom-height*.018),
+                 (margin*1.4, top+height*.020, right-margin*.35, bottom-height*.020),
                  overlay_cfg.get("body_font") or fonts.get("body","Rokkitt-Regular.ttf"),
-                 max(16,width*.037),color_hex(colors["bone"]),6)
+                 max(16,width*.034),color_hex(colors["bone"]),4)
     canvas.save(path)
 
 
@@ -3313,6 +3382,17 @@ def add_music(source: Path, music: Path, volume: float, target: Path, *, ducking
     temp.replace(target)
 
 
+def render_segments_for_version(plan: dict[str, Any], version: str) -> list[dict[str, Any]]:
+    """Retorna apenas o que realmente participa da versão renderizada."""
+    return [
+        segment for segment in plan.get("segments", [])
+        if segment.get("enabled", True)
+        and version in segment.get(
+            "include_in", ["branded", "clean"] if segment.get("type") == "media" else ["branded"]
+        )
+    ]
+
+
 @isolated_render
 def render_plan(project_dir: Path, plan_path: Path, use_proxies: bool = False, only: str = "both") -> list[Path]:
     check_runtime()
@@ -3334,10 +3414,7 @@ def render_plan(project_dir: Path, plan_path: Path, use_proxies: bool = False, o
         versions.append("clean")
     results: list[Path] = []
     for version in versions:
-        selected = [
-            s for s in plan["segments"]
-            if s.get("enabled", True) and version in s.get("include_in", ["branded", "clean"] if s.get("type") == "media" else ["branded"])
-        ]
+        selected = render_segments_for_version(plan, version)
         if not selected:
             raise AutoEditeError(f"A versão {version} não contém segmentos ativos.")
         rendered: list[Path | None] = [None] * len(selected)
@@ -3445,42 +3522,98 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
     plan = read_json(plan_path)
     brand = load_brand()
     style = load_card_style(project_dir)
+    # A geração é uma fronteira explícita de cache. Fundos continuam
+    # cacheados durante o lote, mas nunca atravessam uma nova solicitação do
+    # usuário no Studio.
+    _material_card_background.cache_clear()
     namespace = slugify(plan.get("project", {}).get("slug") or plan.get("project", {}).get("name", "projeto"))
     output_dir = project_dir / "cards_editaveis" / namespace
     output_dir.mkdir(parents=True, exist_ok=True)
-    outputs = []
+    outputs: list[Path] = []
+    pending: list[tuple[Path, Path, dict[str, Any], bool]] = []
     card_segments = [segment for segment in plan.get("segments", []) if segment.get("type") == "card"]
     make_masters = bool(style.get("cards", {}).get("always_generate_4k_masters", True))
     total = len(card_segments) * (2 if make_masters else 1)
     completed = 0
-    for segment in card_segments:
-        target = output_dir / f"{segment['segment_id']}.png"
+    generation_stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+    def stage_preview(target: Path, segment: dict[str, Any], target_plan: dict[str, Any], master: bool) -> None:
+        nonlocal completed
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(f".{target.stem}.{generation_stamp}.partial.png")
+        temporary.unlink(missing_ok=True)
         info(f"Cards {completed + 1}/{total}: gerando {target.name}")
-        card_image(target, segment, plan, brand, style, project_dir)
-        outputs.append(target)
+        try:
+            card_image(temporary, segment, target_plan, brand, style, project_dir)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+        pending.append((temporary, target, segment, master))
         completed += 1
-    if make_masters:
-        source_width = int(plan.get("output", {}).get("width") or 1920)
-        source_height = int(plan.get("output", {}).get("height") or 1080)
-        if source_width > source_height * 1.05:
-            master_width, master_height = 3840, 2160
-        elif source_height > source_width * 1.05:
-            master_width, master_height = 2160, 3840
-        else:
-            master_width, master_height = 2160, 2160
-        master_plan = copy.deepcopy(plan)
-        master_plan.setdefault("output", {}).update({
-            "width": master_width, "height": master_height,
-            "quality_preset": "4k_card_master",
-        })
-        master_dir = output_dir / "4K_MASTERS"
-        master_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
         for segment in card_segments:
-            target = master_dir / f"{segment['segment_id']}_4K.png"
-            info(f"Cards {completed + 1}/{total}: gerando {target.name}")
-            card_image(target, segment, master_plan, brand, style, project_dir)
+            stage_preview(output_dir / f"{segment['segment_id']}.png", segment, plan, False)
+        if make_masters:
+            source_width = int(plan.get("output", {}).get("width") or 1920)
+            source_height = int(plan.get("output", {}).get("height") or 1080)
+            if source_width > source_height * 1.05:
+                master_width, master_height = 3840, 2160
+            elif source_height > source_width * 1.05:
+                master_width, master_height = 2160, 3840
+            else:
+                master_width, master_height = 2160, 2160
+            master_plan = copy.deepcopy(plan)
+            master_plan.setdefault("output", {}).update({
+                "width": master_width, "height": master_height,
+                "quality_preset": "4k_card_master",
+            })
+            master_dir = output_dir / "4K_MASTERS"
+            master_dir.mkdir(parents=True, exist_ok=True)
+            for segment in card_segments:
+                stage_preview(master_dir / f"{segment['segment_id']}_4K.png", segment, master_plan, True)
+
+        # Publicação somente depois de o lote inteiro ter sido construído.
+        # Assim uma falha não faz uma prévia antiga parecer uma geração nova.
+        for temporary, target, _segment, _master in pending:
+            temporary.replace(target)
             outputs.append(target)
-            completed += 1
+    finally:
+        for temporary, _target, _segment, _master in pending:
+            temporary.unlink(missing_ok=True)
+
+    plan_digest = hashlib.sha256(
+        json.dumps(plan, ensure_ascii=False, sort_keys=True, allow_nan=False).encode("utf-8")
+    ).hexdigest()
+    visual_digest = style_signature(brand, style, project_dir)
+    records = []
+    for _temporary, target, segment, master in pending:
+        stat = target.stat()
+        records.append({
+            "relative": rel(target, project_dir),
+            "version": f"{stat.st_mtime_ns:x}-{stat.st_size:x}-{sha256_short(target)}",
+            "segment_id": str(segment.get("segment_id") or ""),
+            "card_kind": str(segment.get("card_kind") or "phase"),
+            "service_key": str(segment.get("service_key") or segment.get("service_id") or ""),
+            "card_family": str(segment.get("card_family") or ""),
+            "balloon_family": str(segment.get("balloon_family") or ""),
+            "is_4k_master": master,
+        })
+    try:
+        source_plan = rel(plan_path, project_dir)
+    except ValueError:
+        source_plan = plan_path.name
+    write_json(project_dir / "_CONTROLE" / "CARD_PREVIEWS.json", {
+        "schema_version": 1,
+        "generation_id": f"{generation_stamp}-{plan_digest[:10]}-{visual_digest}",
+        "generated_at": now_iso(),
+        "source_plan": source_plan,
+        "plan_sha256": plan_digest,
+        "style_signature": visual_digest,
+        "procedural_service_layers": True,
+        "independent_layer_animation": False,
+        "previews": records,
+    })
     guide = f"""# Cards editáveis — FR AutoEdite {APP_VERSION}
 
 - Conteúdo: altere `title` e `body` nos segmentos `type: card` do plano JSON.
@@ -3535,10 +3668,20 @@ def build_card_preview_plan(project_dir: Path, answers: dict[str, Any]) -> Path:
         segments.append({
             "segment_id": f"P{len(segments) + 1:04d}", "type": "card", "enabled": True,
             "card_kind": "service", "service_key": service["key"],
-            "service_asset": service.get("asset", ""), "include_in": ["branded"],
+            "service_asset": service.get("asset", ""),
+            "service_layout": service.get("layout", ""), "include_in": ["branded"],
             "duration_sec": round(float(service_config.get("duration_sec") or 3.5), 3),
             "title": str(service_config.get("custom_title") or service.get("label") or "SERVIÇO"),
             "body": str(service_config.get("custom_body") or service.get("body") or ""),
+            "service_id": service["key"], "service_name": service.get("label", ""),
+            "service_confidence": 1.0, "service_card_enabled": True,
+            "card_type": "service", "card_mode": "service",
+            "service_family": service.get("visual_family") or service.get("layout", ""),
+            "card_family": service.get("visual_family") or service.get("layout", ""),
+            "balloon_family": service.get("balloon_family", ""),
+            "visual_motif": service.get("visual_motif", ""),
+            "motion_hint": service.get("motion_hint", ""),
+            "overlay_text": str(service_config.get("custom_title") or service.get("label") or "SERVIÇO"),
             "phase_order": 0, "transition": transitions[len(segments) % len(transitions)],
             "card_animation": str(service_config.get("animation") or "forge_reveal"),
         })
