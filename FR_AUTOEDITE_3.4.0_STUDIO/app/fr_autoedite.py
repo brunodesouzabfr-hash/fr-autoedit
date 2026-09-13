@@ -178,6 +178,24 @@ def normalize_answers(raw: dict[str, Any]) -> dict[str, Any]:
     base = read_json(TEMPLATES / "questionario_base.json")
     merged = deep_merge(base, raw)
     merged["schema_version"] = 3
+    input_config = merged.setdefault("input", {})
+    input_mode = str(input_config.get("mode") or "raw_media").strip().lower()
+    if input_mode not in {"raw_media", "ready_video"}:
+        raise AutoEditeError("input.mode inválido: use raw_media ou ready_video.")
+    input_config["mode"] = input_mode
+    input_config["base_video_id"] = str(input_config.get("base_video_id") or "")
+    input_config["timeline_locked"] = bool(
+        input_config.get("timeline_locked", input_mode == "ready_video")
+    )
+    if input_mode == "ready_video":
+        input_config["timeline_locked"] = True
+    input_config["allow_duration_extension"] = bool(input_config.get("allow_duration_extension", False))
+    from style_engine import DEFAULT_STYLE_PACK_ID, load_style_pack, StylePackError
+    input_config["style_pack_id"] = str(input_config.get("style_pack_id") or DEFAULT_STYLE_PACK_ID)
+    try:
+        load_style_pack(APP_ROOT, input_config["style_pack_id"])
+    except StylePackError as exc:
+        raise AutoEditeError(str(exc)) from exc
     edition = merged.setdefault("edition", {})
     edition["order_mode"] = normalize_order_mode(
         edition.get("order_mode", "automatico")
@@ -2239,13 +2257,31 @@ def sync_card_style_from_answers(
     return style
 
 
-def style_signature(brand: dict[str, Any], style: dict[str, Any], project_dir: Path) -> str:
+def style_signature(
+    brand: dict[str, Any], style: dict[str, Any], project_dir: Path,
+    plan: dict[str, Any] | None = None,
+) -> str:
+    """Assina design, Style Pack, serviço e bytes/mtime de assets dependentes."""
     logo = logo_path_for(project_dir, style)
     payload = json.dumps({"brand": brand, "style": style}, ensure_ascii=False, sort_keys=True).encode("utf-8")
     digest = hashlib.sha256(payload)
     if logo.is_file():
+        stat = logo.stat()
+        digest.update(f"logo:{stat.st_mtime_ns}:{stat.st_size}:".encode("ascii"))
         digest.update(sha256_short(logo).encode("ascii"))
-    return digest.hexdigest()[:12]
+    catalog = load_service_catalog()
+    service_assets = []
+    # O catálogo é pequeno; assinar todos os medalhões também invalida cards
+    # ainda não presentes na timeline, antes de o usuário trocar o serviço.
+    for key in sorted(catalog):
+        relative = str(catalog.get(key, {}).get("asset") or "")
+        if relative:
+            service_assets.append(ASSETS / relative)
+    from style_engine import DEFAULT_STYLE_PACK_ID, style_pack_signature
+    pack_id = str((plan or {}).get("style_pack_id") or DEFAULT_STYLE_PACK_ID)
+    digest.update(style_pack_signature(APP_ROOT, pack_id, extra_assets=service_assets).encode("ascii"))
+    digest.update(pack_id.encode("utf-8"))
+    return digest.hexdigest()[:24]
 
 
 def color_hex(value: str) -> str:
@@ -3400,7 +3436,7 @@ def render_plan(project_dir: Path, plan_path: Path, use_proxies: bool = False, o
     use_proxies = bool(use_proxies or plan.get("output", {}).get("render_source") == "proxies")
     brand = load_brand()
     style = load_card_style(project_dir)
-    visual_signature = style_signature(brand, style, project_dir)
+    visual_signature = style_signature(brand, style, project_dir, plan)
     render_root = project_dir / "render"
     from project_scope import read as scope_read
     run_record = scope_read(project_dir / "RENDER_RUN.json", {})
@@ -3585,7 +3621,7 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
     plan_digest = hashlib.sha256(
         json.dumps(plan, ensure_ascii=False, sort_keys=True, allow_nan=False).encode("utf-8")
     ).hexdigest()
-    visual_digest = style_signature(brand, style, project_dir)
+    visual_digest = style_signature(brand, style, project_dir, plan)
     records = []
     for _temporary, target, segment, master in pending:
         stat = target.stat()
@@ -3610,6 +3646,8 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
         "source_plan": source_plan,
         "plan_sha256": plan_digest,
         "style_signature": visual_digest,
+        "style_pack_id": str(plan.get("style_pack_id") or "fr_chiaroscuro_vintage_v1"),
+        "asset_dependency_signature": visual_digest,
         "procedural_service_layers": True,
         "independent_layer_animation": False,
         "previews": records,
@@ -4954,6 +4992,14 @@ Este pacote foi preparado pelo **FR AutoEdite {APP_VERSION} Universal** para o p
 
 def external_ai_package_prompt(answers: dict[str, Any]) -> str:
     project_name = str(answers.get("project", {}).get("name") or "Projeto Franco Romeu")
+    input_mode = str(answers.get("input", {}).get("mode") or "raw_media")
+    mode_instruction = (
+        "Este projeto usa `ready_video`: preserve integralmente o vídeo-base e edite somente `overlays`. "
+        "Não corte, reordene, acelere, estabilize ou substitua quadros. Respeite `timeline_locked=true`, "
+        "a duração e o áudio existentes."
+        if input_mode == "ready_video" else
+        "Este projeto usa `raw_media`: selecione e ordene os registros pelo contrato de montagem."
+    )
     return f"""# INSTRUÇÕES PARA A IA EXTERNA — FR AUTOEDITE {APP_VERSION}
 
 Copie esta instrução para o chat da IA depois de anexar todos os arquivos desta pasta e
@@ -4962,6 +5008,8 @@ todos os lotes de proxies. O projeto é **{project_name}**.
 O FR AutoEdite transforma registros simples de obra, reforma, projeto e processo em uma
 montagem executável. O Roteiro Mestre é um contrato declarativo: a ordem das listas define
 a montagem e o aplicativo valida cada mídia, janela de tempo e escolha antes de renderizar.
+
+Modo de entrada atual: `{input_mode}`. {mode_instruction}
 
 Leia primeiro `00_NAO_EDITAR_CONTEXTO_PROJETO.md`, depois
 `02_NAO_EDITAR_MANIFESTO_MEDIA.json`, e assista a todos os proxies contidos em
@@ -4978,6 +5026,12 @@ configurações técnicas disponíveis no contrato. Para trocar de serviço, cla
 trecho com `service_id`/`service_key` e use cards `card_kind=service` nos pontos exatos da
 mudança. Preencha também confiança, tipo/família do card, família do balão, motivo visual,
 texto sobreposto, locução, legenda e transições de entrada/saída por segmento.
+
+Quando `input_mode=ready_video`, preencha `overlays` usando apenas `service_card`,
+`common_card`, `balloon`, `callout`, `lower_third`, `caption` e `logo`. Cada camada precisa
+de ID único, início/fim dentro da duração, apresentação, posição, área segura, opacidade,
+animação de entrada/saída e política de áudio. `rationale` é metadado e nunca aparece no
+vídeo. Deixe `asset_id` vazio para fallback procedural ou use somente um asset instalado.
 
 Aplique o DNA Franco Romeu: luxo conceitual, precisão técnica, verde-petróleo predominante,
 laranja como acento, ouro/osso de apoio, tipografia do contrato, respiro e evidência real.
@@ -5633,11 +5687,64 @@ Abra o painel com: `fr-autoedite studio`
     return manifest, plan
 
 
+def reindex_style_assets(project_dir: Path) -> dict[str, Any]:
+    """Atualiza somente o índice do Style Pack; nunca remove assets."""
+    answers = normalize_answers(read_json(project_dir / "QUESTIONARIO_RESPONDIDO.json"))
+    from style_engine import asset_index, style_pack_signature
+    style_pack_id = str(answers.get("input", {}).get("style_pack_id") or "fr_chiaroscuro_vintage_v1")
+    result = asset_index(APP_ROOT, style_pack_id)
+    result["signature"] = style_pack_signature(APP_ROOT, style_pack_id)
+    result["indexed_at"] = now_iso()
+    write_json(project_dir / "_CONTROLE" / "STYLE_PACK_INDEX.json", result)
+    info(
+        f"Style Pack {style_pack_id}: {sum(item['installed'] for item in result['assets'])} instalado(s), "
+        f"{len(result['missing_optional'])} slot(s) opcional(is) aguardando arte."
+    )
+    return result
+
+
+def prepare_ready_video(
+    source: Path, project_dir: Path, answers: dict[str, Any], *, package: bool = True,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Prepara um vídeo já editado sem executar a montagem de mídias brutas."""
+    from ready_video import prepare as prepare_ready
+    manifest, plan = prepare_ready(globals(), source, project_dir, answers)
+    answers = normalize_answers(read_json(project_dir / "QUESTIONARIO_RESPONDIDO.json"))
+    write_manifest_csv(project_dir / "MANIFESTO_MEDIA.csv", manifest.get("media", []))
+    write_handoff_files(project_dir, answers, manifest)
+    create_contact_sheets(project_dir, manifest.get("media", []))
+    sync_card_style_from_answers(project_dir, answers)
+    reindex_style_assets(project_dir)
+    if answers.get("editing_brief", {}).get("auto_generate", True):
+        generate_ai_editing_brief(project_dir, answers, plan, manifest)
+    if package:
+        create_chatgpt_package(project_dir, answers)
+    for source_file, target in (
+        (project_dir / "QUESTIONARIO_RESPONDIDO.json", project_dir / "_EDITAR" / "01_CONFIGURACOES_DO_PROJETO.json"),
+        (project_dir / "EDIT_PLAN.json", project_dir / "_EDITAR" / "02_PLANO_DA_EDICAO.json"),
+        (project_dir / "CARD_STYLE.json", project_dir / "_EDITAR" / "03_DESIGN_DOS_CARDS.json"),
+        (project_dir / "READY_VIDEO_PLAN.json", project_dir / "_EDITAR" / "04_OVERLAYS_VIDEO_PRONTO.json"),
+    ):
+        if source_file.is_file():
+            shutil.copy2(source_file, target)
+    info(f"Vídeo pronto preparado sem alterar o original: {project_dir}")
+    return manifest, plan
+
+
+def render_ready_video(project_dir: Path, *, preview: bool = False) -> dict[str, Any]:
+    """Aplica camadas ao vídeo pronto pela rota dedicada e bloqueada."""
+    from ready_video import render as render_ready
+    plan_path = project_dir / "READY_VIDEO_PLAN.json"
+    if not plan_path.is_file():
+        raise AutoEditeError("READY_VIDEO_PLAN.json não encontrado. Prepare ou importe o Roteiro Mestre primeiro.")
+    return render_ready(globals(), project_dir, read_json(plan_path), preview=preview)
+
+
 def status(project_dir: Path) -> None:
     print(f"Projeto: {project_dir}")
     for name in (
         "QUESTIONARIO_RESPONDIDO.json", "CONTEXTO_PROJETO.md", "MANIFESTO_MEDIA.json",
-        "EDIT_PLAN.json", "CARD_STYLE.json", "SOCIAL_PLAN.json",
+        "EDIT_PLAN.json", "READY_VIDEO_PLAN.json", "CARD_STYLE.json", "SOCIAL_PLAN.json",
         "ROTEIRO_MESTRE_PARA_IA.md", "PUBLICACAO_SOCIAL.md",
         "PROMPT_PRONTO_PARA_CHATGPT.md", "UPLOAD_LIST.txt",
         "PACOTE_PARA_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
@@ -5730,6 +5837,19 @@ def audit_project(project_dir: Path) -> dict[str, Any]:
             record(f"json:{name}", False, str(exc))
 
     manifest = parsed.get("MANIFESTO_MEDIA.json", {})
+    questionnaire = parsed.get("QUESTIONARIO_RESPONDIDO.json", {})
+    if questionnaire.get("input", {}).get("mode") == "ready_video":
+        ready_path = project_dir / "READY_VIDEO_PLAN.json"
+        record("arquivo:READY_VIDEO_PLAN.json", ready_path.is_file(), str(ready_path))
+        if ready_path.is_file():
+            try:
+                from master_contract import validate_ready_video_contract
+                from types import SimpleNamespace
+                ready_payload = read_json(ready_path)
+                validate_ready_video_contract(SimpleNamespace(**globals()), ready_payload, manifest)
+                record("ready_video:contrato", True, "Timeline bloqueada e overlays válidos")
+            except (AutoEditeError, ValueError, TypeError) as exc:
+                record("ready_video:contrato", False, str(exc))
     rows = {str(row.get("id")): row for row in manifest.get("media", [])}
     plan = parsed.get("EDIT_PLAN.json", {})
     unknown_ids: list[str] = []
@@ -6060,6 +6180,19 @@ def parser() -> argparse.ArgumentParser:
     prep.add_argument("--respostas", required=True, help="questionário JSON respondido")
     prep.add_argument("--zip", dest="zip_path", help="substitui o caminho do ZIP do questionário")
     prep.add_argument("--projeto", help="substitui a pasta de projeto")
+    ready_prep = commands.add_parser(
+        "preparar-video-pronto",
+        help="catalogar um vídeo já editado sem cortar nem remontar seu conteúdo",
+    )
+    ready_prep.add_argument("--arquivo", required=True, help="vídeo-base já editado")
+    ready_prep.add_argument("--respostas", required=True, help="questionário JSON do projeto")
+    ready_prep.add_argument("--projeto", required=True, help="pasta do projeto")
+    ready_preview = commands.add_parser("preview-video-pronto", help="gerar prévia curta dos overlays do vídeo pronto")
+    ready_preview.add_argument("--projeto", required=True)
+    ready_render = commands.add_parser("render-video-pronto", help="renderizar overlays preservando a timeline do vídeo pronto")
+    ready_render.add_argument("--projeto", required=True)
+    style_index = commands.add_parser("reindexar-assets", help="reindexar slots instalados do Style Pack")
+    style_index.add_argument("--projeto", required=True)
     takeout = commands.add_parser(
         "importar-takeout",
         help="restaurar datas dos JSONs do Google Takeout e criar o ZIP de entrada",
@@ -6234,6 +6367,20 @@ def main(argv: list[str] | None = None) -> int:
                 embed_metadata=not args.sem_metadados_internos,
             )
             return 0
+        if args.command == "preparar-video-pronto":
+            answers = normalize_answers(read_json(expand_path(args.respostas)))
+            answers.setdefault("input", {})["mode"] = "ready_video"
+            prepare_ready_video(expand_path(args.arquivo), expand_path(args.projeto), answers)
+            return 0
+        if args.command == "preview-video-pronto":
+            render_ready_video(expand_path(args.projeto), preview=True)
+            return 0
+        if args.command == "render-video-pronto":
+            render_ready_video(expand_path(args.projeto), preview=False)
+            return 0
+        if args.command == "reindexar-assets":
+            reindex_style_assets(expand_path(args.projeto))
+            return 0
         if args.command in {"preparar", "tudo"}:
             answers = normalize_answers(read_json(expand_path(args.respostas)))
             zip_path, project_dir = project_paths(answers, args.projeto)
@@ -6248,6 +6395,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "render":
             project_dir = expand_path(args.projeto)
             questionnaire = project_dir / "QUESTIONARIO_RESPONDIDO.json"
+            if questionnaire.is_file() and normalize_answers(read_json(questionnaire)).get("input", {}).get("mode") == "ready_video":
+                render_ready_video(project_dir, preview=False)
+                return 0
             if questionnaire.is_file() and read_json(project_dir / "EDIT_PLAN.json").get("contract_version") != 2:
                 sync_card_style_from_answers(project_dir, normalize_answers(read_json(questionnaire)))
             plan_path = expand_path(args.plano) if args.plano else project_dir / "EDIT_PLAN.json"
@@ -6256,6 +6406,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "draft":
             project_dir = expand_path(args.projeto)
             questionnaire = project_dir / "QUESTIONARIO_RESPONDIDO.json"
+            if questionnaire.is_file() and normalize_answers(read_json(questionnaire)).get("input", {}).get("mode") == "ready_video":
+                render_ready_video(project_dir, preview=True)
+                return 0
             if questionnaire.is_file() and read_json(project_dir / "EDIT_PLAN.json").get("contract_version") != 2:
                 sync_card_style_from_answers(project_dir, normalize_answers(read_json(questionnaire)))
             render_draft(project_dir, only=args.somente)
@@ -6263,6 +6416,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "social":
             project_dir = expand_path(args.projeto)
             answers = normalize_answers(read_json(project_dir / "QUESTIONARIO_RESPONDIDO.json"))
+            if answers.get("input", {}).get("mode") == "ready_video":
+                raise AutoEditeError(
+                    "Saídas sociais com novo recorte alterariam a timeline bloqueada do vídeo pronto. "
+                    "Renderize os overlays; versões sociais sem cortes serão adicionadas em fase posterior."
+                )
             if read_json(project_dir / "EDIT_PLAN.json").get("contract_version") != 2:
                 sync_card_style_from_answers(project_dir, answers)
             render_social_outputs(

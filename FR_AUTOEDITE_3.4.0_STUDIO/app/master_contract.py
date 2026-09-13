@@ -14,6 +14,19 @@ CARD_KINDS = {"intro", "service", "phase", "outro", "detail", "comparison"}
 ANIMATIONS = {"none", "soft_zoom", "forge_reveal", "zoom_out", "fade"}
 PROTECTED = {"ai_copilot", "cloud_export", "handoff", "local_analysis"}
 CARD_MODES = {"none", "common", "service"}
+INPUT_MODES = {"raw_media", "ready_video"}
+OVERLAY_KINDS = {
+    "service_card", "common_card", "balloon", "callout", "lower_third",
+    "caption", "logo",
+}
+OVERLAY_PRESENTATIONS = {"overlay", "full_frame"}
+OVERLAY_POSITIONS = {
+    "top_left", "top_center", "top_right", "center",
+    "bottom_left", "bottom_center", "bottom_right",
+}
+OVERLAY_SAFE_AREAS = {"auto", "title_safe", "action_safe", "none"}
+OVERLAY_ANIMATIONS = {"none", "fade", "slide_up", "slide_down", "soft_scale"}
+AUDIO_POLICIES = {"preserve", "mix"}
 SERVICE_ALIASES = {
     "projeto_3d": "projetos_3d", "project_3d": "projetos_3d",
     "mobilia": "moveis", "marcenaria": "moveis", "mobilia_marcenaria": "moveis",
@@ -131,6 +144,143 @@ def validate_strategy(c, value):
     if intent and intent not in allowed_intents:
         fail(c, "strategy.editorial.primary_intent: escolha um valor de allowed_values.primary_intents.")
     return result
+
+
+def validate_ready_video_contract(c, payload, manifest):
+    """Valida o contrato de camadas sem permitir edição oculta do vídeo-base."""
+    if not isinstance(payload, dict):
+        fail(c, "ready_video: esperado objeto.")
+    mode = str(payload.get("input_mode") or manifest.get("input_mode") or "raw_media")
+    if mode not in INPUT_MODES:
+        fail(c, "input_mode: use raw_media ou ready_video.")
+    if mode == "raw_media":
+        return {
+            "input_mode": "raw_media", "base_video_id": "", "timeline_locked": False,
+            "allow_duration_extension": False,
+            "style_pack_id": str(payload.get("style_pack_id") or "fr_chiaroscuro_vintage_v1"),
+            "audio_policy": "preserve", "overlays": [],
+        }, []
+    base_video_id = str(payload.get("base_video_id") or manifest.get("base_video_id") or "")
+    row = next(
+        (item for item in manifest.get("media", [])
+         if item.get("id") == base_video_id and item.get("status", "ok") == "ok"),
+        None,
+    )
+    if not row or row.get("media_type") != "video":
+        fail(c, f"base_video_id: vídeo disponível não encontrado: `{base_video_id}`.")
+    duration = float(row.get("duration_sec") or 0)
+    if duration <= 0:
+        fail(c, "base_video_id: duração do vídeo-base indisponível.")
+    if payload.get("timeline_locked", True) is not True:
+        fail(c, "timeline_locked: ready_video exige true para impedir cortes, reordenação ou velocidade.")
+    allow_extension = payload.get("allow_duration_extension", False)
+    if not isinstance(allow_extension, bool):
+        fail(c, "allow_duration_extension: use true ou false.")
+    style_pack_id = str(payload.get("style_pack_id") or "fr_chiaroscuro_vintage_v1")
+    try:
+        from style_engine import load_style_pack, resolve_asset, StylePackError
+        style_manifest = load_style_pack(c.APP_ROOT, style_pack_id)
+    except StylePackError as exc:
+        fail(c, str(exc))
+    services = c.load_service_catalog()
+    overlays = payload.get("overlays", [])
+    if not isinstance(overlays, list) or len(overlays) > 500:
+        fail(c, "overlays: use uma lista com até 500 camadas.")
+    seen: set[str] = set()
+    normalized: list[dict] = []
+    notices: list[dict] = []
+    for index, raw in enumerate(overlays, 1):
+        label = f"overlays[{index}]"
+        if not isinstance(raw, dict):
+            fail(c, label + ": esperado objeto.")
+        item = copy.deepcopy(raw)
+        overlay_id = str(item.get("overlay_id") or f"OV{index:04d}")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", overlay_id) or overlay_id in seen:
+            fail(c, label + ".overlay_id: use ID único com letras, números, hífen ou sublinhado.")
+        seen.add(overlay_id)
+        kind = str(item.get("kind") or "")
+        if kind not in OVERLAY_KINDS:
+            fail(c, label + f".kind: tipo desconhecido `{kind}`. Use um kind executável de allowed_values.overlay_kinds.")
+        start = number(c, item.get("start_sec"), label + ".start_sec", 0, duration)
+        end = number(c, item.get("end_sec"), label + ".end_sec", 0, duration)
+        if end <= start:
+            fail(c, label + ".end_sec: precisa ser maior que start_sec.")
+        if end > duration + 0.0005:
+            fail(c, label + f".end_sec: {end:.3f}s excede o vídeo-base de {duration:.3f}s.")
+        presentation = str(item.get("presentation") or "overlay")
+        if presentation not in OVERLAY_PRESENTATIONS:
+            fail(c, label + ".presentation: use overlay ou full_frame.")
+        position = str(item.get("position") or ("top_right" if kind == "logo" else "bottom_center" if kind in {"caption", "lower_third"} else "bottom_left"))
+        if position not in OVERLAY_POSITIONS:
+            fail(c, label + ".position: posição desconhecida.")
+        safe_area = item.get("safe_area", "auto")
+        if isinstance(safe_area, dict):
+            for side in ("top", "right", "bottom", "left"):
+                if side in safe_area:
+                    safe_area[side] = number(c, safe_area[side], label + ".safe_area." + side, 0, 0.45)
+        elif str(safe_area) not in OVERLAY_SAFE_AREAS:
+            fail(c, label + ".safe_area: use auto, title_safe, action_safe, none ou margens proporcionais.")
+        animation_in = str(item.get("animation_in") or "fade")
+        animation_out = str(item.get("animation_out") or "fade")
+        if animation_in not in OVERLAY_ANIMATIONS or animation_out not in OVERLAY_ANIMATIONS:
+            fail(c, label + ": animation_in/animation_out desconhecida.")
+        if animation_in not in {"none", "fade"} or animation_out not in {"none", "fade"}:
+            notices.append({
+                "level": "warning", "block": label + ".animation",
+                "message": "A animação direcional foi preservada, mas esta V1 executa sua entrada/saída como fade suave.",
+                "effect": "Posição, conteúdo e janela permanecem exatos; movimento independente fica para o próximo compositor.",
+            })
+        audio_policy = str(item.get("audio_policy") or payload.get("audio_policy") or "preserve")
+        if audio_policy not in AUDIO_POLICIES:
+            fail(c, label + ".audio_policy: use preserve ou mix.")
+        service_key = SERVICE_ALIASES.get(str(item.get("service_key") or ""), str(item.get("service_key") or ""))
+        if service_key and service_key not in services:
+            fail(c, label + f".service_key: serviço desconhecido `{service_key}`.")
+        if kind == "service_card" and not service_key:
+            fail(c, label + ".service_key: obrigatório para service_card.")
+        asset_id = str(item.get("asset_id") or "")
+        if asset_id:
+            try:
+                resolve_asset(c.APP_ROOT, style_pack_id, asset_id)
+            except StylePackError as exc:
+                fail(c, label + ".asset_id: " + str(exc))
+        text = clean_editorial_text(c, str(item.get("text") or ""), label + ".text")
+        if kind in {"balloon", "callout", "lower_third", "caption"} and not text:
+            fail(c, label + ".text: texto final obrigatório para esta camada.")
+        rationale = clean_editorial_text(c, str(item.get("rationale") or ""), label + ".rationale")
+        if rationale:
+            notices.append({
+                "level": "info", "block": label + ".rationale",
+                "message": "Justificativa aceita somente como metadado.",
+                "effect": "O texto rationale nunca será desenhado no vídeo.",
+            })
+        normalized.append({
+            "overlay_id": overlay_id, "kind": kind,
+            "start_sec": round(start, 6), "end_sec": round(end, 6),
+            "text": text, "body": clean_editorial_text(c, str(item.get("body") or ""), label + ".body"),
+            "service_key": service_key, "asset_id": asset_id,
+            "presentation": presentation, "position": position, "safe_area": safe_area,
+            "opacity": number(c, item.get("opacity", 1.0), label + ".opacity", 0, 1),
+            "animation_in": animation_in, "animation_out": animation_out,
+            "audio_policy": audio_policy, "rationale": rationale,
+        })
+    global_audio = str(payload.get("audio_policy") or "preserve")
+    if global_audio not in AUDIO_POLICIES:
+        fail(c, "audio_policy: use preserve ou mix.")
+    if global_audio == "mix" or any(item["audio_policy"] == "mix" for item in normalized):
+        notices.append({
+            "level": "info", "block": "audio_policy",
+            "message": "Mixagem foi solicitada sem uma faixa de áudio declarada.",
+            "effect": "O render preserva o áudio-base; uma faixa futura exigirá asset de áudio validado.",
+        })
+    return {
+        "input_mode": "ready_video", "base_video_id": base_video_id,
+        "timeline_locked": True, "allow_duration_extension": allow_extension,
+        "style_pack_id": style_pack_id, "audio_policy": global_audio,
+        "overlays": normalized, "base_duration_sec": duration,
+        "style_pack_label": style_manifest.get("label", style_pack_id),
+        "project": copy.deepcopy(payload.get("configuration", {}).get("project") or payload.get("project") or {}),
+    }, notices
 
 
 def normalize_segment_contract(c, segment, label, warnings):
@@ -634,7 +784,8 @@ def prepare_bundle(env, project, payload):
         fail(c, "schema_version incompatível. Gere um novo Markdown nesta versão do Studio.")
     supported_top = {"schema_version","application","roteiro","configuration","main_timeline","reels",
                      "carousel","stories","card_style","publication","strategy","executive_summary",
-                     "media_inventory","allowed_values"}
+                     "media_inventory","allowed_values","input_mode","base_video_id","timeline_locked",
+                     "allow_duration_extension","style_pack_id","audio_policy","overlays"}
     top_warnings = [{"level":"warning","block":key,
         "message":"Bloco ainda não executado foi ignorado nesta versão.",
         "effect":"Filme, planos e configurações reconhecidos continuam válidos."}
@@ -654,6 +805,38 @@ def prepare_bundle(env, project, payload):
         for key in keys:
             config[group][key] = current.get(group, {}).get(key, "")
     config["cards"]["style_file"] = "CARD_STYLE.json"
+    ready, ready_notices = validate_ready_video_contract(c, payload, manifest)
+    if ready["input_mode"] == "ready_video":
+        # Faça esta barreira antes da validação genérica de recortes. Assim uma
+        # tentativa de editar a timeline travada recebe o diagnóstico correto,
+        # sem ser confundida com um simples intervalo fora da mídia.
+        raw_main = payload.get("main_timeline")
+        raw_segments = raw_main.get("segments") if isinstance(raw_main, dict) else None
+        active = [item for item in raw_segments or [] if isinstance(item, dict) and item.get("enabled", True)]
+        base_duration = float(ready["base_duration_sec"])
+        locked = active[0] if len(active) == 1 else {}
+        def locked_number(value, fallback):
+            try:
+                return float(fallback if value is None else value)
+            except (TypeError, ValueError):
+                fail(c, "main_timeline: vídeo pronto está bloqueado; tempos e velocidade devem permanecer numéricos e inalterados.")
+        if (
+            len(active) != 1
+            or locked.get("type") != "media"
+            or locked.get("media_id") != ready["base_video_id"]
+            or abs(locked_number(locked.get("start_sec"), 0)) > 0.0005
+            or abs(locked_number(locked.get("duration_sec"), 0) - base_duration) > 0.001
+            or ("end_sec" in locked and abs(locked_number(locked.get("end_sec"), 0) - base_duration) > 0.001)
+            or abs(locked_number(locked.get("playback_speed"), 1) - 1.0) > 0.000001
+        ):
+            fail(c, "main_timeline: vídeo pronto está bloqueado; preserve início 0, duração integral, ordem e velocidade 1x.")
+    config.setdefault("input", {}).update({
+        key: copy.deepcopy(ready[key]) for key in (
+            "input_mode", "base_video_id", "timeline_locked",
+            "allow_duration_extension", "style_pack_id",
+        )
+    })
+    config["input"]["mode"] = config["input"].pop("input_mode")
     provenance = scope.identity(project, manifest)
     meta = copy.deepcopy(payload.get("roteiro") or {"id": "roteiro-legado", "name": "Roteiro importado R4", "revision": 1, **provenance})
     if version == 2 and any(meta.get(k) != v for k, v in provenance.items()):
@@ -717,6 +900,22 @@ def prepare_bundle(env, project, payload):
                 fail(c, label + ": a versão " + name + " está ativa, mas não possui segmentos.")
         return p
     main = complete(payload.get("main_timeline"), "filme principal")
+    if ready["input_mode"] == "ready_video":
+        active_media = [
+            segment for segment in main.get("segments", [])
+            if segment.get("enabled", True) and segment.get("type") == "media"
+        ]
+        base_duration = float(ready["base_duration_sec"])
+        if len(active_media) != 1:
+            fail(c, "main_timeline: ready_video exige exatamente um trecho ativo do vídeo-base.")
+        locked = active_media[0]
+        if (
+            locked.get("media_id") != ready["base_video_id"]
+            or abs(float(locked.get("start_sec") or 0)) > 0.0005
+            or abs(float(locked.get("duration_sec") or 0) - base_duration) > 0.001
+            or abs(float(locked.get("playback_speed") or 1) - 1.0) > 0.000001
+        ):
+            fail(c, "main_timeline: vídeo pronto está bloqueado; preserve início 0, duração integral, ordem e velocidade 1x.")
     reels = payload.get("reels", {})
     if not isinstance(reels, dict):
         fail(c, "reels: esperado objeto de planos indexados pela duração.")
@@ -748,9 +947,13 @@ def prepare_bundle(env, project, payload):
         fail(c, "executive_summary deve ser lista de decisões.")
     result = {"schema_version": 2, "roteiro": meta, "configuration": config, "card_style": style,
               "main_timeline": main, "reels": validated_reels, "carousel": carousel,
-              "stories": stories, "publication": publication, "strategy": strategy, "executive_summary": executive}
+              "stories": stories, "publication": publication, "strategy": strategy, "executive_summary": executive,
+              **{key: copy.deepcopy(ready[key]) for key in (
+                  "input_mode", "base_video_id", "timeline_locked", "allow_duration_extension",
+                  "style_pack_id", "audio_policy", "overlays",
+              )}}
     result["review"] = review(c, result)
-    result["review"]["notices"] = top_warnings + result["review"]["notices"]
+    result["review"]["notices"] = top_warnings + ready_notices + result["review"]["notices"]
     if any(strategy.get(key) for key in ("retention", "ethical_marketing_growth", "ethical_neuromarketing", "final_copy")):
         result["review"]["notices"].append({
             "level": "info", "block": "strategy",
@@ -794,6 +997,13 @@ def apply_file(env, project, path):
                                      "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]},
                  "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md": path.read_bytes(),
                  "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md": path.read_bytes()}
+        if bundle.get("input_mode") == "ready_video":
+            files["READY_VIDEO_PLAN.json"] = {
+                key: copy.deepcopy(bundle[key]) for key in (
+                    "input_mode", "base_video_id", "timeline_locked", "allow_duration_extension",
+                    "style_pack_id", "audio_policy", "overlays",
+                )
+            }
         for key, plan in bundle["reels"].items():
             files[f"social/planos/REEL_{key}S.json"] = plan
         deletes = [p.relative_to(project).as_posix() for p in (project / "social/planos").glob("REEL_*S.json")
@@ -846,13 +1056,19 @@ def generate(env, project, answers=None, plan=None, manifest=None):
         name = str(answers.get("editing_brief", {}).get("scenario_name") or active.get("name") or "roteiro-principal")
         meta = {"id": c.slugify(name)[:64], "name": name, "revision": int(active.get("revision", 0)) + 1,
                 **scope.identity(project, manifest)}
+        input_config = answers.get("input", {})
+        input_mode = str(input_config.get("mode") or manifest.get("input_mode") or "raw_media")
+        base_video_id = str(input_config.get("base_video_id") or manifest.get("base_video_id") or "")
+        ready_plan = scope.read(project / "READY_VIDEO_PLAN.json", {}) if input_mode == "ready_video" else {}
         plans = project / "social/planos"
-        reels = {str(int(c.read_json(p).get("social_target_sec", 0))): c.read_json(p) for p in sorted(plans.glob("REEL_*S.json"))}
+        reels = ({str(int(c.read_json(p).get("social_target_sec", 0))): c.read_json(p) for p in sorted(plans.glob("REEL_*S.json"))}
+                 if input_mode == "raw_media" else {})
         social = answers.get("social", {})
-        if not reels and social.get("reels_enabled"):
+        if input_mode == "raw_media" and not reels and social.get("reels_enabled"):
             reels = {str(t): c.build_reel_plan(plan, int(t)) for t in social.get("reel_durations_sec", [30, 60, 90])}
-        carousel = scope.read(plans / "CARROSSEL_PLAN.json") or c.build_carousel_plan(project, answers, plan, manifest)
-        carousel["enabled"] = social.get("carousel_enabled", True)
+        carousel = (scope.read(plans / "CARROSSEL_PLAN.json") or c.build_carousel_plan(project, answers, plan, manifest)
+                    if input_mode == "raw_media" else {"enabled": False, "slides": []})
+        carousel["enabled"] = bool(input_mode == "raw_media" and social.get("carousel_enabled", True))
         for slide in carousel.get("slides", []):
             if slide.get("kind") == "media" and not slide.get("visual"):
                 row = next((x for x in manifest.get("media", []) if x.get("id") == slide.get("media_id")), {})
@@ -910,9 +1126,28 @@ def generate(env, project, answers=None, plan=None, manifest=None):
         publication.setdefault("caption", "")
         publication.setdefault("hashtags", [])
         publication.setdefault("overlay_typography", {"title_font": "StardosStencil-Bold.ttf", "body_font": "Rokkitt-Regular.ttf", "technical_font": "ShareTechMono-Regular.ttf"})
+        selected_style_pack_id = str(input_config.get("style_pack_id") or "fr_chiaroscuro_vintage_v1")
+        try:
+            from style_engine import asset_index, StylePackError
+            installed_style_assets = [
+                item["asset_id"] for item in asset_index(c.APP_ROOT, selected_style_pack_id)["assets"]
+                if item["installed"]
+            ]
+        except StylePackError:
+            installed_style_assets = []
         payload = {"schema_version": 2, "application": f"FR AutoEdite {c.APP_VERSION}", "roteiro": meta,
+            "input_mode": input_mode,
+            "base_video_id": base_video_id,
+            "timeline_locked": bool(input_mode == "ready_video" or input_config.get("timeline_locked", False)),
+            "allow_duration_extension": bool(input_config.get("allow_duration_extension", False)),
+            "style_pack_id": selected_style_pack_id,
+            "audio_policy": str(ready_plan.get("audio_policy") or "preserve"),
+            "overlays": copy.deepcopy(ready_plan.get("overlays", [])),
             "configuration": safe_config, "main_timeline": plan, "reels": reels,
-            "carousel": carousel, "stories": scope.read(plans / "STORIES_PLAN.json", {"enabled": bool(social.get("stories_enabled") and reels), "source_reel_sec": int(default_story), "part_duration_sec": social.get("story_part_duration_sec", 15)}),
+            "carousel": carousel, "stories": (
+                scope.read(plans / "STORIES_PLAN.json", {"enabled": bool(social.get("stories_enabled") and reels), "source_reel_sec": int(default_story), "part_duration_sec": social.get("story_part_duration_sec", 15)})
+                if input_mode == "raw_media" else {"enabled": False}
+            ),
             "card_style": style, "publication": publication,
             "strategy": {
                 "service_key": answers.get("service_intro", {}).get("service_key", ""),
@@ -954,6 +1189,16 @@ def generate(env, project, answers=None, plan=None, manifest=None):
             },
             "executive_summary": [], "media_inventory": c._brief_media_inventory(manifest),
             "allowed_values": {"transitions": sorted(c.TRANSITION_MAP), "card_kinds": sorted(CARD_KINDS), "card_modes": sorted(CARD_MODES), "card_animations": sorted(ANIMATIONS),
+                "input_modes": sorted(INPUT_MODES), "overlay_kinds": sorted(OVERLAY_KINDS),
+                "overlay_presentations": sorted(OVERLAY_PRESENTATIONS), "overlay_positions": sorted(OVERLAY_POSITIONS),
+                "overlay_safe_areas": sorted(OVERLAY_SAFE_AREAS), "overlay_animations": sorted(OVERLAY_ANIMATIONS),
+                "audio_policies": sorted(AUDIO_POLICIES),
+                "overlay_item_fields": [
+                    "overlay_id", "kind", "start_sec", "end_sec", "text", "service_key", "asset_id",
+                    "presentation", "position", "safe_area", "opacity", "animation_in", "animation_out",
+                    "audio_policy", "rationale",
+                ],
+                "style_pack_assets_installed": installed_style_assets,
                 "service_profiles": c.load_service_catalog(), "fonts": sorted(p.name for p in c.FONTS.glob("*.ttf")),
                 "playback_speed": [0.25, 30], "time_basis": ["absolute_parent_media", "scene_local"],
                 "cut_styles": ["hard", "match", "jump", "j_cut", "l_cut"],

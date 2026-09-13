@@ -22,6 +22,7 @@ import uuid
 APP_ROOT = Path(__file__).resolve().parents[1]
 DECISIONS = (
     "QUESTIONARIO_RESPONDIDO.json", "EDIT_PLAN.json", "EDIT_PLAN_DRAFT.json",
+    "READY_VIDEO_PLAN.json",
     "CARD_STYLE.json", "SOCIAL_PLAN.json", "PUBLICACAO_SOCIAL.json",
     "PUBLICACAO_SOCIAL.md", "RESUMO_EXECUTIVO_IA.md", "ESTRATEGIA_IA.json",
     "ROTEIRO_MESTRE_PARA_IA.md", "RELATORIO_APLICACAO_ROTEIRO_IA.json",

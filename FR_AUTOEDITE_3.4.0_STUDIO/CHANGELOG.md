@@ -1,5 +1,27 @@
 # Alterações
 
+## 3.4.0 — Vídeo pronto e Style Pack Chiaroscuro V1 — 2026-09-13
+
+- adiciona o modo `ready_video` para receber um filme já editado e preservar
+  integralmente duração, resolução, FPS, áudio, ordem e velocidade;
+- cria proxy, miniaturas de referência, manifesto, timeline bloqueada e
+  contrato específico de overlays para o Roteiro Mestre;
+- renderiza `service_card`, `common_card`, `balloon`, `callout`, `lower_third`,
+  `caption` e `logo` em janelas temporais validadas, sem alterar o original;
+- exige permissão explícita antes de intro/outro aumentar a duração;
+- introduz o Style Pack `fr_chiaroscuro_vintage_v1`, com 24 slots opcionais,
+  fallbacks procedurais, índice seguro e assinatura de bytes/mtime para cache;
+- adiciona upload, edição de overlays, prévia, render, auditoria e estados
+  responsivos no Studio, mantendo `raw_media` como modo padrão;
+- adiciona testes de integridade SHA-256, duração/áudio, contrato bloqueado,
+  assets, cache, fallback FFmpeg e ausência opcional do MoviePy.
+
+### Validação
+
+- 13 testes específicos do modo vídeo pronto aprovados;
+- `STUDIO HTTP TEST OK`;
+- `SMOKE TEST OK`, incluindo preparação e renders do fluxo de mídias brutas.
+
 ## 3.4.0 Fase 2 — Roteiro Mestre Estratégico e Pacote IA
 
 ### Correções de auditoria — commit `8571235`

@@ -9,11 +9,51 @@ que sempre podem ser revisados pelo usuário.
 from __future__ import annotations
 
 import math
+import importlib.util
 import re
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
+
+
+def compositor_capabilities() -> dict[str, Any]:
+    """Detecta compositores sem importar dependências opcionais no Studio."""
+    moviepy_available = importlib.util.find_spec("moviepy") is not None
+    ffmpeg_available = shutil.which("ffmpeg") is not None
+    return {
+        "ffmpeg": ffmpeg_available,
+        "moviepy": moviepy_available,
+        "preview_backend": "moviepy" if moviepy_available else "ffmpeg",
+        "final_render_backend": "ffmpeg" if ffmpeg_available else "unavailable",
+    }
+
+
+def choose_preview_backend(prefer_moviepy: bool = True) -> str:
+    """Escolhe MoviePy só para prévia; o fallback equivalente é FFmpeg."""
+    capabilities = compositor_capabilities()
+    if prefer_moviepy and capabilities["moviepy"]:
+        return "moviepy"
+    if capabilities["ffmpeg"]:
+        return "ffmpeg"
+    return "unavailable"
+
+
+def ready_video_reference_times(
+    path: Path, duration: float, *, maximum: int = 12,
+) -> list[float]:
+    """Combina mudanças reais de cena com amostras distribuídas do vídeo pronto."""
+    if duration <= 0:
+        return []
+    boundaries = scene_boundaries(path, duration, max_scan_seconds=min(180.0, duration))
+    distributed_count = max(3, min(maximum, int(math.ceil(duration / 20.0)) + 2))
+    distributed = [duration * index / (distributed_count + 1) for index in range(1, distributed_count + 1)]
+    candidates = sorted({round(max(0.0, min(duration - 0.04, value)), 3) for value in [*boundaries, *distributed]})
+    if len(candidates) <= maximum:
+        return candidates
+    # Mantém início, meio e fim sem fingir que toda mudança detectada é relevante.
+    step = (len(candidates) - 1) / max(1, maximum - 1)
+    return [candidates[round(index * step)] for index in range(maximum)]
 
 
 def _laplacian_variance(pixels: bytes, width: int, height: int) -> float:

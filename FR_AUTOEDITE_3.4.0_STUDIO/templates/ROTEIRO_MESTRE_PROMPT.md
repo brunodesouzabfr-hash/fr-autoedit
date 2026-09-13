@@ -5,11 +5,33 @@ Analise este contrato, o contexto do chat e as mídias anexadas. Entregue um ún
 **ROTEIRO MESTRE EDITADO E DEVOLVIDO.md**. Preserve os marcadores e o JSON válido.
 Não devolva somente uma explicação, um novo prompt, pseudocódigo ou um roteiro fora do contrato.
 
-Tome todas as decisões criativas aplicáveis. Você pode substituir por completo as listas de
-segmentos e slides, criar/excluir/reordenar cards e recortes, usar zero cards no filme,
-reutilizar o mesmo media_id várias vezes com tempos diferentes, congelar frames e criar
-comparações. A ordem das listas é exatamente a ordem de execução. Não se limite às escolhas
-automáticas iniciais. Não acrescente funcionalidades que o contrato não executa.
+Tome todas as decisões criativas aplicáveis ao `input_mode`. Em `raw_media`, você pode
+substituir por completo as listas de segmentos e slides, criar/excluir/reordenar cards e
+recortes, usar zero cards no filme, reutilizar o mesmo media_id várias vezes com tempos
+diferentes, congelar frames e criar comparações. Em `ready_video`, a timeline do vídeo-base
+fica bloqueada: decida somente as camadas de `overlays`. Não se limite às escolhas automáticas
+iniciais e não acrescente funcionalidades que o contrato não executa.
+
+### Modos de entrada
+
+- `raw_media`: siga o fluxo integral de seleção, corte, ordem, velocidade e saídas já descrito.
+- `ready_video`: analise o proxy e todas as referências, mas não corte, reordene, acelere,
+  estabilize nem substitua quadros. Preserve `base_video_id`, `timeline_locked=true`, duração,
+  FPS, resolução e áudio. Preencha `overlays` com camadas temporizadas.
+- Em `ready_video`, `allow_duration_extension=false` impede intro/outro de estender a entrega.
+  Só habilite extensão quando o contexto pedir explicitamente e existirem assets locais.
+- `rationale` documenta por que uma camada foi escolhida e nunca deve conter texto que precise
+  aparecer no vídeo. O render não desenha esse campo.
+- Use `presentation=overlay` para preservar a leitura da obra. `full_frame` cobre o quadro
+  somente entre `start_sec` e `end_sec`; não muda o relógio do vídeo-base.
+- `asset_id` vazio usa o fallback procedural do Style Pack. Se informar um ID, use somente um
+  slot instalado no índice; asset declarado mas ausente é rejeitado.
+
+Kinds executáveis: `service_card`, `common_card`, `balloon`, `callout`, `lower_third`,
+`caption` e `logo`. Cada item exige `overlay_id`, `start_sec`, `end_sec`, `presentation`,
+`position`, `safe_area`, `opacity`, `animation_in`, `animation_out` e `audio_policy`.
+O tempo deve estar integralmente dentro da duração do vídeo-base. `audio_policy=preserve`
+mantém o áudio; `mix` só tem efeito quando uma faixa de áudio validada existir.
 
 ### Prioridade das fontes e autonomia
 
@@ -101,6 +123,12 @@ marcenaria ou acabamento, divida a mídia em segmentos com tempos próprios e tr
 
 | Bloco/campo | Regra executável |
 |---|---|
+| input_mode | `raw_media` habilita montagem; `ready_video` bloqueia o vídeo-base e executa somente overlays. |
+| base_video_id / timeline_locked | Em vídeo pronto, preserve o ID fornecido e `timeline_locked=true`. O filme principal deve conter o vídeo-base integral em 1x. |
+| allow_duration_extension | Intro/outro só podem aumentar a entrega quando este booleano for `true`; overlays nunca alteram duração. |
+| style_pack_id | Identifica o Style Pack instalado. A V1 padrão é `fr_chiaroscuro_vintage_v1`. |
+| overlays | Lista temporal independente da montagem. Tipos desconhecidos, IDs repetidos, assets ausentes e tempos fora do vídeo são erros. |
+| overlay.rationale | Metadado de revisão. Nunca aparece no vídeo, card, balão, legenda ou locução. |
 | roteiro | id identifica a alternativa; name é o nome legível; revision é a revisão. Preserve project_id e media_fingerprint. Um escopo por Markdown. Atualize também o comentário ROTEIRO se mudar o id. |
 | configuration | Decisões completas do projeto. Blocos ausentes voltam aos padrões, não herdam o roteiro anterior. Localização de mídias, música/LUT anexadas, credenciais e destinos ficam sob controle local. |
 | main_timeline.segments | Lista completa do filme. Cada ocorrência tem segment_id único. media_id referencia a fonte e pode se repetir. |

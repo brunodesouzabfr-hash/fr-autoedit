@@ -180,6 +180,21 @@ def render_service_card(env, path, segment, plan, brand, style, project):
                         (w-m, int(h*.075)), anchor="ra", opacity=245)
     # Estrutura procedural específica por serviço, sem dados técnicos fictícios.
     draw_service_motif(c, draw, layout, (m, h*.17, w-m, h*.84), pal, unit, subtle=True)
+    # Uma camada externa instalada ocupa o mesmo papel do motivo procedural e
+    # permanece sob textos/fotos. Slot ausente é esperado e não gera ruído.
+    try:
+        from style_engine import load_style_pack, resolve_asset, StylePackError
+        pack_id = str(plan.get("style_pack_id") or "fr_chiaroscuro_vintage_v1")
+        pack = load_style_pack(c.APP_ROOT, pack_id)
+        service_slot = pack.get("services", {}).get(key, {}).get("asset_id")
+        if service_slot:
+            asset_path = resolve_asset(c.APP_ROOT, pack_id, service_slot)
+            with Image.open(asset_path) as opened:
+                layer = ImageOps.contain(opened.convert("RGBA"), (w, h), Image.Resampling.LANCZOS)
+            canvas.alpha_composite(layer, ((w - layer.width) // 2, (h - layer.height) // 2))
+            draw = ImageDraw.Draw(canvas)
+    except (StylePackError, OSError):
+        pass
     if vertical:
         title_box = (m, h*.17, w-m, h*.285)
         panel = (m, h*.29, w-m, h*.70)

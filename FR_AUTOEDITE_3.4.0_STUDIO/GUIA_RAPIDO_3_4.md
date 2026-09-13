@@ -72,6 +72,17 @@ Se o terminal não encontrar o comando:
 
 O ZIP original é preservado no projeto local.
 
+### 6A. Se o material já é um vídeo editado
+
+1. Selecione **Vídeo já editado** em vez de Mídias brutas.
+2. Envie o vídeo-base.
+3. Mantenha a extensão de duração desligada para bloquear intro/outro.
+4. Em Montagem, clique em **Preparar vídeo e referências**.
+
+Nesse modo, o Studio preserva o arquivo recebido e bloqueia cortes, ordem,
+velocidade, resolução, FPS e áudio. Ele cria uma cópia conferida por SHA-256,
+um proxy e imagens de referência para a IA.
+
 ## 7. Gerar proxies e manifesto
 
 Clique em **Preparar projeto**. A aplicação:
@@ -140,6 +151,11 @@ Na **ETAPA 06 · FILME PRINCIPAL**:
 - corrija conflitos;
 - abra a prévia e percorra a timeline.
 
+No modo **Vídeo já editado**, essa etapa muda para **Revise o vídeo-base e suas
+camadas**. Adicione apenas overlays, informe início e fim dentro da duração,
+salve e use **Gerar prévia em popup**. O campo de justificativa é interno e
+nunca aparece no vídeo.
+
 ## 13. Gerar e assistir ao rascunho
 
 Gere o rascunho por proxies. Assista ao vídeo inteiro e confira:
@@ -156,6 +172,10 @@ Gere o rascunho por proxies. Assista ao vídeo inteiro e confira:
 
 Depois da revisão, selecione os originais como fonte da master e renderize.
 Revise também Reels e Stories antes de entregar ou publicar.
+
+No modo **Vídeo já editado**, use **Renderizar vídeo pronto**. A aplicação cria
+uma nova saída em `entrega/` e confere novamente que o vídeo-base não mudou.
+Saídas sociais que exigiriam novo recorte ficam bloqueadas nessa V1.
 
 ## Segurança
 

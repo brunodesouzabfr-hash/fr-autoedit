@@ -1,5 +1,12 @@
 {
   "schema_version": 3,
+  "input": {
+    "mode": "raw_media",
+    "base_video_id": "",
+    "timeline_locked": false,
+    "allow_duration_extension": false,
+    "style_pack_id": "fr_chiaroscuro_vintage_v1"
+  },
   "project": {
     "name": "Novo projeto Franco Romeu",
     "slug": "novo-projeto",

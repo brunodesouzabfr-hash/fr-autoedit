@@ -314,6 +314,7 @@ class StudioState:
             ("VOCÊ EDITA · contexto", "_ENTRADA/CONTEXTO_PROJETO.md", "Preencha no painel Importar"),
             ("STUDIO EDITA · configurações", "QUESTIONARIO_RESPONDIDO.json", "Prefira editar pelos controles do Studio"),
             ("STUDIO EDITA · plano", "EDIT_PLAN.json", "Prefira editar pela timeline"),
+            ("STUDIO EDITA · overlays do vídeo pronto", "READY_VIDEO_PLAN.json", "Timeline bloqueada; edite somente as camadas"),
             ("STUDIO EDITA · design", "CARD_STYLE.json", "Prefira editar em Cards e marca"),
             ("IA EDITA E DEVOLVE · roteiro", "_ENVIAR_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md", "Único Markdown que a IA deve alterar"),
             ("PACOTE PARA IA · pasta canônica", "PACOTE_PARA_IA", "Contexto, roteiro, manifesto, lotes, instruções e resposta"),
@@ -424,6 +425,7 @@ class StudioState:
                 manifest = json.loads((project / "MANIFESTO_MEDIA.json").read_text(encoding="utf-8"))
             except Exception:
                 pass
+        ready_video_plan = project_scope.read(project / "READY_VIDEO_PLAN.json", {})
         reel_plans: dict[str, dict[str, Any]] = {}
         reel_root = project / "social" / "planos"
         if reel_root.is_dir():
@@ -473,6 +475,17 @@ class StudioState:
                     "version": f"legacy-{stat.st_mtime_ns:x}-{stat.st_size:x}",
                     "generation_id": "legacy",
                 })
+        try:
+            from style_engine import asset_index
+            style_pack_id = str(config.get("input", {}).get("style_pack_id") or "fr_chiaroscuro_vintage_v1")
+            style_pack = asset_index(self.app_root, style_pack_id)
+        except Exception as exc:
+            style_pack = {"ready": False, "assets": [], "missing_required": [], "error": str(exc)}
+        try:
+            from local_analysis import compositor_capabilities
+            compositor = compositor_capabilities()
+        except Exception:
+            compositor = {"ffmpeg": bool(shutil.which("ffmpeg")), "moviepy": False, "preview_backend": "ffmpeg"}
         return {
             "application_version": self.app_version,
             "roteiro_versions": project_scope.list_versions(project),
@@ -483,6 +496,9 @@ class StudioState:
             "config": config,
             "context": context,
             "plan": plan,
+            "ready_video_plan": ready_video_plan,
+            "ready_video_preview": project_scope.read(project / "_CONTROLE/READY_VIDEO_PREVIEW.json", {}),
+            "ready_video_render": project_scope.read(project / "_CONTROLE/READY_VIDEO_RENDER.json", {}),
             "manifest": manifest,
             "reel_plans": reel_plans,
             "service_catalog": service_catalog,
@@ -490,10 +506,13 @@ class StudioState:
             "ai_files": self.ai_files(project),
             "artifact_conflicts": self.artifact_conflicts(project),
             "card_previews": card_previews,
+            "style_pack": style_pack,
             "capabilities": {
                 "rclone": bool(shutil.which("rclone")),
                 "ffmpeg": bool(shutil.which("ffmpeg")),
                 "exiftool": bool(shutil.which("exiftool")),
+                "moviepy": bool(compositor.get("moviepy")),
+                "preview_backend": compositor.get("preview_backend", "ffmpeg"),
             },
             "job": job,
         }
@@ -637,7 +656,7 @@ class StudioState:
         protected_prefixes = ("originais/", "_ENTRADA/", "_TAKEOUT/", "_HISTORICO/")
         protected_names = {
             "QUESTIONARIO_RESPONDIDO.json", "FR_AUTOEDITE_PROJECT.json", "MANIFESTO_MEDIA.json",
-            "MANIFESTO_MEDIA.csv", "EDIT_PLAN.json", "CARD_STYLE.json", "SOCIAL_PLAN.json",
+            "MANIFESTO_MEDIA.csv", "EDIT_PLAN.json", "READY_VIDEO_PLAN.json", "CARD_STYLE.json", "SOCIAL_PLAN.json",
             "PUBLICACAO_SOCIAL.json", "PUBLICACAO_SOCIAL.md", "ROTEIRO_MESTRE_PARA_IA.md",
             "00_NAO_EDITAR_CONTEXTO_PROJETO.md", "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
             "02_NAO_EDITAR_MANIFESTO_MEDIA.json", "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md",
@@ -920,7 +939,18 @@ class StudioState:
                 config = {}
         use_proxies = config.get("edition", {}).get("render_source") == "proxies"
         if action == "prepare":
+            if config.get("input", {}).get("mode") == "ready_video":
+                candidates = sorted((project / "_ENTRADA").glob("VIDEO_PRONTO_ORIGINAL.*"))
+                if not candidates:
+                    raise StudioError("Envie primeiro o vídeo já editado.")
+                return [str(self.launcher), "preparar-video-pronto", "--arquivo", str(candidates[-1]), "--respostas", str(questionnaire), "--projeto", str(project)]
             return [str(self.launcher), "preparar", "--respostas", str(questionnaire), "--zip", str(zip_path), "--projeto", str(project)]
+        if action == "ready-preview":
+            return [str(self.launcher), "preview-video-pronto", "--projeto", str(project)]
+        if action == "ready-render":
+            return [str(self.launcher), "render-video-pronto", "--projeto", str(project)]
+        if action == "style-reindex":
+            return [str(self.launcher), "reindexar-assets", "--projeto", str(project)]
         if action == "draft":
             return [str(self.launcher), "draft", "--projeto", str(project)]
         if action == "render":
@@ -1151,6 +1181,31 @@ class StudioState:
         temporary.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(target)
         shutil.copy2(target, project / "_EDITAR" / "02_PLANO_DA_EDICAO.json")
+
+    def save_ready_video_plan(self, project: Path, plan: dict[str, Any]) -> dict[str, Any]:
+        import fr_autoedite as fr
+        from master_contract import validate_ready_video_contract
+        from types import SimpleNamespace
+        manifest_path = project / "MANIFESTO_MEDIA.json"
+        if not manifest_path.is_file():
+            raise StudioError("Prepare o vídeo pronto antes de editar overlays.")
+        try:
+            validated, notices = validate_ready_video_contract(
+                SimpleNamespace(**vars(fr)), plan, fr.read_json(manifest_path),
+            )
+        except fr.AutoEditeError as exc:
+            raise StudioError(str(exc)) from exc
+        target = project / "READY_VIDEO_PLAN.json"
+        previous = project_scope.read(target, {})
+        if target.is_file() and previous != validated:
+            stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            shutil.copy2(target, project / "_HISTORICO" / f"READY_VIDEO_PLAN_{stamp}.json")
+        editable_target = project / "_EDITAR" / "04_OVERLAYS_VIDEO_PRONTO.json"
+        if previous != validated:
+            project_scope.write(target, validated)
+        if previous != validated or not editable_target.is_file():
+            project_scope.write(editable_target, validated)
+        return {"plan": validated, "notices": notices}
 
     def save_reel_plan(self, project: Path, plan: dict[str, Any]) -> Path:
         if (project / "MANIFESTO_MEDIA.json").is_file():
@@ -1439,6 +1494,46 @@ class StudioHandler(BaseHTTPRequestHandler):
                     busy = self.state.jobs.get(project.name, {}).get("running")
                 if busy:
                     raise StudioError("Aguarde a tarefa atual terminar antes de alterar este projeto.")
+            if parsed.path == "/api/ready-video-upload":
+                filename = Path(unquote(self.headers.get("X-Filename", "video.mp4"))).name
+                suffix = Path(filename).suffix.lower()
+                allowed = {".mp4", ".mov", ".mkv", ".m4v", ".avi", ".webm", ".3gp", ".mts", ".m2ts"}
+                if suffix not in allowed:
+                    raise StudioError("Selecione um vídeo compatível para o modo Vídeo já editado.")
+                stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+                incoming = project / "_ENTRADA" / f"VIDEO_PRONTO_RECEBENDO_{stamp}{suffix}"
+                size = self._receive_file(incoming, 80 * 1024 * 1024 * 1024)
+                try:
+                    probe = subprocess.run(
+                        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate:format=duration", "-of", "json", str(incoming)],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    incoming.unlink(missing_ok=True)
+                    raise StudioError("A validação do vídeo pronto excedeu 60 segundos.") from exc
+                if probe.returncode != 0:
+                    incoming.unlink(missing_ok=True)
+                    raise StudioError("O arquivo não pôde ser reconhecido como vídeo íntegro.")
+                existing = sorted((project / "_ENTRADA").glob("VIDEO_PRONTO_ORIGINAL.*"))
+                duplicate = next((old for old in existing if self.state._sha256(old) == self.state._sha256(incoming)), None)
+                if duplicate:
+                    incoming.unlink(missing_ok=True)
+                    config = self.state.load_config(project)
+                    config.setdefault("input", {}).update(mode="ready_video", base_video_id="READY_VIDEO_BASE", timeline_locked=True)
+                    config = self.state.save_config(project, config)
+                    self._json({"ok": True, "path": str(duplicate), "size_bytes": duplicate.stat().st_size,
+                                "duplicate": True, "config": config,
+                                "message": "Este vídeo pronto já estava anexado; nenhuma cópia foi criada."})
+                    return
+                for old in existing:
+                    old.replace(project / "_HISTORICO" / f"VIDEO_PRONTO_ORIGINAL_{stamp}{old.suffix.lower()}")
+                target = project / "_ENTRADA" / f"VIDEO_PRONTO_ORIGINAL{suffix}"
+                incoming.replace(target)
+                config = self.state.load_config(project)
+                config.setdefault("input", {}).update(mode="ready_video", base_video_id="READY_VIDEO_BASE", timeline_locked=True)
+                config = self.state.save_config(project, config)
+                self._json({"ok": True, "path": str(target), "size_bytes": size, "config": config})
+                return
             if parsed.path == "/api/upload":
                 length = int(self.headers.get("Content-Length", "0") or 0)
                 if length < 4:
@@ -1630,6 +1725,10 @@ class StudioHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/plan":
                 self.state.save_plan(project, data.get("plan") or {})
                 self._json({"ok": True})
+                return
+            if parsed.path == "/api/ready-video-plan":
+                result = self.state.save_ready_video_plan(project, data.get("plan") or {})
+                self._json({"ok": True, **result})
                 return
             if parsed.path == "/api/reel-plan":
                 target = self.state.save_reel_plan(project, data.get("plan") or {})

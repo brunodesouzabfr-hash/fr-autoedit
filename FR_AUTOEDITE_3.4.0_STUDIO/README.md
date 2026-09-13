@@ -25,6 +25,19 @@ ZIP de mídias
 → render final, Reels e Stories
 ```
 
+Para um filme que já chega editado, o Studio oferece um fluxo separado e não
+destrutivo:
+
+```text
+Vídeo já editado
+→ cópia íntegra + SHA-256
+→ proxy e referências para análise
+→ Roteiro Mestre com timeline bloqueada
+→ overlays temporizados
+→ prévia curta
+→ render final separado, sem remontar o vídeo-base
+```
+
 O `PACOTE_PARA_IA/` é gerado pela aplicação dentro de cada projeto:
 
 ```text
@@ -44,6 +57,11 @@ janelas de cena, tipos, valores e recursos disponíveis antes de aplicar o plano
 ## Recursos atuais
 
 - Studio visual local em `127.0.0.1`;
+- entrada alternativa de vídeo já editado, com duração, resolução, FPS, áudio,
+  ordem e velocidade bloqueados;
+- overlays temporizados de card, balão, callout, lower third, legenda e logo;
+- Style Pack `fr_chiaroscuro_vintage_v1`, com slots opcionais, fallbacks
+  procedurais e cache invalidado quando um asset muda;
 - importação segura de ZIP e Google Takeout;
 - geração retomável de proxies, miniaturas e manifesto;
 - lotes independentes de proxies com menos de 150 MB;
@@ -140,6 +158,8 @@ Para uma atualização distribuída em arquivo, também existe
 
 ## Uso básico
 
+### Mídias brutas
+
 1. Abra `fr-autoedite studio`.
 2. Crie um projeto e escreva o contexto confirmado.
 3. Envie o ZIP de fotos e vídeos.
@@ -151,6 +171,34 @@ Para uma atualização distribuída em arquivo, também existe
 8. Importe e leia os erros, avisos e metadados preservados.
 9. Gere e assista ao rascunho.
 10. Só então renderize a master pelos originais.
+
+### Vídeo já editado
+
+1. Crie um projeto e escolha **Vídeo já editado** em Importar.
+2. Envie o vídeo-base e deixe **Permitir intro/outro estender a entrega**
+   desligado, salvo quando a extensão for realmente desejada.
+3. Em Montagem, clique em **Preparar vídeo e referências**. Os controles de
+   corte, ordem, velocidade e qualidade do filme-base permanecem ocultos.
+4. Gere o Roteiro Mestre para a IA ou vá a Revisar filme e crie os overlays
+   manualmente.
+5. Salve as camadas, gere a prévia e confira seus intervalos no relógio do
+   vídeo-base.
+6. Renderize o vídeo pronto. A saída é criada em `entrega/`; o original em
+   `_ENTRADA/` não é alterado.
+
+Os mesmos passos podem ser executados por terminal:
+
+```bash
+fr-autoedite preparar-video-pronto --arquivo VIDEO.mp4 --respostas QUESTIONARIO_RESPONDIDO.json --projeto /CAMINHO/DO/PROJETO
+fr-autoedite preview-video-pronto --projeto /CAMINHO/DO/PROJETO
+fr-autoedite render-video-pronto --projeto /CAMINHO/DO/PROJETO
+fr-autoedite reindexar-assets --projeto /CAMINHO/DO/PROJETO
+```
+
+Os nomes e dimensões dos slots de arte estão em
+`assets/style_packs/fr_chiaroscuro_vintage_v1/ASSET_REQUIREMENTS.md`. Slots
+ausentes usam composição procedural; um `asset_id` explícito só é aceito se o
+arquivo existir e tiver conteúdo.
 
 Consulte [GUIA_RAPIDO_3_4.md](GUIA_RAPIDO_3_4.md) para o passo a passo e
 [UPGRADE_3.4.0.md](UPGRADE_3.4.0.md) para as mudanças da Fase 2.
@@ -197,9 +245,9 @@ contrato, cards, HTTP local, preparação retomável, renders e saídas sociais.
 ## Limitações honestas
 
 - IA e heurísticas locais não substituem revisão visual;
-- locução sobre vídeo, keyframes arbitrários, múltiplos balões temporizados e
-  algumas transições avançadas ainda podem ser preservados apenas como
-  metadados;
+- no fluxo de mídias brutas, locução sobre vídeo, keyframes arbitrários,
+  múltiplos balões temporizados e algumas transições avançadas ainda podem ser
+  preservados apenas como metadados;
 - a aplicação não publica automaticamente em redes sociais;
 - métricas de retenção e conversão dependem dos dados reais da plataforma;
 - música, imagem, marca e depoimentos só podem ser usados com autorização e
