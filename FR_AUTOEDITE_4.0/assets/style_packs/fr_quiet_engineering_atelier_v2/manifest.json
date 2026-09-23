@@ -1,0 +1,383 @@
+{
+  "assets": {
+    "logo_primary": {
+      "asset_id": "logo_primary",
+      "path": "assets/franco-romeu-logo.png",
+      "publicavel": false,
+      "sha256": "e636c298fcf1f3b0fe07a86b3248b8a04e8b23a80569e67f206f308c0e614bc8",
+      "status": "installed_requires_review",
+      "tipo": "logo"
+    },
+    "medallion_alvenaria": {
+      "asset_id": "medallion_alvenaria",
+      "caminho": "assets/service-medallions/original/alvenaria.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "a5f6caee9004dc98bd32bc63f4f995288ae01ac6762df34e12d07e69eeb5bfa4",
+        "sha256": "05b2c63387aba7392b4478b6bc8761c58ac57ce9a0f9450497b06c6e7827a3d0",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/alvenaria.png",
+      "path": "assets/service-medallions/original/alvenaria.png",
+      "publicavel": false,
+      "servico": "alvenaria",
+      "sha256": "a5f6caee9004dc98bd32bc63f4f995288ae01ac6762df34e12d07e69eeb5bfa4",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_criacoes": {
+      "asset_id": "medallion_criacoes",
+      "caminho": "assets/service-medallions/original/criacoes.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "7ecd0bc56b3e829f67448fe0690b29eabd5a0c10e7412400113e3e1b4f8f8563",
+        "sha256": "55b3551c95f5421d56f36fdc59d6f0faada9b310acef7ab414fa3c5373915591",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/criacoes.png",
+      "path": "assets/service-medallions/original/criacoes.png",
+      "publicavel": false,
+      "servico": "criacoes",
+      "sha256": "7ecd0bc56b3e829f67448fe0690b29eabd5a0c10e7412400113e3e1b4f8f8563",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_eletrica": {
+      "asset_id": "medallion_eletrica",
+      "caminho": "assets/service-medallions/original/eletrica.png",
+      "dimensoes": [
+        1254,
+        1254
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": true,
+        "original_sha256": "658166b5a4ef12b7bfddcf3f500c2d117b8970c2c13020e64b1a4807c33c6c88",
+        "sha256": "262a34d5a096d0b7275d968b14933a34cf1939e3516cd950d02c4d3142b1a8d6",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/eletrica.png",
+      "path": "assets/service-medallions/original/eletrica.png",
+      "publicavel": false,
+      "servico": "eletrica",
+      "sha256": "658166b5a4ef12b7bfddcf3f500c2d117b8970c2c13020e64b1a4807c33c6c88",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_hidraulica": {
+      "asset_id": "medallion_hidraulica",
+      "caminho": "assets/service-medallions/original/hidraulica.png",
+      "dimensoes": [
+        1254,
+        1254
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": true,
+        "original_sha256": "e41ab029bfef02eb1212398bea70fb2fa3a69c7d6a58e2c8fbd1f59871b91500",
+        "sha256": "33b248bff782df66246246657aff2fc40fb2cfaa0799413b77ef3b7bd9ad5110",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/hidraulica.png",
+      "path": "assets/service-medallions/original/hidraulica.png",
+      "publicavel": false,
+      "servico": "hidraulica",
+      "sha256": "e41ab029bfef02eb1212398bea70fb2fa3a69c7d6a58e2c8fbd1f59871b91500",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_iluminacao": {
+      "asset_id": "medallion_iluminacao",
+      "caminho": "assets/service-medallions/original/iluminacao.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": true,
+        "original_sha256": "081707b82533fb00e59b88736617101f70ca66b4154eb9e11f0bb72c15c7d795",
+        "sha256": "79c676fbda1ffcf9fee564d8cd75379ad3bdf51631a05f911f3962f5ae68d27c",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/iluminacao.png",
+      "path": "assets/service-medallions/original/iluminacao.png",
+      "publicavel": false,
+      "servico": "iluminacao",
+      "sha256": "081707b82533fb00e59b88736617101f70ca66b4154eb9e11f0bb72c15c7d795",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_instalacao": {
+      "asset_id": "medallion_instalacao",
+      "caminho": "assets/service-medallions/original/instalacao.png",
+      "dimensoes": [
+        1254,
+        1254
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": true,
+        "original_sha256": "547ee5bbd23f0bc481099b2405e4809a59075e2b37ddae5d0365646055a3c225",
+        "sha256": "30e6140ecdeb2df15bb0bb8899e06aa862224da0b3429cd989efdcec94c9d525",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/instalacao.png",
+      "path": "assets/service-medallions/original/instalacao.png",
+      "publicavel": false,
+      "servico": "instalacao",
+      "sha256": "547ee5bbd23f0bc481099b2405e4809a59075e2b37ddae5d0365646055a3c225",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_manutencao": {
+      "asset_id": "medallion_manutencao",
+      "caminho": "assets/service-medallions/original/manutencao.png",
+      "dimensoes": [
+        1254,
+        1254
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": true,
+        "original_sha256": "80848a34f05abcf505e08e27999720a2c68eaa30a1591a62974100d80056a984",
+        "sha256": "6c18a0be6708cf954126225c4bfe83581dd394a7f5f6c3177cd3cf2a7a2ba72e",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/manutencao.png",
+      "path": "assets/service-medallions/original/manutencao.png",
+      "publicavel": false,
+      "servico": "manutencao",
+      "sha256": "80848a34f05abcf505e08e27999720a2c68eaa30a1591a62974100d80056a984",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_moveis": {
+      "asset_id": "medallion_moveis",
+      "caminho": "assets/service-medallions/original/moveis.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "86d6eea71ada12c9a6536782a225c5b9bf3e0947edb6736f34f57eba5abb075c",
+        "sha256": "193432639c64417d06f2e8aeea7b42cff95ab064e4352f0a7768fb8d2b745fce",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/moveis.png",
+      "path": "assets/service-medallions/original/moveis.png",
+      "publicavel": false,
+      "servico": "moveis",
+      "sha256": "86d6eea71ada12c9a6536782a225c5b9bf3e0947edb6736f34f57eba5abb075c",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_pintura": {
+      "asset_id": "medallion_pintura",
+      "caminho": "assets/service-medallions/original/pintura.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "ae2750e875bb9e511f6fada53b4f1acebb200f4db65fe1ff75d2a23770e8500f",
+        "sha256": "b82587c05b0c75a72bf100c621b422d644e311a46b19b016877f3459aeb0bbea",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/pintura.png",
+      "path": "assets/service-medallions/original/pintura.png",
+      "publicavel": false,
+      "servico": "pintura",
+      "sha256": "ae2750e875bb9e511f6fada53b4f1acebb200f4db65fe1ff75d2a23770e8500f",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_producoes": {
+      "asset_id": "medallion_producoes",
+      "caminho": "assets/service-medallions/original/producoes.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "eefa99acfc023091ba98de8b552bc8abeadfa41c7026f32deba9564b76e4303c",
+        "sha256": "946dc6caa9e84c87f50eb23bbd3afe1d7767b799370a6c244a71c2361a2fff5b",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/producoes.png",
+      "path": "assets/service-medallions/original/producoes.png",
+      "publicavel": false,
+      "servico": "producoes",
+      "sha256": "eefa99acfc023091ba98de8b552bc8abeadfa41c7026f32deba9564b76e4303c",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_projetos_3d": {
+      "asset_id": "medallion_projetos_3d",
+      "caminho": "assets/service-medallions/original/projetos_3d.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": true,
+        "original_sha256": "58448e34e6791385bb8fc92763abecec835613bbd41fb206d9a9fd9c2b6d6f65",
+        "sha256": "8426dbbe582e2c78251b1d5b14f4afa49413244028e6060f46dc3f23754d607d",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/projetos_3d.png",
+      "path": "assets/service-medallions/original/projetos_3d.png",
+      "publicavel": false,
+      "servico": "projetos_3d",
+      "sha256": "58448e34e6791385bb8fc92763abecec835613bbd41fb206d9a9fd9c2b6d6f65",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_revestimentos": {
+      "asset_id": "medallion_revestimentos",
+      "caminho": "assets/service-medallions/original/revestimentos.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "4faee3e5b349ddb1d6cb21e7b38a4af90a36ffa8ae2a6ac756395ac3190bb71d",
+        "sha256": "64a788e7f864bdac14b30c88721e2683f228b328ce8a0f10fec2835a5228b5bb",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/revestimentos.png",
+      "path": "assets/service-medallions/original/revestimentos.png",
+      "publicavel": false,
+      "servico": "revestimentos",
+      "sha256": "4faee3e5b349ddb1d6cb21e7b38a4af90a36ffa8ae2a6ac756395ac3190bb71d",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    },
+    "medallion_textura": {
+      "asset_id": "medallion_textura",
+      "caminho": "assets/service-medallions/original/textura.png",
+      "dimensoes": [
+        1024,
+        1024
+      ],
+      "fallback": "medallion_placeholder_tecnico",
+      "normalized": {
+        "apparent_target_px": 1740,
+        "dimensions": [
+          2048,
+          2048
+        ],
+        "normalization": "alpha_bbox_contain_v1",
+        "opaque_background_preserved": false,
+        "original_sha256": "f080f58789a939d16eddc7c6a2be175e16410021f44d31dbb5d5441f8186458a",
+        "sha256": "28dce5108c374bd8948ec40f9a330f05f7fe3e85befe56e3ba70cefc71290119",
+        "visual_review_required": true
+      },
+      "normalized_path": "assets/service-medallions/normalized/textura.png",
+      "path": "assets/service-medallions/original/textura.png",
+      "publicavel": false,
+      "servico": "textura",
+      "sha256": "f080f58789a939d16eddc7c6a2be175e16410021f44d31dbb5d5441f8186458a",
+      "status": "installed_requires_review",
+      "tipo": "medallion"
+    }
+  },
+  "design_version": "2.0.0",
+  "generated_timestamp": null,
+  "identity_policy": "original_bytes_preserved",
+  "review_policy": "manual_before_publish",
+  "root_basis": "application",
+  "schema_version": 2,
+  "style_pack_id": "fr_quiet_engineering_atelier_v2"
+}

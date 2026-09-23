@@ -1,0 +1,58 @@
+{
+  "schema_version": 3,
+  "source_note": "Síntese operacional dos documentos Franco Romeu e dos roteiros-base fornecidos para Manus. Não contém métricas ou promessas não verificadas.",
+  "truth_rules": [
+    "Mostrar somente processos, materiais, resultados e dados confirmados no contexto ou visíveis nas mídias.",
+    "Nunca apresentar referência externa, render ou conteúdo de terceiro como obra executada pela Franco Romeu.",
+    "Usar uma única chamada para ação proporcional e reversível.",
+    "Não inventar urgência, desconto, prova social, prazo, medida, preço ou especificação."
+  ],
+  "angle_families": [
+    "processo",
+    "detalhe técnico",
+    "transformação comprovável",
+    "bastidor",
+    "compatibilização",
+    "materialidade",
+    "manutenção",
+    "autoria"
+  ],
+  "reel": {
+    "default_durations_sec": [30, 60, 90],
+    "structure": [
+      "0-3s: detalhe, contraste ou pergunta verdadeira",
+      "3-8s: contexto suficiente para compreender o projeto",
+      "8-60s: processo, decisões e evidências em ordem coerente",
+      "fechamento: resultado e uma chamada para ação"
+    ],
+    "editing_rule": "Ritmo claro e progressivo; não usar edição frenética para esconder falta de informação."
+  },
+  "carousel": {
+    "default_slides": 8,
+    "structure": [
+      "capa com tensão ou transformação específica",
+      "contexto inicial",
+      "princípio ou decisão",
+      "processo 1",
+      "processo 2",
+      "detalhe ou demonstração",
+      "resultado aplicável",
+      "contato e chamada para ação"
+    ]
+  },
+  "ihc": {
+    "identification": "Abrir com situação reconhecível e específica.",
+    "history": "Mostrar contexto real, obstáculo, decisão e evolução.",
+    "content": "Entregar critério técnico simples, direto e verificável.",
+    "invitation": "Convidar para diagnóstico, orçamento ou conversa sem pressão."
+  },
+  "channel_outputs": [
+    "filme institucional",
+    "filme limpo",
+    "Reels curtos",
+    "Stories em partes",
+    "carrossel 4:5",
+    "capas para Reels",
+    "plano e textos para revisão no ChatGPT"
+  ]
+}

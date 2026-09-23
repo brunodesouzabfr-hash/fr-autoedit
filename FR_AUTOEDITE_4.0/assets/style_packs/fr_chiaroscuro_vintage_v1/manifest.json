@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "style_pack_id": "fr_chiaroscuro_vintage_v1",
+  "label": "FR Chiaroscuro Vintage Luxury V1",
+  "description": "Contrato visual Franco Romeu com chiaroscuro, luxo conceitual e fallbacks procedurais sóbrios.",
+  "procedural_fallbacks": true,
+  "palette": {
+    "black": "#0A0A0A",
+    "petroleum": ["#0A2F26", "#031812"],
+    "burgundy": "#4A0E17",
+    "orange": ["#FF6B00", "#FF7A00"],
+    "gold": ["#C8A034", "#F6A700"],
+    "bone": "#E6D6B5"
+  },
+  "typography": {
+    "title": "StardosStencil-Bold.ttf",
+    "body": "Rokkitt-Regular.ttf",
+    "technical": "ShareTechMono-Regular.ttf",
+    "editorial_accent": "CormorantGaramond-Italic.ttf"
+  },
+  "assets": {
+    "common_editorial_vertical": {"path": "cards_common/common_editorial_vertical_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:chiaroscuro_editorial"},
+    "common_editorial_horizontal": {"path": "cards_common/common_editorial_horizontal_3840x2160.png", "kind": "transparent_png", "required": false, "fallback": "procedural:chiaroscuro_editorial"},
+    "balloon_technical_vertical": {"path": "balloons/balloon_technical_vertical_1600x480.png", "kind": "transparent_png", "required": false, "fallback": "procedural:technical_balloon"},
+    "balloon_technical_horizontal": {"path": "balloons/balloon_technical_horizontal_1920x360.png", "kind": "transparent_png", "required": false, "fallback": "procedural:technical_balloon"},
+    "frame_vertical": {"path": "frames/frame_chiaroscuro_vertical_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:safe_frame"},
+    "frame_horizontal": {"path": "frames/frame_chiaroscuro_horizontal_3840x2160.png", "kind": "transparent_png", "required": false, "fallback": "procedural:safe_frame"},
+    "background_chiaroscuro_vertical": {"path": "background_motifs/background_chiaroscuro_vertical_2160x3840.png", "kind": "rgba_png", "required": false, "fallback": "procedural:chiaroscuro_background"},
+    "background_chiaroscuro_horizontal": {"path": "background_motifs/background_chiaroscuro_horizontal_3840x2160.png", "kind": "rgba_png", "required": false, "fallback": "procedural:chiaroscuro_background"},
+    "texture_gold_brushed": {"path": "textures/texture_gold_brushed_2048.png", "kind": "seamless_png", "required": false, "fallback": "procedural:brushed_gold"},
+    "texture_patina_petroleum": {"path": "textures/texture_patina_petroleum_2048.png", "kind": "seamless_png", "required": false, "fallback": "procedural:petroleum_patina"},
+    "logo_primary": {"path": "logo/fr_logo_primary_bone_gold_1600.png", "kind": "transparent_png", "required": false, "fallback": "builtin:brand_logo"},
+    "projetos_3d_service": {"path": "cards_service/service_projetos_3d_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:grid_planta"},
+    "pintura_service": {"path": "cards_service/service_pintura_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:pigmento"},
+    "textura_service": {"path": "cards_service/service_textura_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:relevo"},
+    "revestimentos_service": {"path": "cards_service/service_revestimentos_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:paginacao"},
+    "moveis_service": {"path": "cards_service/service_moveis_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:marcenaria"},
+    "alvenaria_service": {"path": "cards_service/service_alvenaria_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:modulos"},
+    "producoes_service": {"path": "cards_service/service_producoes_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:palco_luz"},
+    "criacoes_service": {"path": "cards_service/service_criacoes_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:autoria"},
+    "iluminacao_service": {"path": "cards_service/service_iluminacao_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:fachos"},
+    "eletrica_service": {"path": "cards_service/service_eletrica_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:trajetos_luminosos"},
+    "hidraulica_service": {"path": "cards_service/service_hidraulica_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:fluxo"},
+    "instalacao_service": {"path": "cards_service/service_instalacao_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:encaixes"},
+    "manutencao_service": {"path": "cards_service/service_manutencao_overlay_2160x3840.png", "kind": "transparent_png", "required": false, "fallback": "procedural:inspecao"}
+  },
+  "services": {
+    "projetos_3d": {"asset_id": "projetos_3d_service", "motif": "grid, planta e perspectiva"},
+    "pintura": {"asset_id": "pintura_service", "motif": "pigmento e matéria"},
+    "textura": {"asset_id": "textura_service", "motif": "relevo e luz rasante"},
+    "revestimentos": {"asset_id": "revestimentos_service", "motif": "paginação e juntas"},
+    "moveis": {"asset_id": "moveis_service", "motif": "marcenaria e encaixe"},
+    "alvenaria": {"asset_id": "alvenaria_service", "motif": "módulos e prumo"},
+    "producoes": {"asset_id": "producoes_service", "motif": "palco, luz e movimento"},
+    "criacoes": {"asset_id": "criacoes_service", "motif": "autoria e protótipo"},
+    "iluminacao": {"asset_id": "iluminacao_service", "motif": "fachos controlados"},
+    "eletrica": {"asset_id": "eletrica_service", "motif": "trajetos luminosos e cobre"},
+    "hidraulica": {"asset_id": "hidraulica_service", "motif": "fluxo e tubulação"},
+    "instalacao": {"asset_id": "instalacao_service", "motif": "encaixes e precisão"},
+    "manutencao": {"asset_id": "manutencao_service", "motif": "inspeção e checklist"}
+  }
+}

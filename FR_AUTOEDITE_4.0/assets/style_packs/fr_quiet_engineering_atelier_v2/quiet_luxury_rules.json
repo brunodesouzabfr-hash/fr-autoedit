@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "system": "FR QUIET ENGINEERING ATELIER",
+  "palette": ["#031812", "#0A2F26", "#123F34", "#1A6069", "#FF6B00", "#FF7A00", "#F6A700", "#E6D6B5", "#0A0A0A"],
+  "forbidden_motion": ["bounce", "elastic", "continuous_rotation", "generic_glow"],
+  "allowed_easing": ["easeInOutCubic", "easeOutQuint", "easeInOutSine", "easeOutCubic"],
+  "micro_action_ms": [200, 600],
+  "chapter_transition_ms": [800, 1200],
+  "claims_require_evidence": true,
+  "viralization_guarantee_forbidden": true,
+  "marble_as_institutional_base": false,
+  "square_crop_from_vertical_forbidden": true
+}
+

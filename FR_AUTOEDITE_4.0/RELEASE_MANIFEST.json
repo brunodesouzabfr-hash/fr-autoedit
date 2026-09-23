@@ -1,0 +1,969 @@
+{
+  "schema_version": 1,
+  "version": "4.0.0-candidate",
+  "source_base": "3.4.0",
+  "generated_at": null,
+  "files": [
+    {
+      "path": "ATUALIZAR_CORRECAO_CARDS.sh",
+      "sha256": "0929ab59ace27c29c18ad5617a386e8e6bdf297cfe45dedb946ec7707fce2a13",
+      "bytes": 2567
+    },
+    {
+      "path": "ATUALIZAR_FR_AUTOEDITE_3.3.1.sh",
+      "sha256": "39b2aa98481d6f5bfa6bd84dd36fe42bbf75cd0c1d1339fd451e4aee4300a0d8",
+      "bytes": 3698
+    },
+    {
+      "path": "ATUALIZAR_FR_AUTOEDITE_3.4.0.sh",
+      "sha256": "312e1bc7cb926c919842a8c1da9505af81cb04bf363e6bdb66e00923de5f190b",
+      "bytes": 305
+    },
+    {
+      "path": "AUDITORIA_TECNICA_3.3.1.md",
+      "sha256": "d8ad38de5f94c570bc6ab140019317734076548b1abe10d49c9729ccdb1fc3fa",
+      "bytes": 5042
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "f47bfb049112437bca9c561923b57a57271e433cba0d3bcb8ea3ac61e5ed1cdf",
+      "bytes": 15267
+    },
+    {
+      "path": "CONTEXTO_PARA_IA_AUDITORIA_E_AUTOMACAO.md",
+      "sha256": "393a9496fc85c86e0092abb43ce0ab8fcc7f1a1aa7552a5fbfa0a7102b553094",
+      "bytes": 18770
+    },
+    {
+      "path": "GUIA_ATUALIZACAO_3.3.1.md",
+      "sha256": "55f4045280aef3d7d8d654565efe0f275a9f96a1602f643a453482daf6230b2d",
+      "bytes": 2071
+    },
+    {
+      "path": "GUIA_RAPIDO_3_3.md",
+      "sha256": "fe4e5376334eea29262b97fd045892f9c513e362a696407665d50575fdc24ae0",
+      "bytes": 4100
+    },
+    {
+      "path": "GUIA_RAPIDO_3_4.md",
+      "sha256": "70e878b559f13d53fef66d5df7a823354c3a636aa3ee5136fc14449dd018d15f",
+      "bytes": 4923
+    },
+    {
+      "path": "INSTALAR_EM_OUTRO_COMPUTADOR.sh",
+      "sha256": "1fa0e3de3c854a6f1438903ebed9b1300c2efca18c6dcbef26444a8f352cbf94",
+      "bytes": 4557
+    },
+    {
+      "path": "INSTALAR_FR_AUTOEDITE_4.sh",
+      "sha256": "e6b049ebea727596ff6c6fe75cae87c8bb534cfae54e347fbb4cef50da332e6d",
+      "bytes": 164
+    },
+    {
+      "path": "LEIA_PRIMEIRO_OUTRO_COMPUTADOR.md",
+      "sha256": "d5311460646fbbaa05727b9bb26b4e081ffe257cc5ae6b88cc51b0fb2cbee3e6",
+      "bytes": 3445
+    },
+    {
+      "path": "README.md",
+      "sha256": "6a65f2e3c8a58f83f1164aaef6e3cb4e2edc059bb663fe4ab22ef56b07aff093",
+      "bytes": 9374
+    },
+    {
+      "path": "RELATORIO_DE_VALIDACAO_3_3.md",
+      "sha256": "7f9abd68a4fa15a0e25facd43db98ce0991b9bdead0846840b35a57c567ccd3d",
+      "bytes": 1947
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "c10afe98e52b99011c99be98bf0ba0f070b901e93c2287feb701788f5ec2d539",
+      "bytes": 402
+    },
+    {
+      "path": "UPGRADE_3.4.0.md",
+      "sha256": "6ff61abdaa2f63889fde1ab4fcd22199047fbef06be8d0610edc8cdf051ae2eb",
+      "bytes": 6182
+    },
+    {
+      "path": "VERSION",
+      "sha256": "be743c789d65e04dcfa24466db55a548ab94cd4d8c65905e5603c509eac95424",
+      "bytes": 16
+    },
+    {
+      "path": "app/copilot.py",
+      "sha256": "6429120ba907e2025edc1ce714a22920e879da8d25b2f515d707556a05827616",
+      "bytes": 15642
+    },
+    {
+      "path": "app/fr_autoedite.py",
+      "sha256": "46819cb6f5203a375e1357a306bc0b769cd35f3293faabd5ab369a151aa8659b",
+      "bytes": 333472
+    },
+    {
+      "path": "app/fr_v4/__init__.py",
+      "sha256": "4a8a7f4e7b62a8ad1d626c0f49c6a5d6e72c343a25dc537a2d77951dd7ddc4e1",
+      "bytes": 125
+    },
+    {
+      "path": "app/fr_v4/adapters/__init__.py",
+      "sha256": "3c788676e85bf8b67dfef43e45d127a880007ff9a7ff367e6c65d7d3ed10257f",
+      "bytes": 70
+    },
+    {
+      "path": "app/fr_v4/adapters/base.py",
+      "sha256": "bfa4d335ae02c6e52d1c4fe8a9f7ca0f8a45b8c53d4a9a263781aaf6b92a9b92",
+      "bytes": 3735
+    },
+    {
+      "path": "app/fr_v4/adapters/registry.py",
+      "sha256": "a5744bf810f9b1345c77d18fb3ee4741ca5c4c342b79c9b49645f0ff0d23e970",
+      "bytes": 7686
+    },
+    {
+      "path": "app/fr_v4/bridge.py",
+      "sha256": "6a36157c863fc54aeaafe20c7d3d9d8954ec221694200b18127ae76890376416",
+      "bytes": 4533
+    },
+    {
+      "path": "app/fr_v4/contracts/__init__.py",
+      "sha256": "33df401a30fe391e24c5b44dd8021a577943e76a1a88d3f9ec19b7214f7168ca",
+      "bytes": 80
+    },
+    {
+      "path": "app/fr_v4/contracts/cli.py",
+      "sha256": "c44f3f6e4bd340044ec603ad6133f698fae1af735146102cd6191c71447ab62a",
+      "bytes": 1970
+    },
+    {
+      "path": "app/fr_v4/contracts/generator.py",
+      "sha256": "9d54d66276ecd5be0bfc66ea09b0dfe3a58dd65a750cdab843639da403f4ea5e",
+      "bytes": 4450
+    },
+    {
+      "path": "app/fr_v4/contracts/markdown.py",
+      "sha256": "aef8c9fe7b341eb59731f7e7a65753ff77e5a7612d4676bbe30b548e0a18ff56",
+      "bytes": 3762
+    },
+    {
+      "path": "app/fr_v4/contracts/migration.py",
+      "sha256": "8d12c834525bda57ea2cf6b4b846f366e5f67a6e1fe99488686d777afbd2b4e8",
+      "bytes": 5518
+    },
+    {
+      "path": "app/fr_v4/contracts/service.py",
+      "sha256": "d4cecc8f75f48c65487294a59feb6eab139db891e6296a824852c30e8fd6ea6f",
+      "bytes": 1836
+    },
+    {
+      "path": "app/fr_v4/contracts/validation.py",
+      "sha256": "6e5f4e2b19f4775b5d35d30f6094bca4cd11c7557a5754dfea5971ff6cd85de3",
+      "bytes": 9269
+    },
+    {
+      "path": "app/fr_v4/core/__init__.py",
+      "sha256": "6735395bc59bf36f6a8c09936a9b904c82523ad70c28607aeb147de6a6700c59",
+      "bytes": 55
+    },
+    {
+      "path": "app/fr_v4/core/card_renderer.py",
+      "sha256": "1e18ae5786ca2375091652619a7c4960fc08b9ff4ea8a04af7b067ca88d48c2a",
+      "bytes": 10912
+    },
+    {
+      "path": "app/fr_v4/core/config.py",
+      "sha256": "055d59436c8c0f53112a11264bd0ad587e85d251570aa3d62b845891db4a62d3",
+      "bytes": 2197
+    },
+    {
+      "path": "app/fr_v4/core/grid.py",
+      "sha256": "3142e37811d680d1b7f8adeff538698c8d060b906a4777dc0a6b30c211d48651",
+      "bytes": 3106
+    },
+    {
+      "path": "app/fr_v4/core/typography.py",
+      "sha256": "f001b4ed3a77025cad30eb4307e7760c053b25b9d81d0ca7f9416fe89f05eb61",
+      "bytes": 2965
+    },
+    {
+      "path": "app/fr_v4/diagrams/__init__.py",
+      "sha256": "ccd9db3f0b6ef0a64f8492dd728518793367c96a8e4d77cce5a6e76e7bd9139f",
+      "bytes": 5730
+    },
+    {
+      "path": "app/fr_v4/editorial/__init__.py",
+      "sha256": "0a1c28de71c94f0af6402950bff683594447c1d9e40e808249c22c13325eb7df",
+      "bytes": 198
+    },
+    {
+      "path": "app/fr_v4/editorial/audio.py",
+      "sha256": "98de0c258768984634aaa71831ff53a7ffabff91885b58922bff17d15d38cc35",
+      "bytes": 915
+    },
+    {
+      "path": "app/fr_v4/editorial/captions.py",
+      "sha256": "e5050b3dfd9026270de8862870bc09bccb8935918edd32282ade554808796574",
+      "bytes": 865
+    },
+    {
+      "path": "app/fr_v4/editorial/chapters.py",
+      "sha256": "ba289c6678b1aaaf77995da0588a22dc4d8042aeb9c6b6207309253bf19451c1",
+      "bytes": 794
+    },
+    {
+      "path": "app/fr_v4/editorial/color.py",
+      "sha256": "73fabc90ad99757e94a266409bfcc2d4a1166d424ae25973595b898170d85f36",
+      "bytes": 926
+    },
+    {
+      "path": "app/fr_v4/editorial/metadata.py",
+      "sha256": "0ff1490ce00e38f9fa89b0d51d6b797b32699f885c44e7fc799ad344665b003d",
+      "bytes": 736
+    },
+    {
+      "path": "app/fr_v4/editorial/presets.py",
+      "sha256": "8de396de91e0ed06051c1e3aafdd973f9733cb70ea75683b6f369889d077c398",
+      "bytes": 793
+    },
+    {
+      "path": "app/fr_v4/editorial/search.py",
+      "sha256": "0fa4b26757db6ed46659bdaa6e53c285183851ad0059e70ea4d51bab9575f229",
+      "bytes": 740
+    },
+    {
+      "path": "app/fr_v4/editorial/versioning.py",
+      "sha256": "d01a348742a222c9720ece5e63eaea066e06822a1c1b389bf29737bf5a3795fc",
+      "bytes": 691
+    },
+    {
+      "path": "app/fr_v4/editorial/workflow.py",
+      "sha256": "113e409ede2ecbc73cf9a74b6e9f7f9f67d8c44e2bf39266441e21c67c106a23",
+      "bytes": 701
+    },
+    {
+      "path": "app/fr_v4/families/__init__.py",
+      "sha256": "1adc5692e16b3420533841dbd39b6761ffd016fbcc9757b2822f1cb775f42f54",
+      "bytes": 360
+    },
+    {
+      "path": "app/fr_v4/families/f1_capa.py",
+      "sha256": "0873e7b7903205bb16d5c29a35272042eb640f0a28564a958434e177a096deab",
+      "bytes": 262
+    },
+    {
+      "path": "app/fr_v4/families/f2_etapa.py",
+      "sha256": "a8a05287ca2be9e68bb4e034745228707a1626a8fe577810ed7d360424eb5b48",
+      "bytes": 305
+    },
+    {
+      "path": "app/fr_v4/families/f3_servico.py",
+      "sha256": "4d8f9fb88f7f5ed99c74203b93b09bc10cf1251695fcfd1cd0a43995b358e03c",
+      "bytes": 257
+    },
+    {
+      "path": "app/fr_v4/families/f4_detalhe.py",
+      "sha256": "5cf910524c94c3a2a6ed18f1b725feb4751df5ae58e66108053fd642e6e3cfe7",
+      "bytes": 345
+    },
+    {
+      "path": "app/fr_v4/families/f5_extra.py",
+      "sha256": "5e4aad0e6b474bdb5586a8f31092eb8144f462c7f51fd7306850a8e7dc233d4c",
+      "bytes": 476
+    },
+    {
+      "path": "app/fr_v4/families/f6_encerramento.py",
+      "sha256": "76deb09308db256e6d0341ef090a1bd8294e2e109c015ac3dfac5a79c13bcfa2",
+      "bytes": 256
+    },
+    {
+      "path": "app/fr_v4/models/__init__.py",
+      "sha256": "4f0b33d3c8bd28821b80d127be70d9a542491e00ae86a529282d8298ccdb16e3",
+      "bytes": 79
+    },
+    {
+      "path": "app/fr_v4/models/roteiro_mestre.py",
+      "sha256": "0fd555b19f5c309071988ddbd772d2ee73190788a486aee74e41587d6f9e42fc",
+      "bytes": 1303
+    },
+    {
+      "path": "app/fr_v4/motion/__init__.py",
+      "sha256": "933849139ffd62af02215827a9781ff686696ece5e6d7e18e372f615e86ae8aa",
+      "bytes": 75
+    },
+    {
+      "path": "app/fr_v4/motion/easing.py",
+      "sha256": "970789eb28591a19daac55729764fc04417977e58577d2e658194f0da219fa9f",
+      "bytes": 800
+    },
+    {
+      "path": "app/fr_v4/motion/ffmpeg_filters.py",
+      "sha256": "9ad7da49c31cd60368122b7d092e7969f86f96d6c42d0ae428f7feb41ea86d72",
+      "bytes": 1740
+    },
+    {
+      "path": "app/fr_v4/motion/renderer.py",
+      "sha256": "aa4ac2e5f81f8bb43051010e71ce25cf7813bc23f227e40f78ae1d70067f01bc",
+      "bytes": 5185
+    },
+    {
+      "path": "app/fr_v4/overlays.py",
+      "sha256": "56b64565435aea933a47a1834799e3a0553cacf909e22cb054527f5ddc63be48",
+      "bytes": 3233
+    },
+    {
+      "path": "app/fr_v4/quiet_luxury/__init__.py",
+      "sha256": "490989a03e78de48b3b89cf3f9f3466c3c69f441389f17191868853dcc55dbde",
+      "bytes": 91
+    },
+    {
+      "path": "app/fr_v4/quiet_luxury/validators.py",
+      "sha256": "2bd73b589da29d7d3154ee425ef9546658a04c765e6f6b4345ac8056c7f8ad30",
+      "bytes": 5053
+    },
+    {
+      "path": "app/fr_v4/style_packs/__init__.py",
+      "sha256": "b4dc320d35d1460b5d6e24c192560bdf9f0444a1281cad8351923cccfa019140",
+      "bytes": 69
+    },
+    {
+      "path": "app/fr_v4/style_packs/registry.py",
+      "sha256": "585fdeed281f1e054a80565f4b234e33cfdce12e3dd37ab610a4426379bc0b4b",
+      "bytes": 8494
+    },
+    {
+      "path": "app/local_analysis.py",
+      "sha256": "35b7fbcd5f231fbc8a49456d6703718d3e494404e7b313600793e30f3bf01107",
+      "bytes": 15041
+    },
+    {
+      "path": "app/master_contract.py",
+      "sha256": "a39c799d2f269920056c6b8a545fe757d28c7fb4988b878d8e4eba73c4b679ec",
+      "bytes": 77134
+    },
+    {
+      "path": "app/media_frames.py",
+      "sha256": "15eb5093245f618b0741bd2c0394ec10c92739bb1da543848d31da186ba4968e",
+      "bytes": 2981
+    },
+    {
+      "path": "app/project_scope.py",
+      "sha256": "8a6b471a12263eb22ad3902de7cffafcfa5da1569ed495366a573e65ae4b29a9",
+      "bytes": 18039
+    },
+    {
+      "path": "app/ready_video.py",
+      "sha256": "55a37aa80e7134c81d5cca14cc7d7ab1c2b91375efcaf06df091b33e7c9c709e",
+      "bytes": 31519
+    },
+    {
+      "path": "app/render_joins.py",
+      "sha256": "91c55a53b8cbf01bf990d4ce18ed1521c620c7de4efebb597ebbd806cad5f00a",
+      "bytes": 5420
+    },
+    {
+      "path": "app/service_cards.py",
+      "sha256": "56bc7d6999c1206e99da69fcad63c589628638527ac87ea6d171d389ca566fbb",
+      "bytes": 15021
+    },
+    {
+      "path": "app/social_contract.py",
+      "sha256": "4bd5e5b89f7aba165f954884e00888375d0fa5a9eebbcc01fe5a2e5780991ce1",
+      "bytes": 4053
+    },
+    {
+      "path": "app/studio.py",
+      "sha256": "a6ce4f0d743d513fe644f723e5b2fdf64e2fd0fbc5ef4ad7a1f2a5500af7cc6b",
+      "bytes": 94535
+    },
+    {
+      "path": "app/style_engine.py",
+      "sha256": "fbca89d7a89b145b641df8958941aa4856f165019e3d91916012a20f04ec2ff3",
+      "bytes": 6479
+    },
+    {
+      "path": "assets/cards_4k/FR_CARD_CONTACT_MASTER_4K.png",
+      "sha256": "add3d6af302dc23f0db6ee29a459acff76b4cc2bde47c578f2a61a2079b48aa7",
+      "bytes": 8084578
+    },
+    {
+      "path": "assets/cards_4k/FR_CARD_INTRO_MASTER_4K.png",
+      "sha256": "5a1a7b6b7322ea912bd4aff2885f08b3e8a8dfc09ce5cd79dbd6142fd54fbb92",
+      "bytes": 8090063
+    },
+    {
+      "path": "assets/cards_4k/FR_CARD_PHASE_MASTER_4K.png",
+      "sha256": "af983c970f192409393fa25d0bc1496ea89f4d58e573358f97a58611aa6b30bb",
+      "bytes": 7462252
+    },
+    {
+      "path": "assets/fonts/CormorantGaramond-Italic.ttf",
+      "sha256": "0b9a8a33cfaa624d30f70f9b6686da769b319b8c37a55af16e29fef690108bbf",
+      "bytes": 293036
+    },
+    {
+      "path": "assets/fonts/Rokkitt-Bold.ttf",
+      "sha256": "ff56b6967ff934044531e3ce8cb02b69403eb58f1b16a9804ddc857760e293d0",
+      "bytes": 69116
+    },
+    {
+      "path": "assets/fonts/Rokkitt-Regular.ttf",
+      "sha256": "1637416502454bf095a97a766721fa791f4d412c2900a9522dba6b36b0840237",
+      "bytes": 68668
+    },
+    {
+      "path": "assets/fonts/ShareTechMono-Regular.ttf",
+      "sha256": "5f6b57538a1a35469a038dc3073003cebc4c101ad7b3c219e9555a3b3c0a81d2",
+      "bytes": 41912
+    },
+    {
+      "path": "assets/fonts/StardosStencil-Bold.ttf",
+      "sha256": "c140c043f178a8b45dc89eccb27f70c77751a1c647d84b7547796a8ca5559032",
+      "bytes": 33044
+    },
+    {
+      "path": "assets/fonts/StardosStencil-Regular.ttf",
+      "sha256": "51203997e9e8f92b4b217e9764c32e44a6c62495f7bee9c0021adbb5365c31e5",
+      "bytes": 42388
+    },
+    {
+      "path": "assets/franco-romeu-logo-remaster-4k.png",
+      "sha256": "81700da3306ee184c63324b137ff46fe18a61a10c3aca8ecb0fa1fa332a4e34a",
+      "bytes": 5138968
+    },
+    {
+      "path": "assets/franco-romeu-logo.png",
+      "sha256": "e636c298fcf1f3b0fe07a86b3248b8a04e8b23a80569e67f206f308c0e614bc8",
+      "bytes": 610109
+    },
+    {
+      "path": "assets/service-medallions/normalized/alvenaria.png",
+      "sha256": "05b2c63387aba7392b4478b6bc8761c58ac57ce9a0f9450497b06c6e7827a3d0",
+      "bytes": 5174338
+    },
+    {
+      "path": "assets/service-medallions/normalized/criacoes.png",
+      "sha256": "55b3551c95f5421d56f36fdc59d6f0faada9b310acef7ab414fa3c5373915591",
+      "bytes": 5244137
+    },
+    {
+      "path": "assets/service-medallions/normalized/eletrica.png",
+      "sha256": "262a34d5a096d0b7275d968b14933a34cf1939e3516cd950d02c4d3142b1a8d6",
+      "bytes": 5363633
+    },
+    {
+      "path": "assets/service-medallions/normalized/hidraulica.png",
+      "sha256": "33b248bff782df66246246657aff2fc40fb2cfaa0799413b77ef3b7bd9ad5110",
+      "bytes": 5277454
+    },
+    {
+      "path": "assets/service-medallions/normalized/iluminacao.png",
+      "sha256": "79c676fbda1ffcf9fee564d8cd75379ad3bdf51631a05f911f3962f5ae68d27c",
+      "bytes": 5250467
+    },
+    {
+      "path": "assets/service-medallions/normalized/instalacao.png",
+      "sha256": "30e6140ecdeb2df15bb0bb8899e06aa862224da0b3429cd989efdcec94c9d525",
+      "bytes": 5333203
+    },
+    {
+      "path": "assets/service-medallions/normalized/manutencao.png",
+      "sha256": "6c18a0be6708cf954126225c4bfe83581dd394a7f5f6c3177cd3cf2a7a2ba72e",
+      "bytes": 5383276
+    },
+    {
+      "path": "assets/service-medallions/normalized/moveis.png",
+      "sha256": "193432639c64417d06f2e8aeea7b42cff95ab064e4352f0a7768fb8d2b745fce",
+      "bytes": 5153079
+    },
+    {
+      "path": "assets/service-medallions/normalized/pintura.png",
+      "sha256": "b82587c05b0c75a72bf100c621b422d644e311a46b19b016877f3459aeb0bbea",
+      "bytes": 5206810
+    },
+    {
+      "path": "assets/service-medallions/normalized/producoes.png",
+      "sha256": "946dc6caa9e84c87f50eb23bbd3afe1d7767b799370a6c244a71c2361a2fff5b",
+      "bytes": 5268989
+    },
+    {
+      "path": "assets/service-medallions/normalized/projetos_3d.png",
+      "sha256": "8426dbbe582e2c78251b1d5b14f4afa49413244028e6060f46dc3f23754d607d",
+      "bytes": 4995351
+    },
+    {
+      "path": "assets/service-medallions/normalized/revestimentos.png",
+      "sha256": "64a788e7f864bdac14b30c88721e2683f228b328ce8a0f10fec2835a5228b5bb",
+      "bytes": 5396214
+    },
+    {
+      "path": "assets/service-medallions/normalized/textura.png",
+      "sha256": "28dce5108c374bd8948ec40f9a330f05f7fe3e85befe56e3ba70cefc71290119",
+      "bytes": 5274282
+    },
+    {
+      "path": "assets/service-medallions/original/alvenaria.png",
+      "sha256": "a5f6caee9004dc98bd32bc63f4f995288ae01ac6762df34e12d07e69eeb5bfa4",
+      "bytes": 2315696
+    },
+    {
+      "path": "assets/service-medallions/original/criacoes.png",
+      "sha256": "7ecd0bc56b3e829f67448fe0690b29eabd5a0c10e7412400113e3e1b4f8f8563",
+      "bytes": 2337392
+    },
+    {
+      "path": "assets/service-medallions/original/eletrica.png",
+      "sha256": "658166b5a4ef12b7bfddcf3f500c2d117b8970c2c13020e64b1a4807c33c6c88",
+      "bytes": 2543091
+    },
+    {
+      "path": "assets/service-medallions/original/hidraulica.png",
+      "sha256": "e41ab029bfef02eb1212398bea70fb2fa3a69c7d6a58e2c8fbd1f59871b91500",
+      "bytes": 2502490
+    },
+    {
+      "path": "assets/service-medallions/original/iluminacao.png",
+      "sha256": "081707b82533fb00e59b88736617101f70ca66b4154eb9e11f0bb72c15c7d795",
+      "bytes": 2317582
+    },
+    {
+      "path": "assets/service-medallions/original/instalacao.png",
+      "sha256": "547ee5bbd23f0bc481099b2405e4809a59075e2b37ddae5d0365646055a3c225",
+      "bytes": 2527485
+    },
+    {
+      "path": "assets/service-medallions/original/manutencao.png",
+      "sha256": "80848a34f05abcf505e08e27999720a2c68eaa30a1591a62974100d80056a984",
+      "bytes": 2561315
+    },
+    {
+      "path": "assets/service-medallions/original/moveis.png",
+      "sha256": "86d6eea71ada12c9a6536782a225c5b9bf3e0947edb6736f34f57eba5abb075c",
+      "bytes": 2317839
+    },
+    {
+      "path": "assets/service-medallions/original/pintura.png",
+      "sha256": "ae2750e875bb9e511f6fada53b4f1acebb200f4db65fe1ff75d2a23770e8500f",
+      "bytes": 2329190
+    },
+    {
+      "path": "assets/service-medallions/original/producoes.png",
+      "sha256": "eefa99acfc023091ba98de8b552bc8abeadfa41c7026f32deba9564b76e4303c",
+      "bytes": 2342149
+    },
+    {
+      "path": "assets/service-medallions/original/projetos_3d.png",
+      "sha256": "58448e34e6791385bb8fc92763abecec835613bbd41fb206d9a9fd9c2b6d6f65",
+      "bytes": 2265065
+    },
+    {
+      "path": "assets/service-medallions/original/revestimentos.png",
+      "sha256": "4faee3e5b349ddb1d6cb21e7b38a4af90a36ffa8ae2a6ac756395ac3190bb71d",
+      "bytes": 2389868
+    },
+    {
+      "path": "assets/service-medallions/original/textura.png",
+      "sha256": "f080f58789a939d16eddc7c6a2be175e16410021f44d31dbb5d5441f8186458a",
+      "bytes": 2323660
+    },
+    {
+      "path": "assets/services/alvenaria.png",
+      "sha256": "a5f6caee9004dc98bd32bc63f4f995288ae01ac6762df34e12d07e69eeb5bfa4",
+      "bytes": 2315696
+    },
+    {
+      "path": "assets/services/criacoes.png",
+      "sha256": "7ecd0bc56b3e829f67448fe0690b29eabd5a0c10e7412400113e3e1b4f8f8563",
+      "bytes": 2337392
+    },
+    {
+      "path": "assets/services/eletrica.png",
+      "sha256": "658166b5a4ef12b7bfddcf3f500c2d117b8970c2c13020e64b1a4807c33c6c88",
+      "bytes": 2543091
+    },
+    {
+      "path": "assets/services/hidraulica.png",
+      "sha256": "e41ab029bfef02eb1212398bea70fb2fa3a69c7d6a58e2c8fbd1f59871b91500",
+      "bytes": 2502490
+    },
+    {
+      "path": "assets/services/iluminacao.png",
+      "sha256": "081707b82533fb00e59b88736617101f70ca66b4154eb9e11f0bb72c15c7d795",
+      "bytes": 2317582
+    },
+    {
+      "path": "assets/services/instalacao.png",
+      "sha256": "547ee5bbd23f0bc481099b2405e4809a59075e2b37ddae5d0365646055a3c225",
+      "bytes": 2527485
+    },
+    {
+      "path": "assets/services/manutencao.png",
+      "sha256": "80848a34f05abcf505e08e27999720a2c68eaa30a1591a62974100d80056a984",
+      "bytes": 2561315
+    },
+    {
+      "path": "assets/services/moveis.png",
+      "sha256": "86d6eea71ada12c9a6536782a225c5b9bf3e0947edb6736f34f57eba5abb075c",
+      "bytes": 2317839
+    },
+    {
+      "path": "assets/services/pintura.png",
+      "sha256": "ae2750e875bb9e511f6fada53b4f1acebb200f4db65fe1ff75d2a23770e8500f",
+      "bytes": 2329190
+    },
+    {
+      "path": "assets/services/producoes.png",
+      "sha256": "eefa99acfc023091ba98de8b552bc8abeadfa41c7026f32deba9564b76e4303c",
+      "bytes": 2342149
+    },
+    {
+      "path": "assets/services/projetos_3d.png",
+      "sha256": "58448e34e6791385bb8fc92763abecec835613bbd41fb206d9a9fd9c2b6d6f65",
+      "bytes": 2265065
+    },
+    {
+      "path": "assets/services/revestimentos.png",
+      "sha256": "4faee3e5b349ddb1d6cb21e7b38a4af90a36ffa8ae2a6ac756395ac3190bb71d",
+      "bytes": 2389868
+    },
+    {
+      "path": "assets/services/textura.png",
+      "sha256": "f080f58789a939d16eddc7c6a2be175e16410021f44d31dbb5d5441f8186458a",
+      "bytes": 2323660
+    },
+    {
+      "path": "assets/sfx/ding.wav",
+      "sha256": "9d389a32ab11376579193372da230f308a17fb6096f2601738092c41bd8fb010",
+      "bytes": 134478
+    },
+    {
+      "path": "assets/sfx/whoosh.wav",
+      "sha256": "4745f92bc705ebcab0cb4b7e1f5f25042d28170f17ebeeec162a8b9d4218fcb7",
+      "bytes": 124878
+    },
+    {
+      "path": "assets/studio/index.html",
+      "sha256": "ec7eaa8ccbb3519373f644a0b2b39cb5d15ff300852658ade74177709d3fc6a5",
+      "bytes": 132495
+    },
+    {
+      "path": "assets/style_packs/fr_chiaroscuro_vintage_v1/ASSET_REQUIREMENTS.md",
+      "sha256": "b5ecd2fefe69df8367d5c2c787ee01b4f3bfd28b14b1d1ccc7cabcc5a918765f",
+      "bytes": 5518
+    },
+    {
+      "path": "assets/style_packs/fr_chiaroscuro_vintage_v1/manifest.json",
+      "sha256": "cc92762fd2b200fc9e57a3cd03fe0f2dc03cd496f62a710bb32f05689e92dd93",
+      "bytes": 6091
+    },
+    {
+      "path": "assets/style_packs/fr_quiet_engineering_atelier_v2/ASSET_REQUIREMENTS.md",
+      "sha256": "1787169c4fe1e6dd64a56de530836122d8e6148071115a452f47a11cc49e6dc7",
+      "bytes": 585
+    },
+    {
+      "path": "assets/style_packs/fr_quiet_engineering_atelier_v2/manifest.json",
+      "sha256": "2687d0c00845b6f34b52c6f960810cbd582aaef4a5bfa003c76d41ca34e8bcdd",
+      "bytes": 14348
+    },
+    {
+      "path": "assets/style_packs/fr_quiet_engineering_atelier_v2/quiet_luxury_rules.json",
+      "sha256": "234af00554edc8dbd2e362a8b21c90188ee11fc2eed97fc0a1be716e89c3123e",
+      "bytes": 598
+    },
+    {
+      "path": "docs/ADAPTERS.md",
+      "sha256": "5dcd64fa884b3886d51f30786d51c322eb30fe2984fbb7dfc4101edd0b127d10",
+      "bytes": 1893
+    },
+    {
+      "path": "docs/ARQUITETURA_E_OPERACAO_3_4.md",
+      "sha256": "e35d0dc33c6df38f5ce18cf9333433379c7915dda2b8d801520ae733888fab36",
+      "bytes": 9839
+    },
+    {
+      "path": "docs/ARVORE_ENTREGA_4_0.md",
+      "sha256": "b7c900aeab156e22b25a98647931e4a7c752a151ff669452898b68e46dbe4b1c",
+      "bytes": 1302
+    },
+    {
+      "path": "docs/ASSETS_PENDING.md",
+      "sha256": "22928ba66ed2c803369f41f80408f8aa062c9d65b85ec4d43b71e83595571eb4",
+      "bytes": 1853
+    },
+    {
+      "path": "docs/AUDITORIA_CODIGO_3_4.json",
+      "sha256": "caea688a612b6074fedaabc3c7243a674b863f9d789aadc247d7067551875967",
+      "bytes": 223136
+    },
+    {
+      "path": "docs/CARD_STYLE_SCHEMA_v2.md",
+      "sha256": "0cd5b3bec92283cc520325a17a658c28b733b1f6f3db199df77f621daa67d0cd",
+      "bytes": 961
+    },
+    {
+      "path": "docs/CONTRATO_MARKDOWN_V4.md",
+      "sha256": "8b8b87157b07dfb075741e7307da7a4767ea049a8ec4b6f76fc2572d94b92d67",
+      "bytes": 2108
+    },
+    {
+      "path": "docs/ENTREGA_18_ITENS.md",
+      "sha256": "bae5e31f5546edbd7d98926f0a9558c08064e7651ca8578a0947eb88c9637f4a",
+      "bytes": 3607
+    },
+    {
+      "path": "docs/FR_AUTOEDITE_4_0_ARCHITECTURE.md",
+      "sha256": "7f543da00f1782ded3eff0c633c3d72e24fc9535426ab3f8af5a01b21826d218",
+      "bytes": 3161
+    },
+    {
+      "path": "docs/GUIA_INSTALACAO_ATUALIZACAO_4_0.md",
+      "sha256": "c9799b9e2a950b538d4b2e4d741bc7ce06ca8aabe0277d99915e70e0fb944e0b",
+      "bytes": 2089
+    },
+    {
+      "path": "docs/LEIA_PRIMEIRO_FUNDACAO.md",
+      "sha256": "f038db2a760cbdf00789e462e713487c0be28cf29ccb7100bef362b38508499c",
+      "bytes": 2784
+    },
+    {
+      "path": "docs/QA_VISUAL_4_0.md",
+      "sha256": "92d06ebeb172d8dc84f2d33ff8634a8b320e8909e30cc2b73c5060d87256a316",
+      "bytes": 2034
+    },
+    {
+      "path": "docs/QUESTIONARIO.md",
+      "sha256": "b64de1db445751574481e7ea5b7edd4ceec4bb0253a985350b4fb71a03418140",
+      "bytes": 8746
+    },
+    {
+      "path": "docs/QUIET_LUXURY_OPERACIONAL.md",
+      "sha256": "cdfb78f44e50706c9c5762749ba2f6eeda0067c0ca6c7fe623dbcc711baf0670",
+      "bytes": 1673
+    },
+    {
+      "path": "docs/RELATORIO_MIGRACAO.md",
+      "sha256": "d0795f74a505979d73d999bd57c2a56e2e68bfb2a3803f1ce444f6d16bcf3133",
+      "bytes": 11825
+    },
+    {
+      "path": "docs/RELATORIO_VALIDACAO_4_0.md",
+      "sha256": "f7e1982dd15dd5d72cd3df34c4793dfb98749c7411fb7b7ce0c802d3c0a86317",
+      "bytes": 3623
+    },
+    {
+      "path": "examples/cozinha_carreira.questionario.json",
+      "sha256": "84975164fd8b1730f61f90c743bf69194ab60f3926ab684587a124a0c267bb9a",
+      "bytes": 5238
+    },
+    {
+      "path": "fr-autoedite",
+      "sha256": "eba832b2fa01cfc89b471d4ad855c00a39def2199df03df0255bd02758187e2c",
+      "bytes": 387
+    },
+    {
+      "path": "install.sh",
+      "sha256": "02834ab0571e64de168be6755b7dc5d1196ed04d04685622fa4c391a933ec25d",
+      "bytes": 2412
+    },
+    {
+      "path": "knowledge/FRANCO_ROMEU_MENTE_ESTRATEGICA_LLM_MASTER_v1.1.md",
+      "sha256": "3e3d9dca514b84171e6471416684f4c4940f1fdcd6e8a940dde9a4980b2ce610",
+      "bytes": 366234
+    },
+    {
+      "path": "requirements-dev.txt",
+      "sha256": "9db10e06e59f5c4aa47b067bff5563aae75f66967b41a3811337bc181d6564a6",
+      "bytes": 13
+    },
+    {
+      "path": "schemas/roteiro_mestre_v4.schema.json",
+      "sha256": "398833ade23bf8634ef281405bea36b93e3f05650c880108b59852a9c3c58d0a",
+      "bytes": 10036
+    },
+    {
+      "path": "scripts/aplicar_atualizacao_v4.py",
+      "sha256": "3dab472866e70d698b698e6c5fe08e27e0ddade2e0f835a91efc2920fdf4971a",
+      "bytes": 1555
+    },
+    {
+      "path": "scripts/aplicar_fundacao_v4.py",
+      "sha256": "eca0b75033638f9e21b3eaa66c9cb54e35cab503169df8d1497575fa0e3f100f",
+      "bytes": 3587
+    },
+    {
+      "path": "scripts/auditar_base.py",
+      "sha256": "e2158687e7eb8b20dbc58fa41bb05d53e3bffe552f34867925bee63786027ab1",
+      "bytes": 1780
+    },
+    {
+      "path": "scripts/diagnosticar_v4.py",
+      "sha256": "902e45149bf6d5707556a7c856b01612bcdb38522b92a9fbce399d80b45af52a",
+      "bytes": 589
+    },
+    {
+      "path": "scripts/empacotar_release_v4.py",
+      "sha256": "4dfb5a5047ed346b3a31eadb7ff9973b2d9304339c01e290b7ddf51d57c1defb",
+      "bytes": 4041
+    },
+    {
+      "path": "scripts/exportar_cards_individuais.py",
+      "sha256": "404d101a7b884623a1702c839a1a33a7472633f0f201fc9c858993edb7010db8",
+      "bytes": 2069
+    },
+    {
+      "path": "scripts/finalizar_entrega_cards.py",
+      "sha256": "4a4cf5b0ed6a0f2600b36b5c177c1325ba6ec151040f180a00459ad704c222fd",
+      "bytes": 2393
+    },
+    {
+      "path": "scripts/gerar_cards_v2.py",
+      "sha256": "76929385bb2c21973a8b2f3b52e23e3989f99179a67d7c694ca97a5fed646113",
+      "bytes": 8304
+    },
+    {
+      "path": "scripts/gerar_motion_v2.py",
+      "sha256": "194b1b9449abc5bb0b9189cfc96055a8883188d12af5ae8f95dc17aa379171ea",
+      "bytes": 1993
+    },
+    {
+      "path": "scripts/indexar_assets_v2.py",
+      "sha256": "7533c461d3acf53a7ada3c0f588cfee3db24c0fda94650b0a9c47339aa4f1c23",
+      "bytes": 526
+    },
+    {
+      "path": "scripts/migrar_contrato_v4.py",
+      "sha256": "b5562f97ba3333173051cb0be93baa5e8f5962c8fb6847f44c9db60405d072de",
+      "bytes": 1405
+    },
+    {
+      "path": "scripts/validar_contrato_v4.py",
+      "sha256": "36492da43ca9b0b4d0a1d54fad82132b5a4c02541f354ce4ccf1ffe00da21031",
+      "bytes": 1402
+    },
+    {
+      "path": "templates/EDIT_PLAN_SCHEMA.json",
+      "sha256": "862ccd48247338b26f89ae2ad044d116ca5d4f4b85d4516e54d100f980eb5ded",
+      "bytes": 6297
+    },
+    {
+      "path": "templates/ROTEIRO_MESTRE_PROMPT.md",
+      "sha256": "9a832d8b07f2e05605fac65778a16c479dc17f64d9bf2415efbee32b72be705e",
+      "bytes": 17825
+    },
+    {
+      "path": "templates/card_style.json",
+      "sha256": "9518ac7a12b28ed0f8e68023c1b702c92bd5aee6578d676c1de115338f17ec40",
+      "bytes": 3194
+    },
+    {
+      "path": "templates/fr_brand_profile.json",
+      "sha256": "c621a3c6a7dd4acc4994f729649ff99093c9513a60b9888af0a9d82b01f80a12",
+      "bytes": 1691
+    },
+    {
+      "path": "templates/fr_content_strategy.json",
+      "sha256": "380800864c409764bc8093799a70abb8c9082340126563a834cb9d5c81f97843",
+      "bytes": 2128
+    },
+    {
+      "path": "templates/questionario_base.json",
+      "sha256": "75a674ba04e70df99fe187fcd99eb1f4c0cc704bbd7c9af63c3ce77795faace5",
+      "bytes": 7738
+    },
+    {
+      "path": "templates/service_catalog.json",
+      "sha256": "4903d9d54c49e257dd0dcd4ed4b744838ad7ea9f4f779004594f2ab151dcefac",
+      "bytes": 7876
+    },
+    {
+      "path": "tests/ai_brief_window_test.py",
+      "sha256": "aeee12d1cdf53bc0d54a6cd6c7f128404ff62ab08855bfd6c405e74c134ab89d",
+      "bytes": 2943
+    },
+    {
+      "path": "tests/card_circle_test.py",
+      "sha256": "b643482a76eaae4ee65bc795c0b7768bcc27c74cb0264a9c471bba3320b9aff3",
+      "bytes": 1602
+    },
+    {
+      "path": "tests/card_preview_refresh_test.py",
+      "sha256": "a6dc0475f95d4bec0525ebd0fe8bcc833f3172df593b08efb043b514d3374e8d",
+      "bytes": 10079
+    },
+    {
+      "path": "tests/draft_concat_route_test.py",
+      "sha256": "c856d5e0af70a9b9b06eae54ca5327ed443069ad485f67f30c963da247b24479",
+      "bytes": 981
+    },
+    {
+      "path": "tests/make_fixture.py",
+      "sha256": "0f60a514007a8c2fc37c18336cd205e269737dde1c8fd6b48acca2a66a6bb3b0",
+      "bytes": 5591
+    },
+    {
+      "path": "tests/master_contract_test.py",
+      "sha256": "eff11a817e7aa5315247ae6d60a8b28a127925822f94298261511400d3c2313c",
+      "bytes": 19813
+    },
+    {
+      "path": "tests/phase2_ai_package_test.py",
+      "sha256": "afc4b59caf4fd1b06d92074b05546a3d5c7f381d1dfdd58bbf81f6c2c1ddb945",
+      "bytes": 7958
+    },
+    {
+      "path": "tests/preparation_resume_test.py",
+      "sha256": "ad61d9916f14d11968293019ceba7811425b1f8ee329ed046b513489fcd96ed8",
+      "bytes": 3411
+    },
+    {
+      "path": "tests/ready_video_test.py",
+      "sha256": "5f2ad727a4c34e3812347cb7036c0f1d14d59faa6814e31d2e2ec51fc308a813",
+      "bytes": 16566
+    },
+    {
+      "path": "tests/smoke_test.sh",
+      "sha256": "192bdacf390aad47c96d8a5fd1a43668e9dbff1881aa9000e1bd2cbc838c3e48",
+      "bytes": 9373
+    },
+    {
+      "path": "tests/smoke_v4_foundation.sh",
+      "sha256": "3ed302a8334a952028fbd26ceef4107699719218f7c4e6f5943e07584e90e3fe",
+      "bytes": 540
+    },
+    {
+      "path": "tests/smoke_v4_visual.sh",
+      "sha256": "f128fa1e275b57d23db1c5b0d67db3b31c8e6e142af518dcba5ddfe1a826b0e7",
+      "bytes": 386
+    },
+    {
+      "path": "tests/studio_http_test.py",
+      "sha256": "947887862db4ca7e29e70096421e32969201d0e99a5d671a7eef3ed71e1ba792",
+      "bytes": 15342
+    },
+    {
+      "path": "tests/studio_job_recovery_test.py",
+      "sha256": "998f07732242b2cc0c97746c596d2023ba93097e5fb72902c113fdd72fa0eeb5",
+      "bytes": 3608
+    },
+    {
+      "path": "tests/test_v4_contract_service.py",
+      "sha256": "ac5c3cbd3957356d4b2bc67b59833e69d4006a48f03d1371d9361bc4aa565f3f",
+      "bytes": 1901
+    },
+    {
+      "path": "tests/test_v4_editorial.py",
+      "sha256": "4a39103bc0c1dac618c05c5842f61610b3d7390e1a3820342d668770fc8953ae",
+      "bytes": 1664
+    },
+    {
+      "path": "tests/test_v4_foundation.py",
+      "sha256": "c259364df57b1f347255ca03ded37eecb04a0f5953e129f608eeecb857ea557f",
+      "bytes": 9350
+    },
+    {
+      "path": "tests/test_v4_visual.py",
+      "sha256": "24a9a4134a583ca5dca692e18df2f18b507c919f08909fd15e265a0590aa1e0e",
+      "bytes": 1685
+    }
+  ],
+  "count": 192
+}
