@@ -41,6 +41,16 @@ if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
 import project_scope
+import card_editor_adapter
+
+
+CARD_EDITOR_SOURCE_DIR = "FR_CARD_EDITOR_UNIVERSAL_v1.1.0"
+CARD_EDITOR_ASSETS = (
+    "background-fr-hd.png",
+    "background-fr-source.png",
+    "background-fr.png",
+    "logo-fr.png",
+)
 
 
 def serialized_mutation(fn):
@@ -87,6 +97,94 @@ class StudioState:
         self.mutation_lock = threading.RLock()
         self.jobs: dict[str, dict[str, Any]] = {}
         self.processes: dict[str, subprocess.Popen[str]] = {}
+
+    def card_editor_root(self) -> tuple[Path | None, str]:
+        configured = os.environ.get("FR_CARD_EDITOR_HOME", "").strip()
+        candidates = []
+        if configured:
+            candidates.append((Path(configured).expanduser(), "environment"))
+        candidates.extend([
+            (self.app_root / "local_components" / "fr-card-editor" / "1.1.0", "installed_component"),
+            (self.app_root / CARD_EDITOR_SOURCE_DIR, "local_source_checkout"),
+        ])
+        for root, source in candidates:
+            resolved = root.resolve()
+            required = [resolved / "index.html", *(resolved / "assets" / name for name in CARD_EDITOR_ASSETS)]
+            if all(path.is_file() and not path.is_symlink() for path in required):
+                return resolved, source
+        return None, "missing"
+
+    def card_editor_capabilities(self) -> dict[str, Any]:
+        root, source = self.card_editor_root()
+        required = [] if root is None else [
+            root / "index.html", *(root / "assets" / name for name in CARD_EDITOR_ASSETS)
+        ]
+        return {
+            "available": root is not None and all(path.is_file() for path in required),
+            "editor_version": "1.1.0",
+            "adapter_version": card_editor_adapter.ADAPTER_VERSION,
+            "integration_mode": "same_origin_iframe_content_only",
+            "supported_fields": list(card_editor_adapter.SUPPORTED_FIELDS),
+            "unsupported": ["geometry", "lines", "crop", "images", "data_urls"],
+            "provenance": "user_supplied_local_publication_pending",
+            "component_source": source,
+        }
+
+    def card_editor_document(self) -> bytes:
+        root, _source = self.card_editor_root()
+        if root is None:
+            raise StudioError("FR Card Editor Universal v1.1.0 não está disponível nesta instalação local.")
+        source = root / "index.html"
+        html = source.read_text(encoding="utf-8")
+        html = re.sub(
+            r"\s*<link[^>]+(?:fonts\.googleapis\.com|fonts\.gstatic\.com)[^>]*>",
+            "",
+            html,
+        )
+        for name in CARD_EDITOR_ASSETS:
+            html = html.replace(
+                f"assets/{name}",
+                f"/card-editor/assets/{name}?token={self.token}",
+            )
+        html = html.replace(
+            '$("#saveLocal").onclick=()=>{try{localStorage.setItem("fr-card-editor-v1.1",JSON.stringify(state));toast("Estado salvo neste navegador")}catch{toast("Estado grande demais; exporte JSON")}};',
+            '$("#saveLocal").onclick=()=>toast("Armazenamento local desativado no Studio");',
+        )
+        html = html.replace(
+            'try{let saved=localStorage.getItem("fr-card-editor-v1.1");if(saved)state=normalizeConfig(JSON.parse(saved))}catch{}render();resizeStage();',
+            'state=clone(DEFAULT);render();setEditing(false);resizeStage();',
+        )
+        bridge = r'''
+<style id="fr-autoedite-bridge-style">
+@font-face{font-family:"Stardos Stencil";src:url('/asset/font-title.ttf')}@font-face{font-family:Rokkitt;src:url('/asset/font-body.ttf')}@font-face{font-family:"Cormorant Garamond";src:url('/asset/font-body.ttf')}@font-face{font-family:"Share Tech Mono";src:url('/asset/font-mono.ttf')}
+.app{grid-template-columns:minmax(0,1fr)!important}.panel{display:none!important}.workspace{padding-top:62px!important}#card{pointer-events:none!important}body:not(.fr-integrated-loaded) .stage-wrap{visibility:hidden}.fr-integration-ribbon{position:fixed;z-index:100;left:12px;right:12px;top:10px;padding:9px 12px;border:1px solid #d6a64b;border-radius:8px;color:#e6d6b5;background:#071d18f2;font:12px/1.35 "Share Tech Mono",monospace;box-shadow:0 8px 24px #0008}.fr-integration-ribbon b{color:#f6a700}
+</style>
+<script id="fr-autoedite-bridge">
+(()=>{"use strict";
+const ORIGIN=window.location.origin,ADAPTER="fr-autoedite-card-content/1",TYPE_LOAD="fr-autoedite:load-card";
+const ribbon=document.createElement("div");ribbon.className="fr-integration-ribbon";ribbon.innerHTML="<b>Prévia visual de referência.</b> Somente título e corpo são editáveis no Studio; o preview salvo pelo renderer F1–F6 é a autoridade visual.";document.body.appendChild(ribbon);
+function notify(type,extra={}){window.parent.postMessage({type,bridge_version:ADAPTER,...extra},ORIGIN)}
+function loadCard(message){
+ if(message.adapter_version!==ADAPTER||!message.project||!message.segment_id||!message.fields||typeof message.fields.title!=="string"||typeof message.fields.body!=="string"){notify("fr-autoedite:editor-error",{error:"Payload de conteúdo inválido."});return}
+ try{
+  window.FRCardEditor.reset();
+  const config=window.FRCardEditor.getConfig();
+  config.assets.visual="";config.assets.visualOpacity=0;
+  for(const field of config.fields){if(field.role==="variable")field.visible=field.id==="title"||field.id==="subtitle";if(field.id==="title")field.text=message.fields.title;if(field.id==="subtitle")field.text=message.fields.body}
+  window.FRCardEditor.applyConfig(config);setEditing(false);
+  document.body.classList.add("fr-integrated-loaded");document.body.dataset.project=message.project;document.body.dataset.segmentId=message.segment_id;
+  notify("fr-autoedite:card-loaded",{project:message.project,segment_id:message.segment_id});
+ }catch(error){notify("fr-autoedite:editor-error",{error:String(error&&error.message||error)})}
+}
+window.addEventListener("message",event=>{if(event.origin!==ORIGIN||event.source!==window.parent)return;const message=event.data||{};if(message.type===TYPE_LOAD)loadCard(message)});
+notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
+})();
+</script>
+'''
+        if "localStorage.getItem" in html or "localStorage.setItem" in html:
+            raise StudioError("A integração do Card Editor não conseguiu desativar o localStorage.")
+        html = html.replace("</body>", bridge + "\n</body>")
+        return html.encode("utf-8")
 
     def project_dir(self, slug: str) -> Path:
         safe = _slugify(slug)
@@ -513,6 +611,7 @@ class StudioState:
                 "exiftool": bool(shutil.which("exiftool")),
                 "moviepy": bool(compositor.get("moviepy")),
                 "preview_backend": compositor.get("preview_backend", "ffmpeg"),
+                "card_editor": self.card_editor_capabilities(),
             },
             "job": job,
         }
@@ -1182,6 +1281,47 @@ class StudioState:
         temporary.replace(target)
         shutil.copy2(target, project / "_EDITAR" / "02_PLANO_DA_EDICAO.json")
 
+    def card_content(
+        self, project: Path, segment_id: str, input_mode: str = "raw_media",
+    ) -> dict[str, Any]:
+        if input_mode not in {"raw_media", "ready_video"}:
+            raise StudioError("input_mode inválido para o Card Editor.")
+        target = project / ("READY_VIDEO_PLAN.json" if input_mode == "ready_video" else "EDIT_PLAN.json")
+        plan = project_scope.read(target, {})
+        try:
+            if input_mode == "ready_video":
+                return card_editor_adapter.export_ready_card_content(plan, segment_id)
+            return card_editor_adapter.export_card_content(plan, segment_id)
+        except card_editor_adapter.CardEditorAdapterError as exc:
+            raise StudioError(str(exc)) from exc
+
+    def save_card_content(
+        self, project: Path, payload: dict[str, Any], input_mode: str = "raw_media",
+    ) -> dict[str, Any]:
+        """Apply the content-only adapter through the existing plan save path."""
+        if input_mode not in {"raw_media", "ready_video"}:
+            raise StudioError("input_mode inválido para o Card Editor.")
+        with project_scope.project_lock(project):
+            target = project / ("READY_VIDEO_PLAN.json" if input_mode == "ready_video" else "EDIT_PLAN.json")
+            plan = project_scope.read(target, {})
+            try:
+                updated = (
+                    card_editor_adapter.apply_ready_card_content(plan, payload)
+                    if input_mode == "ready_video"
+                    else card_editor_adapter.apply_card_content(plan, payload)
+                )
+            except card_editor_adapter.CardEditorAdapterError as exc:
+                raise StudioError(str(exc)) from exc
+            if input_mode == "ready_video":
+                self.save_ready_video_plan(project, updated)
+            else:
+                self.save_plan(project, updated)
+            saved = project_scope.read(target, {})
+        item_id = str(payload.get("segment_id") or "")
+        if input_mode == "ready_video":
+            return card_editor_adapter.export_ready_card_content(saved, item_id)
+        return card_editor_adapter.export_card_content(saved, item_id)
+
     def save_ready_video_plan(self, project: Path, plan: dict[str, Any]) -> dict[str, Any]:
         import fr_autoedite as fr
         from master_contract import validate_ready_video_contract
@@ -1448,6 +1588,35 @@ class StudioHandler(BaseHTTPRequestHandler):
             if not self._authorized():
                 self._error("Sessão inválida.", 403)
                 return
+            if parsed.path in {"/card-editor", "/card-editor/"}:
+                body = self.state.card_editor_document()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header(
+                    "Content-Security-Policy",
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; "
+                    "connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; "
+                    "frame-ancestors 'self'",
+                )
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if parsed.path.startswith("/card-editor/assets/"):
+                name = unquote(parsed.path.rsplit("/", 1)[-1])
+                if name not in CARD_EDITOR_ASSETS:
+                    self._error("Asset do Card Editor não permitido.", 404)
+                    return
+                root, _source = self.state.card_editor_root()
+                if root is None:
+                    self._error("FR Card Editor não instalado.", 404)
+                    return
+                self._send_file(root / "assets" / name)
+                return
             if parsed.path == "/api/state":
                 projects = self.state.list_projects()
                 slug = query.get("project", [projects[0]["slug"] if projects else ""])[0]
@@ -1459,6 +1628,15 @@ class StudioHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/library":
                 project = self._project(query)
                 self._json(self.state.library_state(project))
+                return
+            if parsed.path == "/api/card-content":
+                project = self._project(query)
+                segment_id = query.get("segment_id", [""])[0]
+                input_mode = query.get("input_mode", ["raw_media"])[0]
+                self._json({
+                    "ok": True,
+                    "card": self.state.card_content(project, segment_id, input_mode),
+                })
                 return
             if parsed.path in {"/api/file", "/api/media"}:
                 project = self._project(query)
@@ -1671,6 +1849,19 @@ class StudioHandler(BaseHTTPRequestHandler):
                 incoming.replace(target)
                 project_scope.write(project / "_CONTROLE/REVISAO_ROTEIRO.json", review)
                 self._json({"ok": True, "path": str(target), "size_bytes": size, "review": review})
+                return
+            if parsed.path == "/api/card-content":
+                data = self._read_json(limit=64 * 1024)
+                input_mode = query.get("input_mode", ["raw_media"])[0]
+                card = self.state.save_card_content(project, data, input_mode)
+                preview_action = "ready-preview" if input_mode == "ready_video" else "cards"
+                self.state.start_job(project, preview_action)
+                self._json({
+                    "ok": True,
+                    "card": card,
+                    "preview_job_started": True,
+                    "preview_action": preview_action,
+                })
                 return
             data = self._read_json()
             if parsed.path == "/api/reset-definitions":

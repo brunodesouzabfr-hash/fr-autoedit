@@ -1194,7 +1194,7 @@ def generate(env, project, answers=None, plan=None, manifest=None):
                 "overlay_safe_areas": sorted(OVERLAY_SAFE_AREAS), "overlay_animations": sorted(OVERLAY_ANIMATIONS),
                 "audio_policies": sorted(AUDIO_POLICIES),
                 "overlay_item_fields": [
-                    "overlay_id", "kind", "start_sec", "end_sec", "text", "service_key", "asset_id",
+                    "overlay_id", "kind", "start_sec", "end_sec", "text", "body", "service_key", "asset_id",
                     "presentation", "position", "safe_area", "opacity", "animation_in", "animation_out",
                     "audio_policy", "rationale",
                 ],
