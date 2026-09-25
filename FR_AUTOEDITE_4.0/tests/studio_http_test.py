@@ -268,6 +268,29 @@ def main() -> int:
                 {"Content-Type": "text/markdown"},
             )
             assert repeated_response["duplicate"] is True
+            descriptor = json.loads(
+                (canonical_package / "V2" / "PACKAGE_DESCRIPTOR.json").read_text(encoding="utf-8")
+            )
+            begin = downloaded_brief.index("<!-- FR_AUTOEDITE_JSON_BEGIN -->")
+            end = downloaded_brief.index("<!-- FR_AUTOEDITE_JSON_END -->", begin)
+            fenced = downloaded_brief[begin:end].split("```json", 1)[1].split("```", 1)[0]
+            v2_response = json.dumps({
+                "schema_version": 2,
+                "package_snapshot_id": descriptor["snapshot_id"],
+                "edit_plan": json.loads(fenced),
+            }).encode()
+            imported_v2 = request(
+                base + "/api/editing-brief-upload?" + project_query,
+                state.token,
+                v2_response,
+                {"Content-Type": "application/json"},
+            )
+            assert imported_v2["ok"] is True
+            assert imported_v2["path"].endswith("EDIT_PLAN_RESPONSE_V2.json")
+            import_source = json.loads(
+                (project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json").read_text(encoding="utf-8")
+            )
+            assert import_source["format"] == "v2_json"
 
             plan = {
                 "segments": [{

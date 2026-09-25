@@ -1088,9 +1088,18 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
                 ]
             return [str(self.launcher), "gerar-roteiro-ia", "--projeto", str(project)]
         if action == "brief-apply":
+            import_record = project_scope.read(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {})
+            relative = str(import_record.get("relative_path") or "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md")
+            response_path = (project / relative).resolve()
+            try:
+                response_path.relative_to(project.resolve())
+            except ValueError as exc:
+                raise StudioError("A resposta validada aponta para fora do projeto.") from exc
+            if not response_path.is_file():
+                raise StudioError("A resposta validada não está mais disponível; envie-a novamente.")
             return [
                 str(self.launcher), "aplicar-roteiro-ia", "--projeto", str(project),
-                "--arquivo", str(project / "_ENTRADA" / "ROTEIRO_MESTRE_RESPONDIDO.md"),
+                "--arquivo", str(response_path),
             ]
         if action == "takeout-normalize":
             source = project / "_TAKEOUT" / "00_NAO_EDITAR_GOOGLE_TAKEOUT_ORIGINAL.zip"
@@ -1963,18 +1972,23 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "path": str(target), "size_bytes": size, "config": config})
                 return
             if parsed.path == "/api/editing-brief-upload":
-                target = project / "_ENTRADA" / "ROTEIRO_MESTRE_RESPONDIDO.md"
                 stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-                incoming = project / "_ENTRADA" / f"ROTEIRO_MESTRE_RECEBENDO_{stamp}.md"
+                incoming = project / "_ENTRADA" / f"ROTEIRO_MESTRE_RECEBENDO_{stamp}.tmp"
                 size = self._receive_file(incoming, 64 * 1024 * 1024)
                 try:
                     content = incoming.read_text(encoding="utf-8")
                 except UnicodeDecodeError as exc:
                     incoming.unlink(missing_ok=True)
-                    raise StudioError("O roteiro precisa ser um Markdown UTF-8.") from exc
-                if "FR_AUTOEDITE_JSON_BEGIN" not in content or "FR_AUTOEDITE_JSON_END" not in content:
+                    raise StudioError("A resposta precisa ser Markdown ou JSON UTF-8.") from exc
+                is_v2 = content.lstrip().startswith("{")
+                if not is_v2 and (
+                    "FR_AUTOEDITE_JSON_BEGIN" not in content or "FR_AUTOEDITE_JSON_END" not in content
+                ):
                     incoming.unlink(missing_ok=True)
                     raise StudioError("O Markdown não contém os marcadores do Roteiro Mestre.")
+                target = project / "_ENTRADA" / (
+                    "EDIT_PLAN_RESPONSE_V2.json" if is_v2 else "ROTEIRO_MESTRE_RESPONDIDO.md"
+                )
                 import fr_autoedite as fr
                 from master_contract import inspect_file
                 try:
@@ -1987,6 +2001,11 @@ class StudioHandler(BaseHTTPRequestHandler):
                     raise StudioError(str(exc)) from exc
                 if target.is_file() and self.state._sha256(incoming) == self.state._sha256(target):
                     incoming.unlink(missing_ok=True)
+                    project_scope.write(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {
+                        "relative_path": target.relative_to(project).as_posix(),
+                        "sha256": self.state._sha256(target),
+                        "format": "v2_json" if is_v2 else "v1_markdown",
+                    })
                     review = copy.deepcopy(review)
                     review.setdefault("notices", []).append({
                         "level": "info", "block": "roteiro",
@@ -1998,8 +2017,17 @@ class StudioHandler(BaseHTTPRequestHandler):
                                 "duplicate": True, "review": review})
                     return
                 if target.is_file():
-                    shutil.copy2(target, project / "_HISTORICO" / f"ROTEIRO_MESTRE_RESPONDIDO_{stamp}.md")
+                    history_name = (
+                        f"EDIT_PLAN_RESPONSE_V2_{stamp}.json" if is_v2
+                        else f"ROTEIRO_MESTRE_RESPONDIDO_{stamp}.md"
+                    )
+                    shutil.copy2(target, project / "_HISTORICO" / history_name)
                 incoming.replace(target)
+                project_scope.write(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {
+                    "relative_path": target.relative_to(project).as_posix(),
+                    "sha256": self.state._sha256(target),
+                    "format": "v2_json" if is_v2 else "v1_markdown",
+                })
                 project_scope.write(project / "_CONTROLE/REVISAO_ROTEIRO.json", review)
                 self._json({"ok": True, "path": str(target), "size_bytes": size, "review": review})
                 return

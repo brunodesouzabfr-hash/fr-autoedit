@@ -5112,6 +5112,11 @@ def refresh_ai_package_documents(
             "Substitua este conteúdo pelo Markdown completo devolvido pela IA. "
             "O Studio validará antes de aplicar e preservará o roteiro-base.\n"
         ))
+    from ai_package_v2 import generate_snapshot
+    generate_snapshot(
+        project_dir, answers, manifest,
+        probe=lambda path: parse_probe(path, ffprobe(path)),
+    )
     return package
 
 
@@ -5291,26 +5296,11 @@ def create_chatgpt_package(
     max_mb = min(149.0, max(10.0, configured_mb))
     max_bytes = int(max_mb * 1024 * 1024)
     staging_dir = Path(tempfile.mkdtemp(prefix=".PACOTE_CHATGPT_NOVO_", dir=project_dir))
-    metadata_names = [
-        "00_LEIA_PRIMEIRO.md", "PROMPT_PRONTO_PARA_CHATGPT.md", "QUESTIONARIO_RESPONDIDO.json",
-        "MANIFESTO_MEDIA.json", "MANIFESTO_MEDIA.csv", "EDIT_PLAN.json", "EDIT_PLAN_AUTO.json",
-        "fr_brand_profile.json", "franco-romeu-logo.png", "EDIT_PLAN_SCHEMA.json",
-        "CONTEXTO_PROJETO.md", "CARD_STYLE.json", "FR_CONTENT_STRATEGY.json", "SOCIAL_PLAN.json",
-        "ROTEIRO_MESTRE_PARA_IA.md", "PUBLICACAO_SOCIAL.md", "PUBLICACAO_SOCIAL.json",
-        "RELATORIO_ANALISE_LOCAL.json", "RELATORIO_ORGANIZACAO.json", "CONTATO_GERAL_CODEX.jpg"
-    ]
-    metadata = [project_dir / name for name in metadata_names if (project_dir / name).is_file()]
-    metadata += [
-        package_root / name for name in (
-            "00_NAO_EDITAR_CONTEXTO_PROJETO.md",
-            "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
-            "02_NAO_EDITAR_MANIFESTO_MEDIA.json",
-            "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md",
-        ) if (package_root / name).is_file()
-    ]
-    metadata += sorted((project_dir / "contatos_visuais").glob("*.jpg"))
-    metadata += sorted((project_dir / "social" / "planos").glob("*.json"))
-    metadata += sorted(path for path in (project_dir / "fontes_contexto").glob("*") if path.is_file())
+    from ai_package_v2 import DETERMINISTIC_FILES
+    v2_root = package_root / "V2"
+    metadata = [v2_root / name for name in DETERMINISTIC_FILES]
+    if not all(path.is_file() for path in metadata):
+        raise AutoEditeError("O snapshot V2 não foi publicado por completo.")
     bundled_fonts = sorted(FONTS.glob("*.ttf"))
     base_size = sum(path.stat().st_size for path in metadata + bundled_fonts)
     safety = 3 * 1024 * 1024
@@ -5320,7 +5310,17 @@ def create_chatgpt_package(
             f"Os documentos fixos ocupam {base_size / 1024**2:.1f} MB e não cabem com segurança "
             f"num lote de {max_mb:.1f} MB. Remova anexos opcionais ou aumente o limite."
         )
-    proxies = sorted(path for path in (project_dir / "proxies").glob("*") if path.is_file())
+    descriptor = read_json(v2_root / "PACKAGE_DESCRIPTOR.json")
+    proxies = []
+    for relative in descriptor.get("proxy_files", []):
+        path = (project_dir / relative).resolve()
+        try:
+            path.relative_to(project_dir.resolve())
+        except ValueError as exc:
+            raise AutoEditeError("Snapshot V2 contém proxy fora do projeto.") from exc
+        if not path.is_file():
+            raise AutoEditeError(f"Proxy do snapshot V2 desapareceu: {relative}")
+        proxies.append(path)
     payloads = handoff_proxy_items(project_dir, proxies, payload_budget)
     pending = partition_by_size(payloads, payload_budget) if payloads else [[]]
     staged: list[Path] = []
@@ -5366,8 +5366,7 @@ def create_chatgpt_package(
         "",
         *(f"{path}  |  {path.stat().st_size / 1024**2:.1f} MB" for path in canonical_outputs),
         "",
-        f"# Depois envie o conteúdo deste arquivo:",
-        str(package_root / "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md"),
+        "# O contrato de edição está em EDIT_TASK.json e EDIT_SCHEMA.json dentro dos lotes.",
     ]
     write_text(project_dir / "UPLOAD_LIST.txt", "\n".join(upload_lines) + "\n")
     shutil.copy2(project_dir / "UPLOAD_LIST.txt", package_dir / "UPLOAD_LIST.txt")
@@ -5380,9 +5379,8 @@ def create_chatgpt_package(
         "1. Abra `01_LISTA_EXATA_DE_ARQUIVOS.txt`.",
         "2. Anexe TODOS os lotes indicados na mesma conversa, sem extrair os ZIPs.",
         "3. Aguarde os anexos terminarem de carregar.",
-        "4. Envie o conteúdo de `02_PROMPT_PARA_ENVIAR.md`.",
-        "5. Para edição integral por qualquer IA, use `PACOTE_PARA_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md` e peça a devolução do mesmo Markdown preenchido.",
-        "6. Importe o Markdown respondido no Studio; ele atualiza filme, Reels e publicação com backup.", "",
+        "4. Peça uma resposta JSON conforme EDIT_SCHEMA.json, vinculada ao package_snapshot_id atual.",
+        "5. Importe a resposta JSON V2 ou, para compatibilidade, um Roteiro Mestre Markdown V1 no Studio.", "",
         f"Pasta dos lotes: `{package_dir}`", "",
         "Os lotes são múltiplos arquivos ZIP independentes; não são pedaços binários que precisem ser reconstruídos.",
     ]

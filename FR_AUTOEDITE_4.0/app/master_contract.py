@@ -9,6 +9,7 @@ import re
 from types import SimpleNamespace
 
 import project_scope as scope
+from ai_package_v2 import load_v2_response
 from balloon_engine import BalloonError, validate_balloon
 from card_timeline import CardTimelineError, validate_raw_card_instance, validate_ready_card_instance
 
@@ -1006,7 +1007,13 @@ def prepare_bundle(env, project, payload):
 
 def inspect_file(env, project, path):
     c = SimpleNamespace(**env)
-    return prepare_bundle(env, project, c.parse_ai_editing_brief(Path(path)))
+    path = Path(path)
+    try:
+        is_json = path.read_text(encoding="utf-8").lstrip().startswith("{")
+    except UnicodeDecodeError:
+        is_json = False
+    payload = load_v2_response(Path(project), path) if is_json else c.parse_ai_editing_brief(path)
+    return prepare_bundle(env, project, payload)
 
 
 def apply_file(env, project, path):
@@ -1035,9 +1042,13 @@ def apply_file(env, project, path):
                  "ESTRATEGIA_IA.json": bundle["strategy"], "_CONTROLE/ROTEIRO_ATIVO.json": meta,
                  "social/planos/CARROSSEL_PLAN.json": bundle["carousel"], "social/planos/STORIES_PLAN.json": bundle["stories"],
                  "SOCIAL_PLAN.json": {"enabled": config["social"]["enabled"], "contract_version": 2,
-                                     "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]},
-                 "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md": path.read_bytes(),
-                 "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md": path.read_bytes()}
+                                     "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]}}
+        if path.read_text(encoding="utf-8").lstrip().startswith("{"):
+            files["_ENTRADA/EDIT_PLAN_RESPONSE_V2.json"] = path.read_bytes()
+            files["PACOTE_PARA_IA/V2/EDIT_PLAN_RESPONSE.json"] = path.read_bytes()
+        else:
+            files["_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md"] = path.read_bytes()
+            files["PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md"] = path.read_bytes()
         if bundle.get("input_mode") == "ready_video":
             files["READY_VIDEO_PLAN.json"] = {
                 key: copy.deepcopy(bundle[key]) for key in (
