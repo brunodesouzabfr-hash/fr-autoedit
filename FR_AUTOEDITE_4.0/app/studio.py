@@ -1386,6 +1386,92 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             return card_editor_adapter.export_ready_card_content(saved, item_id)
         return card_editor_adapter.export_card_content(saved, item_id)
 
+    def review_ai_card_intent(self, project: Path, intent: dict[str, Any]) -> dict[str, Any]:
+        """Valida e calcula diff sem escrever no projeto."""
+        import ai_card_intent
+        import fr_autoedite as fr
+        try:
+            return ai_card_intent.review_intent(vars(fr), project, intent)
+        except ai_card_intent.AiCardIntentError as exc:
+            raise StudioError(json.dumps(exc.as_dict(), ensure_ascii=False)) from exc
+
+    def apply_ai_card_intent(
+        self, project: Path, intent: dict[str, Any], *, confirmed: bool,
+        confirmation_token: str,
+    ) -> dict[str, Any]:
+        """Aplica somente após revisão vigente e confirmação explícita."""
+        import ai_card_intent
+        import fr_autoedite as fr
+        if confirmed is not True:
+            raise StudioError("A intenção não foi aplicada: confirmação explícita obrigatória.")
+        with project_scope.project_lock(project):
+            try:
+                review = ai_card_intent.review_intent(vars(fr), project, intent)
+            except ai_card_intent.AiCardIntentError as exc:
+                raise StudioError(json.dumps(exc.as_dict(), ensure_ascii=False)) from exc
+            if not isinstance(confirmation_token, str) or confirmation_token != review["confirmation_token"]:
+                raise StudioError("Token de confirmação inválido ou obsoleto; revise a intenção novamente.")
+            intent_id = review["intent"]["intent_id"]
+            snapshot = project_scope.snapshot_decisions(project, "antes-ai-card-" + intent_id)
+            operation_id = project_scope.timestamp() + "_" + intent_id
+            log_path = project / "_CONTROLE" / "AI_CARD_OPERATIONS.json"
+            log = project_scope.read(log_path, {"schema_version": 1, "operations": []})
+            operations = log.get("operations", []) if isinstance(log.get("operations"), list) else []
+            record = {
+                "operation_id": operation_id, "intent_id": intent_id,
+                "input_mode": review["intent"]["input_mode"],
+                "target_id": review["intent"]["target_id"],
+                "origin": "ai_assisted", "applied_at": project_scope.timestamp(),
+                "before_revision": review["before_revision"],
+                "after_revision": review["after_revision"],
+                "diff": copy.deepcopy(review["diff"]),
+                "claims": copy.deepcopy(review["intent"]["claims"]),
+                "evidence": copy.deepcopy(review["intent"]["evidence"]),
+                "provenance": copy.deepcopy(review["intent"]["provenance"]),
+                "rollback_version": snapshot.name,
+                "status": "applying",
+            }
+            operations.append(record)
+            project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+            try:
+                if review["intent"]["input_mode"] == "ready_video":
+                    save_result = self.save_ready_video_plan(project, review["candidate_plan"])
+                else:
+                    save_result = self.save_plan(project, review["candidate_plan"])
+            except BaseException as exc:
+                record["status"] = "failed"
+                record["error"] = str(exc)
+                project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+                raise
+            record["status"] = "applied"
+            project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+        return {
+            "applied": True, "operation": record,
+            "invalidated_card_ids": save_result.get("invalidated_card_ids", []),
+            "notices": save_result.get("notices", []),
+        }
+
+    def revert_ai_card_intent(self, project: Path, operation_id: str) -> dict[str, Any]:
+        with project_scope.project_lock(project):
+            log_path = project / "_CONTROLE" / "AI_CARD_OPERATIONS.json"
+            log = project_scope.read(log_path, {"schema_version": 1, "operations": []})
+            record = next(
+                (item for item in reversed(log.get("operations", [])) if item.get("operation_id") == operation_id),
+                None,
+            )
+            if not record:
+                raise StudioError("Operação assistida não encontrada.")
+            result = project_scope.restore_version(project, str(record.get("rollback_version") or ""))
+            restored_log = project_scope.read(log_path, {"schema_version": 1, "operations": []})
+            operations = restored_log.get("operations", []) if isinstance(restored_log.get("operations"), list) else []
+            operations.append({
+                "operation_id": project_scope.timestamp() + "_revert",
+                "reverted_operation_id": operation_id, "reverted_at": project_scope.timestamp(),
+                "origin": "manual", "result": copy.deepcopy(result),
+            })
+            project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+        return {"reverted": operation_id, "input_mode": record.get("input_mode"), **result}
+
     def save_ready_video_plan(self, project: Path, plan: dict[str, Any]) -> dict[str, Any]:
         import fr_autoedite as fr
         from master_contract import validate_ready_video_contract
@@ -1929,6 +2015,28 @@ class StudioHandler(BaseHTTPRequestHandler):
                     "preview_job_started": True,
                     "preview_action": preview_action,
                 })
+                return
+            if parsed.path == "/api/ai-card-intent-review":
+                data = self._read_json(limit=256 * 1024)
+                review = self.state.review_ai_card_intent(project, data.get("intent") or {})
+                self._json({"ok": True, "review": review})
+                return
+            if parsed.path == "/api/ai-card-intent-apply":
+                data = self._read_json(limit=256 * 1024)
+                result = self.state.apply_ai_card_intent(
+                    project, data.get("intent") or {}, confirmed=data.get("confirmed") is True,
+                    confirmation_token=str(data.get("confirmation_token") or ""),
+                )
+                action = "ready-preview" if result["operation"]["input_mode"] == "ready_video" else "cards"
+                self.state.start_job(project, action)
+                self._json({"ok": True, "result": result, "preview_action": action})
+                return
+            if parsed.path == "/api/ai-card-intent-revert":
+                data = self._read_json(limit=64 * 1024)
+                result = self.state.revert_ai_card_intent(project, str(data.get("operation_id") or ""))
+                action = "ready-preview" if result.get("input_mode") == "ready_video" else "cards"
+                self.state.start_job(project, action)
+                self._json({"ok": True, "result": result, "preview_action": action})
                 return
             data = self._read_json()
             if parsed.path == "/api/reset-definitions":
