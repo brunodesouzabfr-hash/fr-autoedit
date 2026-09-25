@@ -9,6 +9,7 @@ import re
 from types import SimpleNamespace
 
 import project_scope as scope
+from balloon_engine import BalloonError, validate_balloon
 from card_timeline import CardTimelineError, validate_raw_card_instance, validate_ready_card_instance
 
 CARD_KINDS = {"intro", "service", "phase", "outro", "detail", "comparison"}
@@ -266,6 +267,29 @@ def validate_ready_video_contract(c, payload, manifest):
             "animation_in": animation_in, "animation_out": animation_out,
             "audio_policy": audio_policy, "rationale": rationale,
         }
+        if "balloon" in item:
+            try:
+                balloon, balloon_notices = validate_balloon(
+                    item["balloon"], kind, label=label + ".balloon",
+                )
+            except BalloonError as exc:
+                fail(c, str(exc))
+            normalized_item["balloon"] = balloon
+            notices.extend(balloon_notices)
+            if balloon["reduced_motion"]:
+                normalized_item["animation_in"] = "none"
+                normalized_item["animation_out"] = "none"
+                notices.append({
+                    "level": "info", "block": label + ".balloon.reduced_motion",
+                    "message": "Redução de movimento aplicada.",
+                    "effect": "A camada permanece estática durante sua janela; timing e conteúdo não mudam.",
+                })
+            elif balloon["easing"] != "linear":
+                notices.append({
+                    "level": "info", "block": label + ".balloon.easing",
+                    "message": f"Easing {balloon['easing']} será aproximado pela duração do fade desta versão.",
+                    "effect": "Preview e master usam a mesma aproximação; não há movimento direcional prometido.",
+                })
         if "card_instance" in item:
             try:
                 normalized_item["card_instance"] = validate_ready_card_instance(
@@ -1213,7 +1237,7 @@ def generate(env, project, answers=None, plan=None, manifest=None):
                 "overlay_item_fields": [
                     "overlay_id", "kind", "start_sec", "end_sec", "text", "body", "service_key", "asset_id",
                     "presentation", "position", "safe_area", "opacity", "animation_in", "animation_out",
-                    "audio_policy", "rationale", "card_instance",
+                    "audio_policy", "rationale", "card_instance", "balloon",
                 ],
                 "style_pack_assets_installed": installed_style_assets,
                 "service_profiles": c.load_service_catalog(), "fonts": sorted(p.name for p in c.FONTS.glob("*.ttf")),

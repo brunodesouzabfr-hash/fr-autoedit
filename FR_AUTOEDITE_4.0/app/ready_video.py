@@ -299,7 +299,7 @@ def overlay_image(
         layer = render_overlay(overlay, (width, height), c.APP_ROOT)
         default_position = "bottom_center" if kind in {"caption", "lower_third"} else "bottom_left"
         _place_layer(canvas, _apply_opacity(layer, opacity),
-                     str(overlay.get("position") or default_position), safe_margin)
+                     str(overlay.get("_resolved_position") or overlay.get("position") or default_position), safe_margin)
         canvas.save(target)
         layer.close()
         canvas.close()
@@ -364,7 +364,10 @@ def overlay_image(
         draw.text((pad_x, y), line, font=selected_font, fill=(*bone, 255))
         y += line_height
     default_position = "bottom_center" if kind in {"caption", "lower_third"} else "bottom_left"
-    _place_layer(canvas, _apply_opacity(layer, opacity), str(overlay.get("position") or default_position), safe_margin)
+    _place_layer(
+        canvas, _apply_opacity(layer, opacity),
+        str(overlay.get("_resolved_position") or overlay.get("position") or default_position), safe_margin,
+    )
     canvas.save(target)
     return target
 
@@ -380,7 +383,9 @@ def _ffmpeg_compose(
     current = "rv0"
     for index, (overlay, _image) in enumerate(layers, 1):
         start, end = float(overlay["start_sec"]), float(overlay["end_sec"])
-        fade = min(0.28, max(0.0, (end - start) / 4.0))
+        easing = str(overlay.get("balloon", {}).get("easing") or "linear")
+        fade_ratio = {"linear": 4.0, "ease_out": 5.5, "ease_in_out": 3.2}.get(easing, 4.0)
+        fade = min(0.28, max(0.0, (end - start) / fade_ratio))
         source = f"layer{index}"
         layer_filters = ["format=rgba"]
         if overlay.get("animation_in") != "none":
@@ -513,6 +518,15 @@ def render(
     parsed = c.parse_probe(base, c.ffprobe(base))
     width, height = int(parsed["width"]), int(parsed["height"])
     duration, fps = float(parsed["duration_sec"]), float(parsed.get("fps") or 24)
+    from balloon_engine import resolve_collisions
+    render_overlays, layout_notices = resolve_collisions(
+        validated["overlays"], (width, height), c.APP_ROOT,
+    )
+    notices.extend(layout_notices)
+    if not preview and any(item.get("_layout_review_required") for item in render_overlays):
+        raise c.AutoEditeError(
+            "Conflito de balões sem região livre: revise a posição/timing antes do master."
+        )
     style = c.load_card_style(project)
     pack_id = validated["style_pack_id"]
     work = project / "_CACHE_RENDER" / "ready_video_overlays"
@@ -525,13 +539,13 @@ def render(
         "style_pack_signature": style_pack_signature(c.APP_ROOT, pack_id),
         "application": c.APP_VERSION,
     }
-    expected_layers = {f"{overlay['overlay_id']}.png" for overlay in validated["overlays"]}
+    expected_layers = {f"{overlay['overlay_id']}.png" for overlay in render_overlays}
     for stale in work.glob("*.png"):
         if stale.name not in expected_layers:
             stale.unlink(missing_ok=True)
     layers: list[tuple[dict[str, Any], Path]] = []
     next_layer_cache: dict[str, dict[str, str]] = {}
-    for overlay in validated["overlays"]:
+    for overlay in render_overlays:
         target = work / f"{overlay['overlay_id']}.png"
         visual_overlay = {
             key: copy.deepcopy(value) for key, value in overlay.items()

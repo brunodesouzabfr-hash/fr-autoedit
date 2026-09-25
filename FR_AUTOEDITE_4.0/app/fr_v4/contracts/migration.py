@@ -69,7 +69,7 @@ def from_legacy(payload: dict, *, manifest: dict, project_id: str,
         'audio_policies': ['preserve', 'mix'],
         'overlay_item_fields': ['overlay_id', 'kind', 'start_sec', 'end_sec', 'text', 'service_key',
                                 'asset_id', 'presentation', 'position', 'safe_area', 'opacity',
-                                'animation_in', 'animation_out', 'audio_policy', 'rationale'],
+                                'animation_in', 'animation_out', 'audio_policy', 'rationale', 'balloon'],
     }
     body = ('# Roteiro Mestre — migração para revisão\n\n'
             '## Decisões preservadas\n'
