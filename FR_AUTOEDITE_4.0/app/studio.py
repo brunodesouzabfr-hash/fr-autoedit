@@ -1253,7 +1253,63 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
         if not 1.25 <= speed <= 30:
             raise StudioError(f"{label}, segmento {index}: use velocidade entre 1.25x e 30x.")
 
-    def save_plan(self, project: Path, plan: dict[str, Any]) -> None:
+    @staticmethod
+    def _card_preview_state(segment: dict[str, Any]) -> dict[str, Any]:
+        """Campos que podem mudar os pixels do PNG, sem placement temporal."""
+        ignored = {
+            "segment_id", "enabled", "include_in", "duration_sec", "transition",
+            "transition_duration_sec", "phase_order", "card_instance",
+        }
+        return {key: copy.deepcopy(value) for key, value in segment.items() if key not in ignored}
+
+    def _invalidate_card_previews(
+        self, project: Path, previous: dict[str, Any], current: dict[str, Any],
+    ) -> list[str]:
+        old_cards = {
+            str(item.get("segment_id") or ""): item
+            for item in previous.get("segments", [])
+            if isinstance(item, dict) and item.get("type") == "card" and item.get("segment_id")
+        }
+        new_cards = {
+            str(item.get("segment_id") or ""): item
+            for item in current.get("segments", [])
+            if isinstance(item, dict) and item.get("type") == "card" and item.get("segment_id")
+        }
+        affected = {
+            item_id for item_id in set(old_cards) | set(new_cards)
+            if item_id not in old_cards or item_id not in new_cards
+            or self._card_preview_state(old_cards[item_id]) != self._card_preview_state(new_cards[item_id])
+        }
+        if not affected:
+            return []
+        registry_path = project / "_CONTROLE" / "CARD_PREVIEWS.json"
+        registry = project_scope.read(registry_path, {})
+        kept = []
+        for record in registry.get("previews", []):
+            if not isinstance(record, dict) or str(record.get("segment_id") or "") not in affected:
+                kept.append(record)
+                continue
+            try:
+                target = self._safe_project_target(project, str(record.get("relative") or ""))
+            except (StudioError, ValueError):
+                continue
+            target.unlink(missing_ok=True)
+        if registry_path.is_file():
+            registry["previews"] = kept
+            registry["invalidated_card_ids"] = sorted(affected)
+            project_scope.write(registry_path, registry)
+        for item_id in affected:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", item_id):
+                continue
+            for target in (project / "cards_editaveis").glob(f"*/{item_id}.png"):
+                target.unlink(missing_ok=True)
+            for target in (project / "cards_editaveis").glob(f"*/4K_MASTERS/{item_id}_4K.png"):
+                target.unlink(missing_ok=True)
+        return sorted(affected)
+
+    def save_plan(self, project: Path, plan: dict[str, Any]) -> dict[str, Any]:
+        target = project / "EDIT_PLAN.json"
+        previous = project_scope.read(target, {})
         if (project / "MANIFESTO_MEDIA.json").is_file():
             import fr_autoedite as fr
             try:
@@ -1272,14 +1328,18 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             except (TypeError, ValueError) as exc:
                 raise StudioError(f"Segmento {index}: duração inválida.") from exc
             self._validate_segment_controls(segment, index, "Filme")
-        target = project / "EDIT_PLAN.json"
         if target.is_file():
             stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
             shutil.copy2(target, project / "_HISTORICO" / f"EDIT_PLAN_{stamp}.json")
         temporary = target.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(target)
+        reloaded = project_scope.read(target, {})
+        if reloaded != plan:
+            raise StudioError("A timeline salva não coincide com o snapshot validado.")
         shutil.copy2(target, project / "_EDITAR" / "02_PLANO_DA_EDICAO.json")
+        invalidated = self._invalidate_card_previews(project, previous, reloaded)
+        return {"plan": reloaded, "invalidated_card_ids": invalidated}
 
     def card_content(
         self, project: Path, segment_id: str, input_mode: str = "raw_media",
@@ -1345,7 +1405,10 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             project_scope.write(target, validated)
         if previous != validated or not editable_target.is_file():
             project_scope.write(editable_target, validated)
-        return {"plan": validated, "notices": notices}
+        reloaded = project_scope.read(target, {})
+        if reloaded != validated:
+            raise StudioError("O plano de overlays salvo não coincide com o snapshot validado.")
+        return {"plan": reloaded, "notices": notices}
 
     def save_reel_plan(self, project: Path, plan: dict[str, Any]) -> Path:
         if (project / "MANIFESTO_MEDIA.json").is_file():
@@ -1914,8 +1977,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "result": result})
                 return
             if parsed.path == "/api/plan":
-                self.state.save_plan(project, data.get("plan") or {})
-                self._json({"ok": True})
+                result = self.state.save_plan(project, data.get("plan") or {})
+                self._json({"ok": True, **result})
                 return
             if parsed.path == "/api/ready-video-plan":
                 result = self.state.save_ready_video_plan(project, data.get("plan") or {})

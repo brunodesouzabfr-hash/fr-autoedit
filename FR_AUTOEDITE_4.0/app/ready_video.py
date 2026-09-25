@@ -516,15 +516,38 @@ def render(
     pack_id = validated["style_pack_id"]
     work = project / "_CACHE_RENDER" / "ready_video_overlays"
     work.mkdir(parents=True, exist_ok=True)
+    cache_path = work / "LAYER_CACHE.json"
+    layer_cache = project_scope.read(cache_path, {})
+    cached_layers = layer_cache.get("layers", {}) if isinstance(layer_cache.get("layers", {}), dict) else {}
+    shared_layer_state = {
+        "width": width, "height": height, "card_style": style,
+        "style_pack_signature": style_pack_signature(c.APP_ROOT, pack_id),
+        "application": c.APP_VERSION,
+    }
     expected_layers = {f"{overlay['overlay_id']}.png" for overlay in validated["overlays"]}
     for stale in work.glob("*.png"):
         if stale.name not in expected_layers:
             stale.unlink(missing_ok=True)
     layers: list[tuple[dict[str, Any], Path]] = []
+    next_layer_cache: dict[str, dict[str, str]] = {}
     for overlay in validated["overlays"]:
         target = work / f"{overlay['overlay_id']}.png"
-        overlay_image(env, project, overlay, width, height, style, pack_id, target)
+        visual_overlay = {
+            key: copy.deepcopy(value) for key, value in overlay.items()
+            if key not in {"start_sec", "end_sec", "card_instance", "rationale", "audio_policy"}
+        }
+        layer_signature = hashlib.sha256(json.dumps(
+            {"shared": shared_layer_state, "overlay": visual_overlay},
+            ensure_ascii=False, sort_keys=True, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        cached = cached_layers.get(overlay["overlay_id"], {})
+        if not target.is_file() or cached.get("signature") != layer_signature:
+            overlay_image(env, project, overlay, width, height, style, pack_id, target)
+        next_layer_cache[overlay["overlay_id"]] = {
+            "signature": layer_signature, "relative": _relative(target, project),
+        }
         layers.append((overlay, target))
+    project_scope.write(cache_path, {"schema_version": 1, "layers": next_layer_cache})
     signature_payload = {
         "plan": validated,
         "card_style": style,

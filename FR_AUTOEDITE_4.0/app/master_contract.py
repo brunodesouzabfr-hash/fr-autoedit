@@ -9,6 +9,7 @@ import re
 from types import SimpleNamespace
 
 import project_scope as scope
+from card_timeline import CardTimelineError, validate_raw_card_instance, validate_ready_card_instance
 
 CARD_KINDS = {"intro", "service", "phase", "outro", "detail", "comparison"}
 ANIMATIONS = {"none", "soft_zoom", "forge_reveal", "zoom_out", "fade"}
@@ -47,6 +48,7 @@ SUPPORTED_SEGMENT_FIELDS = {
     "service_id", "service_name", "service_confidence", "service_card_enabled",
     "card_type", "card_family", "balloon_family", "visual_motif", "overlay_text",
     "voiceover_text", "caption_text", "transition_in", "transition_out", "balloon_texts",
+    "card_instance",
 }
 AI_FILLER_PREFIXES = (
     "aqui está", "aqui esta", "claro!", "certamente!", "como solicitado",
@@ -254,7 +256,7 @@ def validate_ready_video_contract(c, payload, manifest):
                 "message": "Justificativa aceita somente como metadado.",
                 "effect": "O texto rationale nunca será desenhado no vídeo.",
             })
-        normalized.append({
+        normalized_item = {
             "overlay_id": overlay_id, "kind": kind,
             "start_sec": round(start, 6), "end_sec": round(end, 6),
             "text": text, "body": clean_editorial_text(c, str(item.get("body") or ""), label + ".body"),
@@ -263,7 +265,15 @@ def validate_ready_video_contract(c, payload, manifest):
             "opacity": number(c, item.get("opacity", 1.0), label + ".opacity", 0, 1),
             "animation_in": animation_in, "animation_out": animation_out,
             "audio_policy": audio_policy, "rationale": rationale,
-        })
+        }
+        if "card_instance" in item:
+            try:
+                normalized_item["card_instance"] = validate_ready_card_instance(
+                    item, label=label + ".card_instance",
+                )
+            except CardTimelineError as exc:
+                fail(c, str(exc))
+        normalized.append(normalized_item)
     global_audio = str(payload.get("audio_policy") or "preserve")
     if global_audio not in AUDIO_POLICIES:
         fail(c, "audio_policy: use preserve ou mix.")
@@ -497,11 +507,10 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
             })
             s["cut_style"] = "hard"
         sid = str(s.get("segment_id") or f"S{index:04d}")
-        # IDs identify occurrences, not source videos. Duplicates get stable new IDs.
-        if sid in seen or not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", sid):
-            sid = f"S{index:04d}"
-        while sid in seen:
-            sid += "x"
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", sid):
+            fail(c, p + ".segment_id: use 1–48 letras, números, hífen ou sublinhado.")
+        if sid in seen:
+            fail(c, p + f".segment_id: ID duplicado `{sid}`; IDs de instância devem ser estáveis e únicos.")
         s["segment_id"] = sid
         seen.add(sid)
         if s["type"] == "card":
@@ -541,6 +550,12 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
                     fail(c, p + ".comparison: use before e after.")
                 s["comparison"] = {k: media_ref(c, s["comparison"].get(k), manifest, p + ".comparison." + k)
                                    for k in ("before", "after")}
+            try:
+                instance = validate_raw_card_instance(s, index - 1, label=p + ".card_instance")
+            except CardTimelineError as exc:
+                fail(c, str(exc))
+            if instance is not None:
+                s["card_instance"] = instance
             continue
         mid = str(s.get("media_id") or "")
         row = trusted.get(mid) if s.get("external_asset") else rows.get(mid)
@@ -1196,7 +1211,7 @@ def generate(env, project, answers=None, plan=None, manifest=None):
                 "overlay_item_fields": [
                     "overlay_id", "kind", "start_sec", "end_sec", "text", "body", "service_key", "asset_id",
                     "presentation", "position", "safe_area", "opacity", "animation_in", "animation_out",
-                    "audio_policy", "rationale",
+                    "audio_policy", "rationale", "card_instance",
                 ],
                 "style_pack_assets_installed": installed_style_assets,
                 "service_profiles": c.load_service_catalog(), "fonts": sorted(p.name for p in c.FONTS.glob("*.ttf")),

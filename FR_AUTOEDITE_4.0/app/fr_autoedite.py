@@ -3634,6 +3634,11 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
         for temporary, target, _segment, _master in pending:
             temporary.replace(target)
             outputs.append(target)
+        expected = {target.resolve() for _temporary, target, _segment, _master in pending}
+        stale_candidates = list(output_dir.glob("*.png")) + list((output_dir / "4K_MASTERS").glob("*.png"))
+        for stale in stale_candidates:
+            if stale.resolve() not in expected:
+                stale.unlink(missing_ok=True)
     finally:
         for temporary, _target, _segment, _master in pending:
             temporary.unlink(missing_ok=True)

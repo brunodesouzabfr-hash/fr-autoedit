@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 
 import fr_autoedite as fr
+import card_timeline
 import local_analysis
 import master_contract
 import project_scope
@@ -138,6 +139,27 @@ class ReadyVideoFlow(unittest.TestCase):
         with self.assertRaisesRegex(fr.AutoEditeError, "exige true"):
             master_contract.validate_ready_video_contract(self.c, invalid, self.manifest)
 
+    def test_card_instance_ready_round_trip_legacy_fallback_and_invalid_placement(self):
+        legacy = copy.deepcopy(self.plan)
+        legacy["overlays"] = [self.overlay(kind="common_card", body="Corpo explícito")]
+        validated_legacy, _ = master_contract.validate_ready_video_contract(self.c, legacy, self.manifest)
+        self.assertNotIn("card_instance", validated_legacy["overlays"][0])
+
+        versioned = copy.deepcopy(legacy)
+        versioned["overlays"][0]["card_instance"] = card_timeline.build_ready_card_instance(
+            versioned["overlays"][0]
+        )
+        validated, _ = master_contract.validate_ready_video_contract(self.c, versioned, self.manifest)
+        self.assertEqual(validated["overlays"][0]["card_instance"]["placement"], {
+            "timebase": "ready_video_base", "start_sec": 0.6, "end_sec": 1.8,
+        })
+        self.assertTrue(validated["timeline_locked"])
+
+        invalid = copy.deepcopy(versioned)
+        invalid["overlays"][0]["card_instance"]["placement"]["end_sec"] = 2.0
+        with self.assertRaisesRegex(fr.AutoEditeError, "janela física"):
+            master_contract.validate_ready_video_contract(self.c, invalid, self.manifest)
+
     def test_master_import_rejects_hidden_cut_or_speed_change(self):
         payload = fr.parse_ai_editing_brief(
             self.project / "PACOTE_PARA_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md"
@@ -205,6 +227,41 @@ class ReadyVideoFlow(unittest.TestCase):
         html = (ROOT / "assets" / "studio" / "index.html").read_text(encoding="utf-8")
         self.assertIn("d.ready_video_preview.signature", html)
         self.assertIn("&v=", html)
+
+    def test_ready_layer_cache_reuses_timing_only_change_and_removes_deleted_card(self):
+        overlay = self.overlay(
+            kind="common_card", text="CARD CACHE", body="Corpo explícito", position="center",
+        )
+        overlay["card_instance"] = card_timeline.build_ready_card_instance(overlay)
+        self.plan["overlays"] = [overlay]
+        with patch("ready_video.choose_preview_backend", return_value="ffmpeg"):
+            ready_video.render(vars(fr), self.project, self.plan, preview=True)
+        layer = self.project / "_CACHE_RENDER" / "ready_video_overlays" / "OV0001.png"
+        self.assertTrue(layer.is_file())
+
+        moved = copy.deepcopy(self.plan)
+        moved["overlays"][0].update(start_sec=0.8, end_sec=2.0)
+        moved["overlays"][0]["card_instance"] = card_timeline.build_ready_card_instance(moved["overlays"][0])
+        with (
+            patch("ready_video.choose_preview_backend", return_value="ffmpeg"),
+            patch("ready_video._ffmpeg_compose"),
+            patch("ready_video.overlay_image", wraps=ready_video.overlay_image) as render_layer,
+        ):
+            ready_video.render(vars(fr), self.project, moved, preview=True)
+        self.assertEqual(render_layer.call_count, 0)
+
+        removed = copy.deepcopy(moved)
+        removed["overlays"] = []
+        with (
+            patch("ready_video.choose_preview_backend", return_value="ffmpeg"),
+            patch("ready_video._ffmpeg_compose"),
+        ):
+            ready_video.render(vars(fr), self.project, removed, preview=True)
+        self.assertFalse(layer.exists())
+        cache = project_scope.read(
+            self.project / "_CACHE_RENDER" / "ready_video_overlays" / "LAYER_CACHE.json"
+        )
+        self.assertEqual(cache["layers"], {})
 
     def test_saving_unchanged_overlay_plan_does_not_stack_hidden_history(self):
         state = StudioState(ROOT, self.root / "workspace")
