@@ -31,13 +31,17 @@ class AiPackageV2Test(unittest.TestCase):
         media = []
         for index in range(1, 4):
             relative = f"proxies/M{index:04d}_PROXY.png"
+            source_relative = f"originais/imagem-{index}.png"
             path = self.project / relative
+            source = self.project / source_relative
             path.parent.mkdir(parents=True, exist_ok=True)
+            source.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(image)
+            source.write_bytes(image)
             media.append({
                 "id": f"M{index:04d}", "status": "ok", "media_type": "image",
                 "filename": f"imagem-{index}.png", "proxy_path": relative,
-                "source_path": f"originais/imagem-{index}.png", "duration_sec": 0,
+                "source_path": source_relative, "duration_sec": 0,
                 "width": 512, "height": 512, "has_audio": False,
             })
         self.manifest = {"schema_version": 3, "input_mode": "raw_media", "media": media}

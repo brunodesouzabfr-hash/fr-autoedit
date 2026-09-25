@@ -142,6 +142,7 @@ def _media_inventory(
                 "end_sec": round(end, 6),
             },
             "parent_asset_id": parent_id,
+            "lineage": copy.deepcopy(raw.get("proxy_integrity")),
             "proxy": {
                 "relative_path": relative, "size_bytes": proxy_path.stat().st_size,
                 "sha256": _sha256(proxy_path), **structural,
@@ -192,7 +193,12 @@ def build_snapshot(
     }
     media_manifest = {
         "schema_version": PACKAGE_VERSION,
-        "integrity_level": "structural_m6_pending_lineage_m7",
+        "integrity_level": (
+            "verified_m7" if all(
+                (row.get("lineage") or {}).get("status") in {"verified", "verified_legacy"}
+                for row in rows if row.get("eligible")
+            ) else "structural_m6_pending_lineage_m7"
+        ),
         "assets": rows,
         "eligible_asset_ids": [row["asset_id"] for row in rows if row.get("eligible")],
         "proxy_files": proxy_paths,
@@ -242,7 +248,10 @@ def build_snapshot(
     descriptor = {
         "schema_version": PACKAGE_VERSION, "snapshot_id": snapshot_id,
         "deterministic_files": sorted(core), "proxy_files": proxy_paths,
-        "integrity_status": "m6_structural_only_m7_required",
+        "integrity_status": (
+            "verified_m7" if media_manifest["integrity_level"] == "verified_m7"
+            else "m6_structural_only_m7_required"
+        ),
     }
     return {**core, "PACKAGE_DESCRIPTOR.json": descriptor}
 
