@@ -269,7 +269,7 @@ def validate_ready_video_contract(c, payload, manifest):
         if "card_instance" in item:
             try:
                 normalized_item["card_instance"] = validate_ready_card_instance(
-                    item, label=label + ".card_instance",
+                    item, label=label + ".card_instance", manifest=manifest,
                 )
             except CardTimelineError as exc:
                 fail(c, str(exc))
@@ -551,7 +551,9 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
                 s["comparison"] = {k: media_ref(c, s["comparison"].get(k), manifest, p + ".comparison." + k)
                                    for k in ("before", "after")}
             try:
-                instance = validate_raw_card_instance(s, index - 1, label=p + ".card_instance")
+                instance = validate_raw_card_instance(
+                    s, index - 1, label=p + ".card_instance", manifest=manifest,
+                )
             except CardTimelineError as exc:
                 fail(c, str(exc))
             if instance is not None:

@@ -1260,7 +1260,11 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             "segment_id", "enabled", "include_in", "duration_sec", "transition",
             "transition_duration_sec", "phase_order", "card_instance",
         }
-        return {key: copy.deepcopy(value) for key, value in segment.items() if key not in ignored}
+        result = {key: copy.deepcopy(value) for key, value in segment.items() if key not in ignored}
+        instance = segment.get("card_instance")
+        if isinstance(instance, dict) and "central_media" in instance:
+            result["central_media"] = copy.deepcopy(instance["central_media"])
+        return result
 
     def _invalidate_card_previews(
         self, project: Path, previous: dict[str, Any], current: dict[str, Any],

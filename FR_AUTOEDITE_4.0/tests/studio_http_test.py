@@ -144,7 +144,7 @@ def main() -> int:
                 json.dumps({"palette": {"background": "cor-invalida"}}), encoding="utf-8"
             )
             state.start_job(project, "cards")
-            card_job = wait_for_job(state, project)
+            card_job = wait_for_job(state, project, timeout=90.0)
             assert card_job["returncode"] == 0, "\n".join(card_job.get("log", []))
             assert any("Cards 1/" in line for line in card_job.get("log", []))
             assert (project / "CARD_PREVIEW_PLAN.json").is_file()

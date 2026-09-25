@@ -10,6 +10,8 @@ import math
 import re
 from typing import Any
 
+from card_media import CardMediaError, validate_central_media
+
 
 SCHEMA_VERSION = 1
 EDIT_ORIGINS = frozenset({"manual", "deterministic_auto", "ai_assisted"})
@@ -17,7 +19,7 @@ READY_CARD_KINDS = frozenset({"common_card", "service_card"})
 _ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _COMMON_FIELDS = frozenset({
     "schema_version", "instance_id", "definition_id", "definition_version",
-    "edit_origin", "placement",
+    "edit_origin", "placement", "central_media",
 })
 
 
@@ -58,7 +60,7 @@ def _common(instance: Any, *, expected_id: str, expected_definition: str, label:
     placement = instance.get("placement")
     if not isinstance(placement, dict):
         raise CardTimelineError(f"{label}.placement: esperado objeto.")
-    return {
+    result = {
         "schema_version": SCHEMA_VERSION,
         "instance_id": instance_id,
         "definition_id": definition_id,
@@ -66,12 +68,20 @@ def _common(instance: Any, *, expected_id: str, expected_definition: str, label:
         "edit_origin": origin,
         "placement": placement,
     }
+    if "central_media" in instance:
+        try:
+            result["central_media"] = validate_central_media(
+                instance["central_media"], label=label + ".central_media",
+            )
+        except CardMediaError as exc:
+            raise CardTimelineError(str(exc)) from exc
+    return result
 
 
 def build_raw_card_instance(
     segment: dict[str, Any], sequence_index: int, *, edit_origin: str = "manual",
 ) -> dict[str, Any]:
-    return {
+    result = {
         "schema_version": SCHEMA_VERSION,
         "instance_id": str(segment.get("segment_id") or ""),
         "definition_id": f"raw/{segment.get('card_kind') or 'phase'}",
@@ -83,12 +93,16 @@ def build_raw_card_instance(
             "duration_sec": float(segment.get("duration_sec") or 0),
         },
     }
+    existing = segment.get("card_instance")
+    if isinstance(existing, dict) and "central_media" in existing:
+        result["central_media"] = existing["central_media"]
+    return result
 
 
 def build_ready_card_instance(
     overlay: dict[str, Any], *, edit_origin: str = "manual",
 ) -> dict[str, Any]:
-    return {
+    result = {
         "schema_version": SCHEMA_VERSION,
         "instance_id": str(overlay.get("overlay_id") or ""),
         "definition_id": f"ready/{overlay.get('kind') or 'common_card'}",
@@ -100,10 +114,15 @@ def build_ready_card_instance(
             "end_sec": float(overlay.get("end_sec") or 0),
         },
     }
+    existing = overlay.get("card_instance")
+    if isinstance(existing, dict) and "central_media" in existing:
+        result["central_media"] = existing["central_media"]
+    return result
 
 
 def validate_raw_card_instance(
     segment: dict[str, Any], sequence_index: int, *, label: str = "card_instance",
+    manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Valida metadado novo; ausência significa fallback legado sem escrita."""
     if "card_instance" not in segment:
@@ -113,6 +132,15 @@ def validate_raw_card_instance(
         segment["card_instance"], expected_id=expected["instance_id"],
         expected_definition=expected["definition_id"], label=label,
     )
+    if "central_media" in result:
+        if str(segment.get("card_kind") or "") != "service" or not segment.get("service_key"):
+            raise CardTimelineError(f"{label}.central_media: disponível apenas para cards F3/SERVICE.")
+        try:
+            result["central_media"] = validate_central_media(
+                result["central_media"], manifest, label=label + ".central_media",
+            )
+        except CardMediaError as exc:
+            raise CardTimelineError(str(exc)) from exc
     placement = result["placement"]
     unknown = sorted(set(placement) - {"timebase", "sequence_index", "duration_sec"})
     if unknown:
@@ -138,6 +166,7 @@ def validate_raw_card_instance(
 
 def validate_ready_card_instance(
     overlay: dict[str, Any], *, label: str = "card_instance",
+    manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Valida placement no relógio do vídeo-base; overlays legados ficam intactos."""
     if "card_instance" not in overlay:
@@ -150,6 +179,15 @@ def validate_ready_card_instance(
         overlay["card_instance"], expected_id=expected["instance_id"],
         expected_definition=expected["definition_id"], label=label,
     )
+    if "central_media" in result:
+        if kind != "service_card" or not overlay.get("service_key"):
+            raise CardTimelineError(f"{label}.central_media: disponível apenas para cards F3/SERVICE.")
+        try:
+            result["central_media"] = validate_central_media(
+                result["central_media"], manifest, label=label + ".central_media",
+            )
+        except CardMediaError as exc:
+            raise CardTimelineError(str(exc)) from exc
     placement = result["placement"]
     unknown = sorted(set(placement) - {"timebase", "start_sec", "end_sec"})
     if unknown:

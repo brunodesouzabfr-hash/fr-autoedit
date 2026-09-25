@@ -79,6 +79,12 @@ def spec_from_legacy(segment: dict[str, Any], brand: dict[str, Any]) -> CardSpec
 def render_legacy_card(path: Path, segment: dict[str, Any], plan: dict[str, Any],
                        brand: dict[str, Any], style: dict[str, Any], app_root: Path) -> dict[str, Any]:
     """Renderiza atomicamente e retorna metadados editoriais verificáveis."""
+    central_media = segment.get("card_instance", {}).get("central_media")
+    if isinstance(central_media, dict):
+        # A mídia de projeto precisa ser resolvida no escopo do projeto. O
+        # compositor SERVICE abaixo usa a mesma fachada de preview/master e
+        # mantém o renderer F1–F6 intacto para todas as demais instâncias.
+        return {"handled": False, "reason": "service_central_media"}
     if not enabled(style):
         return {"handled": False}
     output = plan.get("output", {})

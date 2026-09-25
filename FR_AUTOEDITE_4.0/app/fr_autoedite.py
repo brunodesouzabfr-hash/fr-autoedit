@@ -2529,7 +2529,8 @@ def draw_contact_chips(
 
 def paste_service_symbol(
     canvas: Any, asset_path: Path, center: tuple[int, int], size: int,
-    orange: str, gold: str, border: str,
+    orange: str, gold: str, border: str, *, zoom: float = 1.0,
+    focal_x: float = 0.5, focal_y: float = 0.5,
 ) -> bool:
     """Integra o medalhão de serviço num círculo matematicamente perfeito.
 
@@ -2537,24 +2538,16 @@ def paste_service_symbol(
     antes da máscara circular, deformando visualmente o medalhão em uma oval.
     Aqui a imagem é ajustada primeiro a um quadrado e só depois recebe a máscara.
     """
-    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
+    from PIL import Image, ImageDraw
+    from card_media import circle_crop
 
     if not asset_path.is_file():
         return False
     try:
         with Image.open(asset_path) as opened:
-            source = ImageOps.exif_transpose(opened).convert("RGBA")
-        plate = ImageOps.fit(
-            source, (size, size), method=Image.Resampling.LANCZOS,
-            centering=(0.5, 0.5),
-        )
-        mask = Image.new("L", (size, size), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        inset = max(1, size // 160)
-        mask_draw.ellipse((inset, inset, size - inset - 1, size - inset - 1), fill=255)
-        # Antialias discreto apenas na borda; não altera a geometria circular.
-        mask = mask.filter(ImageFilter.GaussianBlur(max(0.6, size / 420)))
-        plate.putalpha(ImageChops.multiply(plate.getchannel("A"), mask))
+            plate = circle_crop(
+                opened, size, zoom=zoom, focal_x=focal_x, focal_y=focal_y,
+            )
         cx, cy = center
         canvas.alpha_composite(plate, (cx - size // 2, cy - size // 2))
         draw = ImageDraw.Draw(canvas, "RGBA")

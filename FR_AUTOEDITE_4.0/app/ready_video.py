@@ -245,6 +245,7 @@ def overlay_image(
             "service_name": service.get("label", ""), "service_asset": service.get("asset", ""),
             "service_layout": service.get("layout", ""), "card_family": service.get("visual_family", ""),
             "balloon_family": service.get("balloon_family", ""),
+            "card_instance": copy.deepcopy(overlay.get("card_instance") or {}),
         }
         full = target.with_name(target.stem + ".card.png")
         c.card_image(
@@ -536,6 +537,9 @@ def render(
             key: copy.deepcopy(value) for key, value in overlay.items()
             if key not in {"start_sec", "end_sec", "card_instance", "rationale", "audio_policy"}
         }
+        instance = overlay.get("card_instance")
+        if isinstance(instance, dict) and "central_media" in instance:
+            visual_overlay["central_media"] = copy.deepcopy(instance["central_media"])
         layer_signature = hashlib.sha256(json.dumps(
             {"shared": shared_layer_state, "overlay": visual_overlay},
             ensure_ascii=False, sort_keys=True, allow_nan=False,
