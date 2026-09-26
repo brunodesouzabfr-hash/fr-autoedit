@@ -7,7 +7,13 @@ fr_data_base="${XDG_DATA_HOME:-$HOME/.local/share}"
 fr_bin_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
 fr_bin_path="$fr_bin_dir/fr-autoedite"
 fr_log_dir="${XDG_STATE_HOME:-$HOME/.local/state}/fr-autoedite"
-fr_log_path="$fr_log_dir/studio-3.4.0.log"
+fr_expected_version="$(tr -d '\r\n' < "$fr_update_root/VERSION")"
+case "$fr_expected_version" in
+  3.4.0|4.0.0-candidate) ;;
+  *) echo "Versão do pacote não suportada: $fr_expected_version" >&2; exit 4 ;;
+esac
+fr_expected_banner="FR AutoEdite $fr_expected_version"
+fr_log_path="$fr_log_dir/studio-$fr_expected_version.log"
 fr_open_studio=true
 
 for fr_argument in "$@"; do
@@ -24,7 +30,7 @@ for fr_argument in "$@"; do
   esac
 done
 
-echo "FR AutoEdite 3.4.0 — atualização segura"
+echo "FR AutoEdite $fr_expected_version — atualização segura"
 echo "Esta rotina fecha somente painéis FR AutoEdite antigos; os projetos são preservados."
 
 mapfile -t fr_studio_pids < <(
@@ -54,13 +60,13 @@ fi
 "$fr_update_root/install.sh"
 
 fr_installed_version="$($fr_bin_path --versao 2>&1 || true)"
-if [[ "$fr_installed_version" != "FR AutoEdite 3.4.0" ]]; then
-  echo "A instalação não confirmou a versão 3.4.0: $fr_installed_version" >&2
+if [[ "$fr_installed_version" != "$fr_expected_banner" ]]; then
+  echo "A instalação não confirmou a versão $fr_expected_version: $fr_installed_version" >&2
   exit 4
 fi
 
 echo
-echo "ATUALIZAÇÃO CONCLUÍDA: FR AutoEdite 3.4.0"
+echo "ATUALIZAÇÃO CONCLUÍDA: $fr_expected_banner"
 if [[ "$fr_open_studio" == true ]]; then
   mkdir -p "$fr_log_dir"
   nohup "$fr_bin_path" studio >"$fr_log_path" 2>&1 </dev/null &
@@ -71,7 +77,7 @@ if [[ "$fr_open_studio" == true ]]; then
     tail -n 20 "$fr_log_path" >&2 || true
     exit 5
   fi
-  echo "Confirme na lateral do navegador: STUDIO 3.4.0 · ROTEIRO ISOLADO"
+  echo "Confirme no navegador: FR AutoEdite Studio $fr_expected_version"
   echo "O painel novo foi aberto. Log técnico: $fr_log_path"
 else
   echo "Instalação concluída sem abrir o painel. Para abrir: fr-autoedite studio"

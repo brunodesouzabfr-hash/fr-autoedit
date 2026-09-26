@@ -12,6 +12,7 @@ import time
 import zipfile
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -72,9 +73,55 @@ def main() -> int:
             assert 'id="reviewModal"' in html and 'id="reviewTimeline"' in html
             assert "Gerar/atualizar PACOTE_PARA_IA" in html
             assert "Transformar em serviço" in html
+            assert "Editar conteúdo" in html
+            assert "fr-autoedite-card-content/1" in html
+            assert 'id="cardContentModal"' in html
+            assert 'id="cardEditorFrame"' in html
+            assert "FR CARD EDITOR UNIVERSAL v1.1.0" in html
+            assert "applyPolledMainPlan" in html
+            assert "applyPolledReadyPlan" in html
+            assert "Alterações não salvas da timeline foram preservadas" in html
+            assert "Alterações não salvas dos overlays foram preservadas" in html
+            assert "Editar conteúdo no Card Editor" in html
+            assert "readyCardEditorCapability" in html
+            assert "else{plan=d.plan;mainPlanDirty=false" not in html
             assert "persistMainPlan(true)" in html
             assert "&v=" in html
             assert "NÃO USADA" in html
+
+            try:
+                request(base + "/card-editor/")
+            except HTTPError as exc:
+                assert exc.code == 403
+            else:
+                raise AssertionError("O Card Editor integrado deveria exigir o token local.")
+            editor_html = request(base + "/card-editor/", state.token).decode("utf-8")
+            editor_call = Request(
+                base + "/card-editor/", headers={"X-FR-Token": state.token},
+            )
+            with urlopen(editor_call, timeout=15) as editor_response:
+                editor_csp = editor_response.headers["Content-Security-Policy"]
+                assert "frame-ancestors 'self'" in editor_csp
+                assert "connect-src 'none'" in editor_csp
+            assert "FR Card Editor Universal v1.1.0" in editor_html
+            assert 'id="fr-autoedite-bridge"' in editor_html
+            assert "fr-autoedite:load-card" in editor_html
+            assert "editor modular abaixo é uma referência visual" not in editor_html
+            assert "Prévia visual de referência" in editor_html
+            assert "localStorage.getItem" not in editor_html
+            assert "localStorage.setItem" not in editor_html
+            assert "fonts.googleapis.com" not in editor_html
+            assert "/card-editor/assets/background-fr-hd.png?token=" in editor_html
+            editor_asset = request(
+                base + "/card-editor/assets/logo-fr.png", state.token,
+            )
+            assert editor_asset.startswith(b"\x89PNG\r\n\x1a\n")
+            try:
+                request(base + "/card-editor/assets/nao-permitido.png", state.token)
+            except HTTPError as exc:
+                assert exc.code == 404
+            else:
+                raise AssertionError("O allowlist de assets do Card Editor deveria rejeitar nomes desconhecidos.")
 
             created = request(
                 base + "/api/project",
@@ -85,13 +132,19 @@ def main() -> int:
             slug = created["project"]["slug"]
             project_query = urlencode({"project": slug})
             project = state.project_dir(slug)
+            initial_state = request(base + "/api/state?" + project_query, state.token)
+            editor_capability = initial_state["capabilities"]["card_editor"]
+            assert editor_capability["available"] is True
+            assert editor_capability["integration_mode"] == "same_origin_iframe_content_only"
+            assert editor_capability["supported_fields"] == ["title", "body"]
+            assert editor_capability["provenance"] == "user_supplied_local_publication_pending"
 
             # Regressão 3.2.3: cards pré-preparo e autorreparo de estilo antigo.
             (project / "CARD_STYLE.json").write_text(
                 json.dumps({"palette": {"background": "cor-invalida"}}), encoding="utf-8"
             )
             state.start_job(project, "cards")
-            card_job = wait_for_job(state, project)
+            card_job = wait_for_job(state, project, timeout=90.0)
             assert card_job["returncode"] == 0, "\n".join(card_job.get("log", []))
             assert any("Cards 1/" in line for line in card_job.get("log", []))
             assert (project / "CARD_PREVIEW_PLAN.json").is_file()
@@ -215,6 +268,29 @@ def main() -> int:
                 {"Content-Type": "text/markdown"},
             )
             assert repeated_response["duplicate"] is True
+            descriptor = json.loads(
+                (canonical_package / "V2" / "PACKAGE_DESCRIPTOR.json").read_text(encoding="utf-8")
+            )
+            begin = downloaded_brief.index("<!-- FR_AUTOEDITE_JSON_BEGIN -->")
+            end = downloaded_brief.index("<!-- FR_AUTOEDITE_JSON_END -->", begin)
+            fenced = downloaded_brief[begin:end].split("```json", 1)[1].split("```", 1)[0]
+            v2_response = json.dumps({
+                "schema_version": 2,
+                "package_snapshot_id": descriptor["snapshot_id"],
+                "edit_plan": json.loads(fenced),
+            }).encode()
+            imported_v2 = request(
+                base + "/api/editing-brief-upload?" + project_query,
+                state.token,
+                v2_response,
+                {"Content-Type": "application/json"},
+            )
+            assert imported_v2["ok"] is True
+            assert imported_v2["path"].endswith("EDIT_PLAN_RESPONSE_V2.json")
+            import_source = json.loads(
+                (project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json").read_text(encoding="utf-8")
+            )
+            assert import_source["format"] == "v2_json"
 
             plan = {
                 "segments": [{
@@ -231,6 +307,88 @@ def main() -> int:
                     {"Content-Type": "application/json"},
                 )
             assert response["ok"] is True
+
+            card = request(
+                base + "/api/card-content?" + urlencode({
+                    "token": state.token, "project": slug, "segment_id": "S0001",
+                })
+            )["card"]
+            assert card["adapter_version"] == "fr-autoedite-card-content/1"
+            assert card["fields"] == {"title": "Teste", "body": "HTTP"}
+            assert card["source"]["card_kind"] == "intro"
+            assert card["capabilities"]["supported_fields"] == ["title", "body"]
+            before_invalid = (project / "EDIT_PLAN.json").read_bytes()
+            invalid = {
+                "adapter_version": card["adapter_version"],
+                "base_revision": card["base_revision"],
+                "segment_id": "S0001",
+                "fields": {"title": "Não aplicar", "body": "Não aplicar"},
+                "geometry": {"x": 10},
+            }
+            try:
+                request(
+                    base + "/api/card-content?" + project_query,
+                    state.token,
+                    json.dumps(invalid).encode(),
+                    {"Content-Type": "application/json"},
+                )
+            except HTTPError as exc:
+                assert exc.code == 400
+                error = json.loads(exc.read())
+                assert "não suportado: geometry" in error["error"]
+            else:
+                raise AssertionError("Geometria fora do adapter deveria ser rejeitada.")
+            assert (project / "EDIT_PLAN.json").read_bytes() == before_invalid
+
+            edited = request(
+                base + "/api/card-content?" + project_query,
+                state.token,
+                json.dumps({
+                    "adapter_version": card["adapter_version"],
+                    "base_revision": card["base_revision"],
+                    "segment_id": "S0001",
+                    "fields": {"title": "Título manual", "body": "Corpo manual"},
+                }).encode(),
+                {"Content-Type": "application/json"},
+            )
+            assert edited["ok"] is True and edited["preview_job_started"] is True
+            preview_job = wait_for_job(state, project, timeout=90.0)
+            assert preview_job["returncode"] == 0, "\n".join(preview_job.get("log", []))
+            persisted = json.loads((project / "EDIT_PLAN.json").read_text())
+            persisted_card = next(item for item in persisted["segments"] if item["segment_id"] == "S0001")
+            assert persisted_card["title"] == "Título manual"
+            assert persisted_card["body"] == "Corpo manual"
+            assert persisted_card["card_kind"] == "intro"
+            reloaded = request(
+                base + "/api/card-content?" + urlencode({
+                    "token": state.token, "project": slug, "segment_id": "S0001",
+                })
+            )["card"]
+            assert reloaded["fields"] == {"title": "Título manual", "body": "Corpo manual"}
+            preview_registry = json.loads(
+                (project / "_CONTROLE" / "CARD_PREVIEWS.json").read_text()
+            )
+            preview = next(item for item in preview_registry["previews"] if item["segment_id"] == "S0001")
+            assert (project / preview["relative"]).is_file()
+
+            try:
+                request(
+                    base + "/api/card-content?" + project_query,
+                    state.token,
+                    json.dumps({
+                        "adapter_version": card["adapter_version"],
+                        "base_revision": card["base_revision"],
+                        "segment_id": "S0001",
+                        "fields": {"title": "Stale", "body": "Stale"},
+                    }).encode(),
+                    {"Content-Type": "application/json"},
+                )
+            except HTTPError as exc:
+                assert exc.code == 400
+                assert "mudou desde" in json.loads(exc.read())["error"]
+            else:
+                raise AssertionError("Uma revisão antiga deveria ser rejeitada.")
+            assert json.loads((project / "EDIT_PLAN.json").read_text())["segments"][0]["title"] == "Título manual"
 
             media_id = next(
                 row["id"] for row in json.loads((project / "MANIFESTO_MEDIA.json").read_text())
@@ -272,7 +430,9 @@ def main() -> int:
             assert "30" in snapshot["reel_plans"]
             assert (project / "_ENTRADA" / "INTRO_PERSONALIZADA.png").is_file()
             assert (project / "_ENTRADA" / "ROTEIRO_MESTRE_RESPONDIDO.md").is_file()
-            assert len(list((project / "_HISTORICO").glob("EDIT_PLAN_*.json"))) == 2
+            # Duas gravações da timeline + a edição content-only, todas pelo
+            # mesmo mecanismo de backup de save_plan().
+            assert len(list((project / "_HISTORICO").glob("EDIT_PLAN_*.json"))) == 3
 
             # Galeria e limpeza segura: cards são regeneráveis, originais não.
             library = request(base + "/api/library?" + urlencode({"token": state.token, "project": slug}))

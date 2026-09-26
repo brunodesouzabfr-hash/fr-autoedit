@@ -245,6 +245,7 @@ def overlay_image(
             "service_name": service.get("label", ""), "service_asset": service.get("asset", ""),
             "service_layout": service.get("layout", ""), "card_family": service.get("visual_family", ""),
             "balloon_family": service.get("balloon_family", ""),
+            "card_instance": copy.deepcopy(overlay.get("card_instance") or {}),
         }
         full = target.with_name(target.stem + ".card.png")
         c.card_image(
@@ -298,7 +299,7 @@ def overlay_image(
         layer = render_overlay(overlay, (width, height), c.APP_ROOT)
         default_position = "bottom_center" if kind in {"caption", "lower_third"} else "bottom_left"
         _place_layer(canvas, _apply_opacity(layer, opacity),
-                     str(overlay.get("position") or default_position), safe_margin)
+                     str(overlay.get("_resolved_position") or overlay.get("position") or default_position), safe_margin)
         canvas.save(target)
         layer.close()
         canvas.close()
@@ -363,7 +364,10 @@ def overlay_image(
         draw.text((pad_x, y), line, font=selected_font, fill=(*bone, 255))
         y += line_height
     default_position = "bottom_center" if kind in {"caption", "lower_third"} else "bottom_left"
-    _place_layer(canvas, _apply_opacity(layer, opacity), str(overlay.get("position") or default_position), safe_margin)
+    _place_layer(
+        canvas, _apply_opacity(layer, opacity),
+        str(overlay.get("_resolved_position") or overlay.get("position") or default_position), safe_margin,
+    )
     canvas.save(target)
     return target
 
@@ -379,7 +383,9 @@ def _ffmpeg_compose(
     current = "rv0"
     for index, (overlay, _image) in enumerate(layers, 1):
         start, end = float(overlay["start_sec"]), float(overlay["end_sec"])
-        fade = min(0.28, max(0.0, (end - start) / 4.0))
+        easing = str(overlay.get("balloon", {}).get("easing") or "linear")
+        fade_ratio = {"linear": 4.0, "ease_out": 5.5, "ease_in_out": 3.2}.get(easing, 4.0)
+        fade = min(0.28, max(0.0, (end - start) / fade_ratio))
         source = f"layer{index}"
         layer_filters = ["format=rgba"]
         if overlay.get("animation_in") != "none":
@@ -512,19 +518,54 @@ def render(
     parsed = c.parse_probe(base, c.ffprobe(base))
     width, height = int(parsed["width"]), int(parsed["height"])
     duration, fps = float(parsed["duration_sec"]), float(parsed.get("fps") or 24)
+    from balloon_engine import resolve_collisions
+    render_overlays, layout_notices = resolve_collisions(
+        validated["overlays"], (width, height), c.APP_ROOT,
+    )
+    notices.extend(layout_notices)
+    if not preview and any(item.get("_layout_review_required") for item in render_overlays):
+        raise c.AutoEditeError(
+            "Conflito de balões sem região livre: revise a posição/timing antes do master."
+        )
     style = c.load_card_style(project)
     pack_id = validated["style_pack_id"]
     work = project / "_CACHE_RENDER" / "ready_video_overlays"
     work.mkdir(parents=True, exist_ok=True)
-    expected_layers = {f"{overlay['overlay_id']}.png" for overlay in validated["overlays"]}
+    cache_path = work / "LAYER_CACHE.json"
+    layer_cache = project_scope.read(cache_path, {})
+    cached_layers = layer_cache.get("layers", {}) if isinstance(layer_cache.get("layers", {}), dict) else {}
+    shared_layer_state = {
+        "width": width, "height": height, "card_style": style,
+        "style_pack_signature": style_pack_signature(c.APP_ROOT, pack_id),
+        "application": c.APP_VERSION,
+    }
+    expected_layers = {f"{overlay['overlay_id']}.png" for overlay in render_overlays}
     for stale in work.glob("*.png"):
         if stale.name not in expected_layers:
             stale.unlink(missing_ok=True)
     layers: list[tuple[dict[str, Any], Path]] = []
-    for overlay in validated["overlays"]:
+    next_layer_cache: dict[str, dict[str, str]] = {}
+    for overlay in render_overlays:
         target = work / f"{overlay['overlay_id']}.png"
-        overlay_image(env, project, overlay, width, height, style, pack_id, target)
+        visual_overlay = {
+            key: copy.deepcopy(value) for key, value in overlay.items()
+            if key not in {"start_sec", "end_sec", "card_instance", "rationale", "audio_policy"}
+        }
+        instance = overlay.get("card_instance")
+        if isinstance(instance, dict) and "central_media" in instance:
+            visual_overlay["central_media"] = copy.deepcopy(instance["central_media"])
+        layer_signature = hashlib.sha256(json.dumps(
+            {"shared": shared_layer_state, "overlay": visual_overlay},
+            ensure_ascii=False, sort_keys=True, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        cached = cached_layers.get(overlay["overlay_id"], {})
+        if not target.is_file() or cached.get("signature") != layer_signature:
+            overlay_image(env, project, overlay, width, height, style, pack_id, target)
+        next_layer_cache[overlay["overlay_id"]] = {
+            "signature": layer_signature, "relative": _relative(target, project),
+        }
         layers.append((overlay, target))
+    project_scope.write(cache_path, {"schema_version": 1, "layers": next_layer_cache})
     signature_payload = {
         "plan": validated,
         "card_style": style,

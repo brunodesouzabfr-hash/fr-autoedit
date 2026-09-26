@@ -8,7 +8,7 @@ fr_bin_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
 fr_bin_path="$fr_bin_dir/fr-autoedite"
 fr_applications_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 
-for fr_command in python3 ffmpeg ffprobe; do
+for fr_command in python3 ffmpeg ffprobe tar; do
   if ! command -v "$fr_command" >/dev/null 2>&1; then
     echo "Dependência ausente: $fr_command" >&2
     echo "No Parrot/Debian: sudo apt update && sudo apt install -y python3 python3-pil ffmpeg unzip zip" >&2
@@ -31,7 +31,27 @@ if [[ -e "$fr_install_dir" ]]; then
 fi
 
 mkdir -p "$fr_install_dir"
-cp -a -- "$fr_source_dir/." "$fr_install_dir/"
+(
+  cd -- "$fr_source_dir"
+  tar --exclude='./FR_CARD_EDITOR_UNIVERSAL_v1.1.0' \
+      --exclude='./local_components/fr-card-editor' -cf - .
+) | (
+  cd -- "$fr_install_dir"
+  tar -xf -
+)
+
+fr_card_editor_source="${FR_CARD_EDITOR_SOURCE:-}"
+if [[ -z "$fr_card_editor_source" && -d "$fr_source_dir/FR_CARD_EDITOR_UNIVERSAL_v1.1.0" ]]; then
+  fr_card_editor_source="$fr_source_dir/FR_CARD_EDITOR_UNIVERSAL_v1.1.0"
+fi
+if [[ -n "$fr_card_editor_source" ]]; then
+  python3 "$fr_source_dir/scripts/install_card_editor_local.py" \
+    --source "$fr_card_editor_source" \
+    --destination "$fr_install_dir/local_components/fr-card-editor/1.1.0"
+else
+  echo "Card Editor modular não instalado: fonte local não informada."
+  echo "Use: FR_CARD_EDITOR_SOURCE=/caminho/FR_CARD_EDITOR_UNIVERSAL_v1.1.0 ./install.sh"
+fi
 chmod +x "$fr_install_dir/fr-autoedite" "$fr_install_dir/install.sh" \
   "$fr_install_dir/ATUALIZAR_FR_AUTOEDITE_3.4.0.sh" \
   "$fr_install_dir/ATUALIZAR_FR_AUTOEDITE_3.3.1.sh" \

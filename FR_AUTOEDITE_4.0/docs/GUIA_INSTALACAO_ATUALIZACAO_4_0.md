@@ -1,4 +1,8 @@
-# Instalar e atualizar o FR AutoEdite 4.0
+# Instalar e atualizar o FR AutoEdite 4.0 beta-next
+
+`FR AutoEdite 4.0 beta-next` é o nome da distribuição de homologação. O
+identificador técnico permanece `4.0.0-candidate` no arquivo `VERSION` e na
+saída de `fr-autoedite --version`.
 
 ## Opção recomendada: instalação normal do usuário
 
@@ -38,7 +42,7 @@ principal.
 cd /CAMINHO/DO/fr-autoedit
 git switch main
 git pull --ff-only origin main
-cd FR_AUTOEDITE_3.4.0_STUDIO
+cd FR_AUTOEDITE_4.0
 ./install.sh
 fr-autoedite --version
 ```
@@ -66,6 +70,40 @@ python3 -m pytest tests
 bash tests/smoke_test.sh
 bash tests/smoke_v4_visual.sh
 ```
+
+## AutoEdit determinístico
+
+O AutoEdit trabalha somente com projetos `raw_media`. Sem `--aplicar`, o
+comando apenas valida e imprime uma proposta, sem gravar a timeline:
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo cronologico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo alfabetico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo aleatorio --seed 731
+```
+
+Para publicar o plano validado, use `--aplicar`. Para também produzir uma
+prova pelos proxies, combine `--aplicar --draft`; `--somente
+branded|clean|both` limita as versões da prova:
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico --aplicar
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo aleatorio --seed 731 --aplicar --draft --somente both
+```
+
+Ao aplicar, o programa cria um snapshot e devolve seu nome no campo
+`rollback_version`. A reversão usa os comandos existentes:
+
+```bash
+fr-autoedite listar-roteiros --projeto /CAMINHO/DO/PROJETO
+fr-autoedite restaurar-roteiro --projeto /CAMINHO/DO/PROJETO --versao NOME_DO_SNAPSHOT
+```
+
+Projetos `ready_video` são recusados para preservar a timeline bloqueada e o
+vídeo-base. No fluxo `raw_media`, o plano de master aponta para os originais;
+somente o draft usa proxies, depois da validação de integridade.
 
 ## Reversão
 

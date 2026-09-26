@@ -17,12 +17,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 
 import fr_autoedite as fr
+import card_timeline
 import local_analysis
 import master_contract
 import project_scope
 import ready_video
 import style_engine
-from studio import StudioState
+from studio import StudioError, StudioState
 
 
 def sha256(path: Path) -> str:
@@ -109,7 +110,7 @@ class ReadyVideoFlow(unittest.TestCase):
         ):
             self.assertIn(key, payload)
         for key in (
-            "overlay_id", "kind", "start_sec", "end_sec", "text", "service_key", "asset_id",
+            "overlay_id", "kind", "start_sec", "end_sec", "text", "body", "service_key", "asset_id",
             "presentation", "position", "safe_area", "opacity", "animation_in", "animation_out",
             "audio_policy", "rationale",
         ):
@@ -136,6 +137,27 @@ class ReadyVideoFlow(unittest.TestCase):
         invalid = copy.deepcopy(self.plan)
         invalid["timeline_locked"] = False
         with self.assertRaisesRegex(fr.AutoEditeError, "exige true"):
+            master_contract.validate_ready_video_contract(self.c, invalid, self.manifest)
+
+    def test_card_instance_ready_round_trip_legacy_fallback_and_invalid_placement(self):
+        legacy = copy.deepcopy(self.plan)
+        legacy["overlays"] = [self.overlay(kind="common_card", body="Corpo explícito")]
+        validated_legacy, _ = master_contract.validate_ready_video_contract(self.c, legacy, self.manifest)
+        self.assertNotIn("card_instance", validated_legacy["overlays"][0])
+
+        versioned = copy.deepcopy(legacy)
+        versioned["overlays"][0]["card_instance"] = card_timeline.build_ready_card_instance(
+            versioned["overlays"][0]
+        )
+        validated, _ = master_contract.validate_ready_video_contract(self.c, versioned, self.manifest)
+        self.assertEqual(validated["overlays"][0]["card_instance"]["placement"], {
+            "timebase": "ready_video_base", "start_sec": 0.6, "end_sec": 1.8,
+        })
+        self.assertTrue(validated["timeline_locked"])
+
+        invalid = copy.deepcopy(versioned)
+        invalid["overlays"][0]["card_instance"]["placement"]["end_sec"] = 2.0
+        with self.assertRaisesRegex(fr.AutoEditeError, "janela física"):
             master_contract.validate_ready_video_contract(self.c, invalid, self.manifest)
 
     def test_master_import_rejects_hidden_cut_or_speed_change(self):
@@ -206,6 +228,41 @@ class ReadyVideoFlow(unittest.TestCase):
         self.assertIn("d.ready_video_preview.signature", html)
         self.assertIn("&v=", html)
 
+    def test_ready_layer_cache_reuses_timing_only_change_and_removes_deleted_card(self):
+        overlay = self.overlay(
+            kind="common_card", text="CARD CACHE", body="Corpo explícito", position="center",
+        )
+        overlay["card_instance"] = card_timeline.build_ready_card_instance(overlay)
+        self.plan["overlays"] = [overlay]
+        with patch("ready_video.choose_preview_backend", return_value="ffmpeg"):
+            ready_video.render(vars(fr), self.project, self.plan, preview=True)
+        layer = self.project / "_CACHE_RENDER" / "ready_video_overlays" / "OV0001.png"
+        self.assertTrue(layer.is_file())
+
+        moved = copy.deepcopy(self.plan)
+        moved["overlays"][0].update(start_sec=0.8, end_sec=2.0)
+        moved["overlays"][0]["card_instance"] = card_timeline.build_ready_card_instance(moved["overlays"][0])
+        with (
+            patch("ready_video.choose_preview_backend", return_value="ffmpeg"),
+            patch("ready_video._ffmpeg_compose"),
+            patch("ready_video.overlay_image", wraps=ready_video.overlay_image) as render_layer,
+        ):
+            ready_video.render(vars(fr), self.project, moved, preview=True)
+        self.assertEqual(render_layer.call_count, 0)
+
+        removed = copy.deepcopy(moved)
+        removed["overlays"] = []
+        with (
+            patch("ready_video.choose_preview_backend", return_value="ffmpeg"),
+            patch("ready_video._ffmpeg_compose"),
+        ):
+            ready_video.render(vars(fr), self.project, removed, preview=True)
+        self.assertFalse(layer.exists())
+        cache = project_scope.read(
+            self.project / "_CACHE_RENDER" / "ready_video_overlays" / "LAYER_CACHE.json"
+        )
+        self.assertEqual(cache["layers"], {})
+
     def test_saving_unchanged_overlay_plan_does_not_stack_hidden_history(self):
         state = StudioState(ROOT, self.root / "workspace")
         state.save_ready_video_plan(self.project, self.plan)
@@ -214,6 +271,62 @@ class ReadyVideoFlow(unittest.TestCase):
         state.save_ready_video_plan(self.project, normalized)
         after_second = len(list((self.project / "_HISTORICO").glob("READY_VIDEO_PLAN_*.json")))
         self.assertEqual(after_second, after_first)
+
+    def test_card_editor_ready_round_trip_preview_and_original_preservation(self):
+        state = StudioState(ROOT, self.root / "workspace-card-editor")
+        self.plan["overlays"] = [self.overlay(
+            kind="common_card", text="CARD READY", body="Corpo original explícito",
+            service_key="", asset_id="", position="center",
+        )]
+        project_scope.write(self.project / "READY_VIDEO_PLAN.json", self.plan)
+        before_plan = copy.deepcopy(self.plan)
+        base = self.project / self.manifest["media"][0]["source_path"]
+        base_hash = sha256(base)
+        with patch("ready_video.choose_preview_backend", return_value="ffmpeg"):
+            initial_preview = ready_video.render(vars(fr), self.project, self.plan, preview=True)
+
+        exported = state.card_content(self.project, "OV0001", "ready_video")
+        payload = {
+            "adapter_version": exported["adapter_version"],
+            "base_revision": exported["base_revision"],
+            "segment_id": exported["segment_id"],
+            "fields": {"title": "CARD READY REVISADO", "body": "Corpo revisado explícito"},
+        }
+        saved = state.save_card_content(self.project, payload, "ready_video")
+        persisted = fr.read_json(self.project / "READY_VIDEO_PLAN.json")
+
+        self.assertEqual(saved["fields"], payload["fields"])
+        self.assertTrue(persisted["timeline_locked"])
+        self.assertEqual(persisted["base_video_id"], "READY_VIDEO_BASE")
+        self.assertEqual(persisted["overlays"][0]["overlay_id"], "OV0001")
+        self.assertEqual(persisted["overlays"][0]["text"], "CARD READY REVISADO")
+        self.assertEqual(persisted["overlays"][0]["body"], "Corpo revisado explícito")
+        for key, value in before_plan.items():
+            if key != "overlays":
+                self.assertEqual(persisted[key], value, key)
+        expected_overlay = copy.deepcopy(before_plan["overlays"][0])
+        actual_overlay = copy.deepcopy(persisted["overlays"][0])
+        for item in (expected_overlay, actual_overlay):
+            item.pop("text")
+            item.pop("body")
+        self.assertEqual(actual_overlay, expected_overlay)
+
+        with self.assertRaisesRegex(StudioError, "timeline mudou"):
+            state.save_card_content(self.project, payload, "ready_video")
+        with self.assertRaisesRegex(StudioError, "outro contrato visual"):
+            unsupported = copy.deepcopy(persisted)
+            unsupported["overlays"].append(self.overlay(overlay_id="OV0002"))
+            project_scope.write(self.project / "READY_VIDEO_PLAN.json", unsupported)
+            state.card_content(self.project, "OV0002", "ready_video")
+        project_scope.write(self.project / "READY_VIDEO_PLAN.json", persisted)
+
+        with patch("ready_video.choose_preview_backend", return_value="ffmpeg"):
+            record = ready_video.render(vars(fr), self.project, persisted, preview=True)
+        self.assertTrue((self.project / record["output_path"]).is_file())
+        self.assertTrue(record["signature"])
+        self.assertNotEqual(record["signature"], initial_preview["signature"])
+        self.assertEqual(sha256(base), base_hash)
+        self.assertEqual(sha256(self.source), self.source_hash)
 
     def test_duration_extension_is_blocked_until_explicitly_allowed(self):
         config = fr.read_json(self.project / "QUESTIONARIO_RESPONDIDO.json")

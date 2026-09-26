@@ -41,6 +41,16 @@ if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
 import project_scope
+import card_editor_adapter
+
+
+CARD_EDITOR_SOURCE_DIR = "FR_CARD_EDITOR_UNIVERSAL_v1.1.0"
+CARD_EDITOR_ASSETS = (
+    "background-fr-hd.png",
+    "background-fr-source.png",
+    "background-fr.png",
+    "logo-fr.png",
+)
 
 
 def serialized_mutation(fn):
@@ -87,6 +97,94 @@ class StudioState:
         self.mutation_lock = threading.RLock()
         self.jobs: dict[str, dict[str, Any]] = {}
         self.processes: dict[str, subprocess.Popen[str]] = {}
+
+    def card_editor_root(self) -> tuple[Path | None, str]:
+        configured = os.environ.get("FR_CARD_EDITOR_HOME", "").strip()
+        candidates = []
+        if configured:
+            candidates.append((Path(configured).expanduser(), "environment"))
+        candidates.extend([
+            (self.app_root / "local_components" / "fr-card-editor" / "1.1.0", "installed_component"),
+            (self.app_root / CARD_EDITOR_SOURCE_DIR, "local_source_checkout"),
+        ])
+        for root, source in candidates:
+            resolved = root.resolve()
+            required = [resolved / "index.html", *(resolved / "assets" / name for name in CARD_EDITOR_ASSETS)]
+            if all(path.is_file() and not path.is_symlink() for path in required):
+                return resolved, source
+        return None, "missing"
+
+    def card_editor_capabilities(self) -> dict[str, Any]:
+        root, source = self.card_editor_root()
+        required = [] if root is None else [
+            root / "index.html", *(root / "assets" / name for name in CARD_EDITOR_ASSETS)
+        ]
+        return {
+            "available": root is not None and all(path.is_file() for path in required),
+            "editor_version": "1.1.0",
+            "adapter_version": card_editor_adapter.ADAPTER_VERSION,
+            "integration_mode": "same_origin_iframe_content_only",
+            "supported_fields": list(card_editor_adapter.SUPPORTED_FIELDS),
+            "unsupported": ["geometry", "lines", "crop", "images", "data_urls"],
+            "provenance": "user_supplied_local_publication_pending",
+            "component_source": source,
+        }
+
+    def card_editor_document(self) -> bytes:
+        root, _source = self.card_editor_root()
+        if root is None:
+            raise StudioError("FR Card Editor Universal v1.1.0 não está disponível nesta instalação local.")
+        source = root / "index.html"
+        html = source.read_text(encoding="utf-8")
+        html = re.sub(
+            r"\s*<link[^>]+(?:fonts\.googleapis\.com|fonts\.gstatic\.com)[^>]*>",
+            "",
+            html,
+        )
+        for name in CARD_EDITOR_ASSETS:
+            html = html.replace(
+                f"assets/{name}",
+                f"/card-editor/assets/{name}?token={self.token}",
+            )
+        html = html.replace(
+            '$("#saveLocal").onclick=()=>{try{localStorage.setItem("fr-card-editor-v1.1",JSON.stringify(state));toast("Estado salvo neste navegador")}catch{toast("Estado grande demais; exporte JSON")}};',
+            '$("#saveLocal").onclick=()=>toast("Armazenamento local desativado no Studio");',
+        )
+        html = html.replace(
+            'try{let saved=localStorage.getItem("fr-card-editor-v1.1");if(saved)state=normalizeConfig(JSON.parse(saved))}catch{}render();resizeStage();',
+            'state=clone(DEFAULT);render();setEditing(false);resizeStage();',
+        )
+        bridge = r'''
+<style id="fr-autoedite-bridge-style">
+@font-face{font-family:"Stardos Stencil";src:url('/asset/font-title.ttf')}@font-face{font-family:Rokkitt;src:url('/asset/font-body.ttf')}@font-face{font-family:"Cormorant Garamond";src:url('/asset/font-body.ttf')}@font-face{font-family:"Share Tech Mono";src:url('/asset/font-mono.ttf')}
+.app{grid-template-columns:minmax(0,1fr)!important}.panel{display:none!important}.workspace{padding-top:62px!important}#card{pointer-events:none!important}body:not(.fr-integrated-loaded) .stage-wrap{visibility:hidden}.fr-integration-ribbon{position:fixed;z-index:100;left:12px;right:12px;top:10px;padding:9px 12px;border:1px solid #d6a64b;border-radius:8px;color:#e6d6b5;background:#071d18f2;font:12px/1.35 "Share Tech Mono",monospace;box-shadow:0 8px 24px #0008}.fr-integration-ribbon b{color:#f6a700}
+</style>
+<script id="fr-autoedite-bridge">
+(()=>{"use strict";
+const ORIGIN=window.location.origin,ADAPTER="fr-autoedite-card-content/1",TYPE_LOAD="fr-autoedite:load-card";
+const ribbon=document.createElement("div");ribbon.className="fr-integration-ribbon";ribbon.innerHTML="<b>Prévia visual de referência.</b> Somente título e corpo são editáveis no Studio; o preview salvo pelo renderer F1–F6 é a autoridade visual.";document.body.appendChild(ribbon);
+function notify(type,extra={}){window.parent.postMessage({type,bridge_version:ADAPTER,...extra},ORIGIN)}
+function loadCard(message){
+ if(message.adapter_version!==ADAPTER||!message.project||!message.segment_id||!message.fields||typeof message.fields.title!=="string"||typeof message.fields.body!=="string"){notify("fr-autoedite:editor-error",{error:"Payload de conteúdo inválido."});return}
+ try{
+  window.FRCardEditor.reset();
+  const config=window.FRCardEditor.getConfig();
+  config.assets.visual="";config.assets.visualOpacity=0;
+  for(const field of config.fields){if(field.role==="variable")field.visible=field.id==="title"||field.id==="subtitle";if(field.id==="title")field.text=message.fields.title;if(field.id==="subtitle")field.text=message.fields.body}
+  window.FRCardEditor.applyConfig(config);setEditing(false);
+  document.body.classList.add("fr-integrated-loaded");document.body.dataset.project=message.project;document.body.dataset.segmentId=message.segment_id;
+  notify("fr-autoedite:card-loaded",{project:message.project,segment_id:message.segment_id});
+ }catch(error){notify("fr-autoedite:editor-error",{error:String(error&&error.message||error)})}
+}
+window.addEventListener("message",event=>{if(event.origin!==ORIGIN||event.source!==window.parent)return;const message=event.data||{};if(message.type===TYPE_LOAD)loadCard(message)});
+notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
+})();
+</script>
+'''
+        if "localStorage.getItem" in html or "localStorage.setItem" in html:
+            raise StudioError("A integração do Card Editor não conseguiu desativar o localStorage.")
+        html = html.replace("</body>", bridge + "\n</body>")
+        return html.encode("utf-8")
 
     def project_dir(self, slug: str) -> Path:
         safe = _slugify(slug)
@@ -513,6 +611,7 @@ class StudioState:
                 "exiftool": bool(shutil.which("exiftool")),
                 "moviepy": bool(compositor.get("moviepy")),
                 "preview_backend": compositor.get("preview_backend", "ffmpeg"),
+                "card_editor": self.card_editor_capabilities(),
             },
             "job": job,
         }
@@ -989,9 +1088,18 @@ class StudioState:
                 ]
             return [str(self.launcher), "gerar-roteiro-ia", "--projeto", str(project)]
         if action == "brief-apply":
+            import_record = project_scope.read(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {})
+            relative = str(import_record.get("relative_path") or "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md")
+            response_path = (project / relative).resolve()
+            try:
+                response_path.relative_to(project.resolve())
+            except ValueError as exc:
+                raise StudioError("A resposta validada aponta para fora do projeto.") from exc
+            if not response_path.is_file():
+                raise StudioError("A resposta validada não está mais disponível; envie-a novamente.")
             return [
                 str(self.launcher), "aplicar-roteiro-ia", "--projeto", str(project),
-                "--arquivo", str(project / "_ENTRADA" / "ROTEIRO_MESTRE_RESPONDIDO.md"),
+                "--arquivo", str(response_path),
             ]
         if action == "takeout-normalize":
             source = project / "_TAKEOUT" / "00_NAO_EDITAR_GOOGLE_TAKEOUT_ORIGINAL.zip"
@@ -1154,7 +1262,67 @@ class StudioState:
         if not 1.25 <= speed <= 30:
             raise StudioError(f"{label}, segmento {index}: use velocidade entre 1.25x e 30x.")
 
-    def save_plan(self, project: Path, plan: dict[str, Any]) -> None:
+    @staticmethod
+    def _card_preview_state(segment: dict[str, Any]) -> dict[str, Any]:
+        """Campos que podem mudar os pixels do PNG, sem placement temporal."""
+        ignored = {
+            "segment_id", "enabled", "include_in", "duration_sec", "transition",
+            "transition_duration_sec", "phase_order", "card_instance",
+        }
+        result = {key: copy.deepcopy(value) for key, value in segment.items() if key not in ignored}
+        instance = segment.get("card_instance")
+        if isinstance(instance, dict) and "central_media" in instance:
+            result["central_media"] = copy.deepcopy(instance["central_media"])
+        return result
+
+    def _invalidate_card_previews(
+        self, project: Path, previous: dict[str, Any], current: dict[str, Any],
+    ) -> list[str]:
+        old_cards = {
+            str(item.get("segment_id") or ""): item
+            for item in previous.get("segments", [])
+            if isinstance(item, dict) and item.get("type") == "card" and item.get("segment_id")
+        }
+        new_cards = {
+            str(item.get("segment_id") or ""): item
+            for item in current.get("segments", [])
+            if isinstance(item, dict) and item.get("type") == "card" and item.get("segment_id")
+        }
+        affected = {
+            item_id for item_id in set(old_cards) | set(new_cards)
+            if item_id not in old_cards or item_id not in new_cards
+            or self._card_preview_state(old_cards[item_id]) != self._card_preview_state(new_cards[item_id])
+        }
+        if not affected:
+            return []
+        registry_path = project / "_CONTROLE" / "CARD_PREVIEWS.json"
+        registry = project_scope.read(registry_path, {})
+        kept = []
+        for record in registry.get("previews", []):
+            if not isinstance(record, dict) or str(record.get("segment_id") or "") not in affected:
+                kept.append(record)
+                continue
+            try:
+                target = self._safe_project_target(project, str(record.get("relative") or ""))
+            except (StudioError, ValueError):
+                continue
+            target.unlink(missing_ok=True)
+        if registry_path.is_file():
+            registry["previews"] = kept
+            registry["invalidated_card_ids"] = sorted(affected)
+            project_scope.write(registry_path, registry)
+        for item_id in affected:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", item_id):
+                continue
+            for target in (project / "cards_editaveis").glob(f"*/{item_id}.png"):
+                target.unlink(missing_ok=True)
+            for target in (project / "cards_editaveis").glob(f"*/4K_MASTERS/{item_id}_4K.png"):
+                target.unlink(missing_ok=True)
+        return sorted(affected)
+
+    def save_plan(self, project: Path, plan: dict[str, Any]) -> dict[str, Any]:
+        target = project / "EDIT_PLAN.json"
+        previous = project_scope.read(target, {})
         if (project / "MANIFESTO_MEDIA.json").is_file():
             import fr_autoedite as fr
             try:
@@ -1173,14 +1341,145 @@ class StudioState:
             except (TypeError, ValueError) as exc:
                 raise StudioError(f"Segmento {index}: duração inválida.") from exc
             self._validate_segment_controls(segment, index, "Filme")
-        target = project / "EDIT_PLAN.json"
         if target.is_file():
             stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
             shutil.copy2(target, project / "_HISTORICO" / f"EDIT_PLAN_{stamp}.json")
         temporary = target.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(target)
+        reloaded = project_scope.read(target, {})
+        if reloaded != plan:
+            raise StudioError("A timeline salva não coincide com o snapshot validado.")
         shutil.copy2(target, project / "_EDITAR" / "02_PLANO_DA_EDICAO.json")
+        invalidated = self._invalidate_card_previews(project, previous, reloaded)
+        return {"plan": reloaded, "invalidated_card_ids": invalidated}
+
+    def card_content(
+        self, project: Path, segment_id: str, input_mode: str = "raw_media",
+    ) -> dict[str, Any]:
+        if input_mode not in {"raw_media", "ready_video"}:
+            raise StudioError("input_mode inválido para o Card Editor.")
+        target = project / ("READY_VIDEO_PLAN.json" if input_mode == "ready_video" else "EDIT_PLAN.json")
+        plan = project_scope.read(target, {})
+        try:
+            if input_mode == "ready_video":
+                return card_editor_adapter.export_ready_card_content(plan, segment_id)
+            return card_editor_adapter.export_card_content(plan, segment_id)
+        except card_editor_adapter.CardEditorAdapterError as exc:
+            raise StudioError(str(exc)) from exc
+
+    def save_card_content(
+        self, project: Path, payload: dict[str, Any], input_mode: str = "raw_media",
+    ) -> dict[str, Any]:
+        """Apply the content-only adapter through the existing plan save path."""
+        if input_mode not in {"raw_media", "ready_video"}:
+            raise StudioError("input_mode inválido para o Card Editor.")
+        with project_scope.project_lock(project):
+            target = project / ("READY_VIDEO_PLAN.json" if input_mode == "ready_video" else "EDIT_PLAN.json")
+            plan = project_scope.read(target, {})
+            try:
+                updated = (
+                    card_editor_adapter.apply_ready_card_content(plan, payload)
+                    if input_mode == "ready_video"
+                    else card_editor_adapter.apply_card_content(plan, payload)
+                )
+            except card_editor_adapter.CardEditorAdapterError as exc:
+                raise StudioError(str(exc)) from exc
+            if input_mode == "ready_video":
+                self.save_ready_video_plan(project, updated)
+            else:
+                self.save_plan(project, updated)
+            saved = project_scope.read(target, {})
+        item_id = str(payload.get("segment_id") or "")
+        if input_mode == "ready_video":
+            return card_editor_adapter.export_ready_card_content(saved, item_id)
+        return card_editor_adapter.export_card_content(saved, item_id)
+
+    def review_ai_card_intent(self, project: Path, intent: dict[str, Any]) -> dict[str, Any]:
+        """Valida e calcula diff sem escrever no projeto."""
+        import ai_card_intent
+        import fr_autoedite as fr
+        try:
+            return ai_card_intent.review_intent(vars(fr), project, intent)
+        except ai_card_intent.AiCardIntentError as exc:
+            raise StudioError(json.dumps(exc.as_dict(), ensure_ascii=False)) from exc
+
+    def apply_ai_card_intent(
+        self, project: Path, intent: dict[str, Any], *, confirmed: bool,
+        confirmation_token: str,
+    ) -> dict[str, Any]:
+        """Aplica somente após revisão vigente e confirmação explícita."""
+        import ai_card_intent
+        import fr_autoedite as fr
+        if confirmed is not True:
+            raise StudioError("A intenção não foi aplicada: confirmação explícita obrigatória.")
+        with project_scope.project_lock(project):
+            try:
+                review = ai_card_intent.review_intent(vars(fr), project, intent)
+            except ai_card_intent.AiCardIntentError as exc:
+                raise StudioError(json.dumps(exc.as_dict(), ensure_ascii=False)) from exc
+            if not isinstance(confirmation_token, str) or confirmation_token != review["confirmation_token"]:
+                raise StudioError("Token de confirmação inválido ou obsoleto; revise a intenção novamente.")
+            intent_id = review["intent"]["intent_id"]
+            snapshot = project_scope.snapshot_decisions(project, "antes-ai-card-" + intent_id)
+            operation_id = project_scope.timestamp() + "_" + intent_id
+            log_path = project / "_CONTROLE" / "AI_CARD_OPERATIONS.json"
+            log = project_scope.read(log_path, {"schema_version": 1, "operations": []})
+            operations = log.get("operations", []) if isinstance(log.get("operations"), list) else []
+            record = {
+                "operation_id": operation_id, "intent_id": intent_id,
+                "input_mode": review["intent"]["input_mode"],
+                "target_id": review["intent"]["target_id"],
+                "origin": "ai_assisted", "applied_at": project_scope.timestamp(),
+                "before_revision": review["before_revision"],
+                "after_revision": review["after_revision"],
+                "diff": copy.deepcopy(review["diff"]),
+                "claims": copy.deepcopy(review["intent"]["claims"]),
+                "evidence": copy.deepcopy(review["intent"]["evidence"]),
+                "provenance": copy.deepcopy(review["intent"]["provenance"]),
+                "rollback_version": snapshot.name,
+                "status": "applying",
+            }
+            operations.append(record)
+            project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+            try:
+                if review["intent"]["input_mode"] == "ready_video":
+                    save_result = self.save_ready_video_plan(project, review["candidate_plan"])
+                else:
+                    save_result = self.save_plan(project, review["candidate_plan"])
+            except BaseException as exc:
+                record["status"] = "failed"
+                record["error"] = str(exc)
+                project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+                raise
+            record["status"] = "applied"
+            project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+        return {
+            "applied": True, "operation": record,
+            "invalidated_card_ids": save_result.get("invalidated_card_ids", []),
+            "notices": save_result.get("notices", []),
+        }
+
+    def revert_ai_card_intent(self, project: Path, operation_id: str) -> dict[str, Any]:
+        with project_scope.project_lock(project):
+            log_path = project / "_CONTROLE" / "AI_CARD_OPERATIONS.json"
+            log = project_scope.read(log_path, {"schema_version": 1, "operations": []})
+            record = next(
+                (item for item in reversed(log.get("operations", [])) if item.get("operation_id") == operation_id),
+                None,
+            )
+            if not record:
+                raise StudioError("Operação assistida não encontrada.")
+            result = project_scope.restore_version(project, str(record.get("rollback_version") or ""))
+            restored_log = project_scope.read(log_path, {"schema_version": 1, "operations": []})
+            operations = restored_log.get("operations", []) if isinstance(restored_log.get("operations"), list) else []
+            operations.append({
+                "operation_id": project_scope.timestamp() + "_revert",
+                "reverted_operation_id": operation_id, "reverted_at": project_scope.timestamp(),
+                "origin": "manual", "result": copy.deepcopy(result),
+            })
+            project_scope.write(log_path, {"schema_version": 1, "operations": operations[-500:]})
+        return {"reverted": operation_id, "input_mode": record.get("input_mode"), **result}
 
     def save_ready_video_plan(self, project: Path, plan: dict[str, Any]) -> dict[str, Any]:
         import fr_autoedite as fr
@@ -1205,7 +1504,10 @@ class StudioState:
             project_scope.write(target, validated)
         if previous != validated or not editable_target.is_file():
             project_scope.write(editable_target, validated)
-        return {"plan": validated, "notices": notices}
+        reloaded = project_scope.read(target, {})
+        if reloaded != validated:
+            raise StudioError("O plano de overlays salvo não coincide com o snapshot validado.")
+        return {"plan": reloaded, "notices": notices}
 
     def save_reel_plan(self, project: Path, plan: dict[str, Any]) -> Path:
         if (project / "MANIFESTO_MEDIA.json").is_file():
@@ -1448,6 +1750,35 @@ class StudioHandler(BaseHTTPRequestHandler):
             if not self._authorized():
                 self._error("Sessão inválida.", 403)
                 return
+            if parsed.path in {"/card-editor", "/card-editor/"}:
+                body = self.state.card_editor_document()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header(
+                    "Content-Security-Policy",
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; "
+                    "connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; "
+                    "frame-ancestors 'self'",
+                )
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if parsed.path.startswith("/card-editor/assets/"):
+                name = unquote(parsed.path.rsplit("/", 1)[-1])
+                if name not in CARD_EDITOR_ASSETS:
+                    self._error("Asset do Card Editor não permitido.", 404)
+                    return
+                root, _source = self.state.card_editor_root()
+                if root is None:
+                    self._error("FR Card Editor não instalado.", 404)
+                    return
+                self._send_file(root / "assets" / name)
+                return
             if parsed.path == "/api/state":
                 projects = self.state.list_projects()
                 slug = query.get("project", [projects[0]["slug"] if projects else ""])[0]
@@ -1459,6 +1790,15 @@ class StudioHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/library":
                 project = self._project(query)
                 self._json(self.state.library_state(project))
+                return
+            if parsed.path == "/api/card-content":
+                project = self._project(query)
+                segment_id = query.get("segment_id", [""])[0]
+                input_mode = query.get("input_mode", ["raw_media"])[0]
+                self._json({
+                    "ok": True,
+                    "card": self.state.card_content(project, segment_id, input_mode),
+                })
                 return
             if parsed.path in {"/api/file", "/api/media"}:
                 project = self._project(query)
@@ -1632,18 +1972,23 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "path": str(target), "size_bytes": size, "config": config})
                 return
             if parsed.path == "/api/editing-brief-upload":
-                target = project / "_ENTRADA" / "ROTEIRO_MESTRE_RESPONDIDO.md"
                 stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-                incoming = project / "_ENTRADA" / f"ROTEIRO_MESTRE_RECEBENDO_{stamp}.md"
+                incoming = project / "_ENTRADA" / f"ROTEIRO_MESTRE_RECEBENDO_{stamp}.tmp"
                 size = self._receive_file(incoming, 64 * 1024 * 1024)
                 try:
                     content = incoming.read_text(encoding="utf-8")
                 except UnicodeDecodeError as exc:
                     incoming.unlink(missing_ok=True)
-                    raise StudioError("O roteiro precisa ser um Markdown UTF-8.") from exc
-                if "FR_AUTOEDITE_JSON_BEGIN" not in content or "FR_AUTOEDITE_JSON_END" not in content:
+                    raise StudioError("A resposta precisa ser Markdown ou JSON UTF-8.") from exc
+                is_v2 = content.lstrip().startswith("{")
+                if not is_v2 and (
+                    "FR_AUTOEDITE_JSON_BEGIN" not in content or "FR_AUTOEDITE_JSON_END" not in content
+                ):
                     incoming.unlink(missing_ok=True)
                     raise StudioError("O Markdown não contém os marcadores do Roteiro Mestre.")
+                target = project / "_ENTRADA" / (
+                    "EDIT_PLAN_RESPONSE_V2.json" if is_v2 else "ROTEIRO_MESTRE_RESPONDIDO.md"
+                )
                 import fr_autoedite as fr
                 from master_contract import inspect_file
                 try:
@@ -1656,6 +2001,11 @@ class StudioHandler(BaseHTTPRequestHandler):
                     raise StudioError(str(exc)) from exc
                 if target.is_file() and self.state._sha256(incoming) == self.state._sha256(target):
                     incoming.unlink(missing_ok=True)
+                    project_scope.write(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {
+                        "relative_path": target.relative_to(project).as_posix(),
+                        "sha256": self.state._sha256(target),
+                        "format": "v2_json" if is_v2 else "v1_markdown",
+                    })
                     review = copy.deepcopy(review)
                     review.setdefault("notices", []).append({
                         "level": "info", "block": "roteiro",
@@ -1667,10 +2017,54 @@ class StudioHandler(BaseHTTPRequestHandler):
                                 "duplicate": True, "review": review})
                     return
                 if target.is_file():
-                    shutil.copy2(target, project / "_HISTORICO" / f"ROTEIRO_MESTRE_RESPONDIDO_{stamp}.md")
+                    history_name = (
+                        f"EDIT_PLAN_RESPONSE_V2_{stamp}.json" if is_v2
+                        else f"ROTEIRO_MESTRE_RESPONDIDO_{stamp}.md"
+                    )
+                    shutil.copy2(target, project / "_HISTORICO" / history_name)
                 incoming.replace(target)
+                project_scope.write(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {
+                    "relative_path": target.relative_to(project).as_posix(),
+                    "sha256": self.state._sha256(target),
+                    "format": "v2_json" if is_v2 else "v1_markdown",
+                })
                 project_scope.write(project / "_CONTROLE/REVISAO_ROTEIRO.json", review)
                 self._json({"ok": True, "path": str(target), "size_bytes": size, "review": review})
+                return
+            if parsed.path == "/api/card-content":
+                data = self._read_json(limit=64 * 1024)
+                input_mode = query.get("input_mode", ["raw_media"])[0]
+                card = self.state.save_card_content(project, data, input_mode)
+                preview_action = "ready-preview" if input_mode == "ready_video" else "cards"
+                self.state.start_job(project, preview_action)
+                self._json({
+                    "ok": True,
+                    "card": card,
+                    "preview_job_started": True,
+                    "preview_action": preview_action,
+                })
+                return
+            if parsed.path == "/api/ai-card-intent-review":
+                data = self._read_json(limit=256 * 1024)
+                review = self.state.review_ai_card_intent(project, data.get("intent") or {})
+                self._json({"ok": True, "review": review})
+                return
+            if parsed.path == "/api/ai-card-intent-apply":
+                data = self._read_json(limit=256 * 1024)
+                result = self.state.apply_ai_card_intent(
+                    project, data.get("intent") or {}, confirmed=data.get("confirmed") is True,
+                    confirmation_token=str(data.get("confirmation_token") or ""),
+                )
+                action = "ready-preview" if result["operation"]["input_mode"] == "ready_video" else "cards"
+                self.state.start_job(project, action)
+                self._json({"ok": True, "result": result, "preview_action": action})
+                return
+            if parsed.path == "/api/ai-card-intent-revert":
+                data = self._read_json(limit=64 * 1024)
+                result = self.state.revert_ai_card_intent(project, str(data.get("operation_id") or ""))
+                action = "ready-preview" if result.get("input_mode") == "ready_video" else "cards"
+                self.state.start_job(project, action)
+                self._json({"ok": True, "result": result, "preview_action": action})
                 return
             data = self._read_json()
             if parsed.path == "/api/reset-definitions":
@@ -1723,8 +2117,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "result": result})
                 return
             if parsed.path == "/api/plan":
-                self.state.save_plan(project, data.get("plan") or {})
-                self._json({"ok": True})
+                result = self.state.save_plan(project, data.get("plan") or {})
+                self._json({"ok": True, **result})
                 return
             if parsed.path == "/api/ready-video-plan":
                 result = self.state.save_ready_video_plan(project, data.get("plan") or {})

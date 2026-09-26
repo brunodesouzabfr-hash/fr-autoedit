@@ -41,10 +41,12 @@ class MasterContract(unittest.TestCase):
         p=self.project
         (p/"originais").mkdir(exist_ok=True)
         (p/"originais/colors.mp4").write_bytes(self.source.read_bytes())
+        (p/"proxies").mkdir(exist_ok=True)
+        (p/"proxies/colors.mp4").write_bytes(self.source.read_bytes())
         self.manifest={"media":[{"id":"M0001","status":"ok","media_type":"video","duration_sec":6,
-            "source_path":"originais/colors.mp4","proxy_path":"originais/colors.mp4","has_audio":False,"width":320,"height":240,"fps":24},
+            "source_path":"originais/colors.mp4","proxy_path":"proxies/colors.mp4","has_audio":False,"width":320,"height":240,"fps":24},
             {"id":"M0001C001","status":"ok","media_type":"video","parent_video":"M0001","scene_start_sec":1.0,"scene_end_sec":5.0,"duration_sec":4,
-             "source_path":"originais/colors.mp4","proxy_path":"originais/colors.mp4","has_audio":False,"width":320,"height":240}]}
+             "source_path":"originais/colors.mp4","proxy_path":"proxies/colors.mp4","has_audio":False,"width":320,"height":240}]}
         scope.write(p/"MANIFESTO_MEDIA.json",self.manifest)
         cfg=self.state.load_config(p)
         cfg["edition"].update(width=320,height=568,format="vertical",quality_preset="custom",fps=24,create_clean_version=False)

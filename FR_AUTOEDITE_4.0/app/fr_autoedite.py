@@ -835,6 +835,87 @@ def parse_probe(path: Path, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def proxy_probe_metadata(path: Path) -> dict[str, Any]:
+    data = ffprobe(path)
+    parsed = parse_probe(path, data)
+    streams = data.get("streams") or []
+    video = next((stream for stream in streams if stream.get("codec_type") == "video"), {})
+    audio = next((stream for stream in streams if stream.get("codec_type") == "audio"), {})
+
+    def stream_duration(stream: dict[str, Any]) -> float:
+        try:
+            if stream.get("duration") not in (None, "N/A"):
+                return float(stream["duration"])
+            if stream.get("duration_ts") not in (None, "N/A"):
+                return float(stream["duration_ts"]) * parse_ratio(stream.get("time_base"))
+        except (TypeError, ValueError):
+            pass
+        return 0.0
+
+    parsed["video_duration_sec"] = round(stream_duration(video) or float(parsed.get("duration_sec") or 0), 6)
+    parsed["audio_duration_sec"] = round(stream_duration(audio), 6) if audio else 0.0
+    try:
+        parsed["declared_frame_count"] = int(video.get("nb_frames") or 0)
+    except (TypeError, ValueError):
+        parsed["declared_frame_count"] = 0
+    return parsed
+
+
+def decode_video_proxy(path: Path) -> dict[str, Any]:
+    result = run([
+        "ffmpeg", "-v", "warning", "-xerror", "-err_detect", "explode",
+        "-nostdin", "-i", str(path), "-map", "0:v:0", "-an",
+        "-progress", "pipe:1", "-nostats", "-f", "null", "-",
+    ], capture=True, check=False, timeout=1800, operation=f"decodificação integral de {path.name}")
+    progress: dict[str, str] = {}
+    for line in (result.stdout or "").splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            progress[key.strip()] = value.strip()
+    stderr = (result.stderr or "").strip()
+    corruption_markers = (
+        "corrupt", "invalid nal", "invalid data", "error while decoding",
+        "partial file", "packet too small", "damaged", "concealing",
+        "missing picture", "end of file",
+    )
+    corruption = [
+        line.strip() for line in stderr.splitlines()
+        if any(marker in line.casefold() for marker in corruption_markers)
+    ]
+    try:
+        frame_count = int(progress.get("frame") or 0)
+    except ValueError:
+        frame_count = 0
+    try:
+        decoded_end = float(progress.get("out_time_us") or 0) / 1_000_000.0
+    except ValueError:
+        decoded_end = 0.0
+    if result.returncode != 0 or corruption:
+        detail = (corruption[-1] if corruption else stderr[-500:]) or "falha sem diagnóstico"
+        raise AutoEditeError(f"Corrupção durante a decodificação de {path.name}: {detail}")
+    if frame_count <= 0 or decoded_end <= 0:
+        raise AutoEditeError(f"Decodificação de {path.name} não entregou frames com PTS válido.")
+    return {
+        "decoded_frame_count": frame_count,
+        "decoded_coverage_end": round(decoded_end, 6),
+        "decoder_warnings": stderr.splitlines(),
+    }
+
+
+def proxy_generation_parameters(row: dict[str, Any], answers: dict[str, Any]) -> dict[str, Any]:
+    media_type = str(row.get("media_type") or "")
+    handoff = answers.get("handoff", {})
+    return {
+        "pipeline_version": "fr-proxy/1",
+        "media_type": media_type,
+        "long_side": 1600 if media_type == "image" else int(handoff.get("proxy_long_side", 720)),
+        "fps": None if media_type == "image" else int(handoff.get("proxy_fps", 24)),
+        "video_codec": None if media_type == "image" else "libx264",
+        "video_crf": None if media_type == "image" else 31,
+        "audio_codec": None if media_type == "image" else "aac-mono-64k",
+    }
+
+
 def media_quality_score(row: dict[str, Any], answers: dict[str, Any]) -> float:
     """Heurística local e explicável; não tenta substituir curadoria visual."""
     score = 50.0
@@ -1046,6 +1127,13 @@ def apply_local_analysis(
                     "exclusion_reason": "",
                     "selection_basis": "mudança de cena local + janela de 3–8 segundos",
                 })
+                if isinstance(child.get("proxy_integrity"), dict):
+                    child["proxy_integrity"] = copy.deepcopy(child["proxy_integrity"])
+                    child["proxy_integrity"].update({
+                        "source_asset_id": row["id"],
+                        "coverage_start": round(start, 6),
+                        "coverage_end": round(start + duration, 6),
+                    })
                 expanded.append(child)
                 report["scene_clips"] += 1
     write_json(project_dir / "RELATORIO_ANALISE_LOCAL.json", report)
@@ -1057,6 +1145,7 @@ def rel(path: Path, base: Path) -> str:
 
 
 def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]:
+    from proxy_integrity import ProxyIntegrityError, file_sha256, verify_asset
     originals = project_dir / "originais"
     proxy_dir = project_dir / "proxies"
     thumb_dir = project_dir / "miniaturas"
@@ -1089,6 +1178,8 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
         proxy = proxy_dir / (f"{media_id}_{slugify(source.stem)[:60]}_PROXY.mp4" if kind == "video" else f"{media_id}_{slugify(source.stem)[:60]}_PROXY.jpg")
         thumb = thumb_dir / f"{media_id}.jpg"
         cached = cached_rows.get(source_relative)
+        generation_parameters = proxy_generation_parameters({"media_type": kind}, answers)
+        cached_integrity = None
         if (
             cached
             and cached.get("id") == media_id
@@ -1096,8 +1187,20 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
             and int(cached.get("size_bytes") or -1) == source.stat().st_size
             and cached.get("status") == "ok"
             and proxy.is_file() and proxy.stat().st_size > 0
-            and thumb.is_file() and thumb.stat().st_size > 0
+            and isinstance(cached.get("proxy_integrity"), dict)
         ):
+            try:
+                cached_integrity = verify_asset(
+                    project_dir, cached,
+                    generation_parameters=generation_parameters,
+                    probe=proxy_probe_metadata, decode_video=decode_video_proxy,
+                    expected=cached["proxy_integrity"],
+                )
+            except ProxyIntegrityError as exc:
+                warning(f"{media_id}: cache de proxy invalidado: {exc}")
+        if cached_integrity:
+            if not thumb.is_file() or thumb.stat().st_size == 0:
+                create_thumbnail(proxy, thumb, kind, float(cached.get("duration_sec") or 0))
             row = copy.deepcopy(cached)
             row.update({
                 "id": media_id,
@@ -1108,6 +1211,7 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
                 "size_bytes": source.stat().st_size,
                 "status": "ok",
                 "error": "",
+                "proxy_integrity": cached_integrity,
             })
             rows.append(row)
             info(f"Preparação {index}/{len(sources)}: {media_id} reutilizado · {source.name}")
@@ -1124,23 +1228,31 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
         taken_at, date_source = capture_time(source, probe_data)
         status = "ok"
         error = ""
+        integrity: dict[str, Any] | None = None
         try:
-            if not proxy.is_file() or proxy.stat().st_size == 0:
-                if kind == "video":
-                    create_video_proxy(
-                        source, proxy, long_side, proxy_fps,
-                        source_duration=float(metadata.get("duration_sec") or 0),
-                    )
-                else:
-                    create_image_proxy(source, proxy)
-            if not thumb.is_file() or thumb.stat().st_size == 0:
-                create_thumbnail(proxy, thumb, kind, metadata["duration_sec"])
+            if kind == "video":
+                create_video_proxy(
+                    source, proxy, long_side, proxy_fps,
+                    source_duration=float(metadata.get("duration_sec") or 0),
+                )
+            else:
+                create_image_proxy(source, proxy)
+            create_thumbnail(proxy, thumb, kind, metadata["duration_sec"])
+            integrity = verify_asset(
+                project_dir, {
+                    "id": media_id, "media_type": kind,
+                    "source_path": source_relative, "proxy_path": rel(proxy, project_dir),
+                },
+                generation_parameters=generation_parameters,
+                probe=proxy_probe_metadata, decode_video=decode_video_proxy,
+            )
         except Exception as exc:
             status = "error"
             error = str(exc)
             warning(f"{media_id} {source.name}: {exc}")
         try:
-            digest = sha256_short(source)
+            source_hash = integrity["source_hash"] if integrity else file_sha256(source)
+            digest = source_hash[:16]
         except OSError as exc:
             digest = ""
             status = "error"
@@ -1162,6 +1274,8 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
             "status": status,
             "error": error,
         }
+        if integrity:
+            row["proxy_integrity"] = integrity
         row["quality_score"] = media_quality_score(row, answers)
         rows.append(row)
         write_json(checkpoint_path, {
@@ -1717,7 +1831,7 @@ def promote_timelapse_parents(
 
 def build_random_plan(
     project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any],
-    usable: list[dict[str, Any]], seed_override: int | None = None,
+    usable: list[dict[str, Any]], seed_override: int | None = None, *, publish: bool = True,
 ) -> dict[str, Any]:
     edition = answers.get("edition", {})
     config = answers.get("random_mode", {})
@@ -1875,13 +1989,17 @@ def build_random_plan(
         "card_style_path": "CARD_STYLE.json", "social": answers.get("social", {}), "segments": segments,
     }
     plan = apply_opening_closing_features(project_dir, answers, plan)
-    write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
-    write_json(project_dir / "EDIT_PLAN.json", plan)
+    if publish:
+        write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
+        write_json(project_dir / "EDIT_PLAN.json", plan)
     info(f"Modo aleatório: seed {seed}. Use esta seed para reproduzir a montagem.")
     return plan
 
 
-def build_auto_plan(project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+def build_auto_plan(
+    project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any], *,
+    publish: bool = True, seed_override: int | None = None,
+) -> dict[str, Any]:
     answers = normalize_answers(answers)
     edition = answers.get("edition", {})
     order_mode = normalize_order_mode(edition.get("order_mode", "automatico"))
@@ -1892,7 +2010,10 @@ def build_auto_plan(project_dir: Path, answers: dict[str, Any], manifest: dict[s
     if not usable:
         raise AutoEditeError("Nenhuma mídia válida para montar o plano.")
     if order_mode == "aleatorio":
-        return build_random_plan(project_dir, answers, manifest, usable)
+        return build_random_plan(
+            project_dir, answers, manifest, usable,
+            seed_override=seed_override, publish=publish,
+        )
     manifest_rows = {str(row.get("id")): row for row in manifest.get("media", [])}
     phases = sorted(answers.get("story", {}).get("chronology", []), key=lambda p: p.get("order", 0))
     if not phases:
@@ -2054,8 +2175,9 @@ def build_auto_plan(project_dir: Path, answers: dict[str, Any], manifest: dict[s
         "segments": segments,
     }
     plan = apply_opening_closing_features(project_dir, answers, plan)
-    write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
-    write_json(project_dir / "EDIT_PLAN.json", plan)
+    if publish:
+        write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
+        write_json(project_dir / "EDIT_PLAN.json", plan)
     return plan
 
 
@@ -2529,7 +2651,8 @@ def draw_contact_chips(
 
 def paste_service_symbol(
     canvas: Any, asset_path: Path, center: tuple[int, int], size: int,
-    orange: str, gold: str, border: str,
+    orange: str, gold: str, border: str, *, zoom: float = 1.0,
+    focal_x: float = 0.5, focal_y: float = 0.5,
 ) -> bool:
     """Integra o medalhão de serviço num círculo matematicamente perfeito.
 
@@ -2537,24 +2660,16 @@ def paste_service_symbol(
     antes da máscara circular, deformando visualmente o medalhão em uma oval.
     Aqui a imagem é ajustada primeiro a um quadrado e só depois recebe a máscara.
     """
-    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
+    from PIL import Image, ImageDraw
+    from card_media import circle_crop
 
     if not asset_path.is_file():
         return False
     try:
         with Image.open(asset_path) as opened:
-            source = ImageOps.exif_transpose(opened).convert("RGBA")
-        plate = ImageOps.fit(
-            source, (size, size), method=Image.Resampling.LANCZOS,
-            centering=(0.5, 0.5),
-        )
-        mask = Image.new("L", (size, size), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        inset = max(1, size // 160)
-        mask_draw.ellipse((inset, inset, size - inset - 1, size - inset - 1), fill=255)
-        # Antialias discreto apenas na borda; não altera a geometria circular.
-        mask = mask.filter(ImageFilter.GaussianBlur(max(0.6, size / 420)))
-        plate.putalpha(ImageChops.multiply(plate.getchannel("A"), mask))
+            plate = circle_crop(
+                opened, size, zoom=zoom, focal_x=focal_x, focal_y=focal_y,
+            )
         cx, cy = center
         canvas.alpha_composite(plate, (cx - size // 2, cy - size // 2))
         draw = ImageDraw.Draw(canvas, "RGBA")
@@ -3634,6 +3749,11 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
         for temporary, target, _segment, _master in pending:
             temporary.replace(target)
             outputs.append(target)
+        expected = {target.resolve() for _temporary, target, _segment, _master in pending}
+        stale_candidates = list(output_dir.glob("*.png")) + list((output_dir / "4K_MASTERS").glob("*.png"))
+        for stale in stale_candidates:
+            if stale.resolve() not in expected:
+                stale.unlink(missing_ok=True)
     finally:
         for temporary, _target, _segment, _master in pending:
             temporary.unlink(missing_ok=True)
@@ -5114,6 +5234,17 @@ def refresh_ai_package_documents(
             "Substitua este conteúdo pelo Markdown completo devolvido pela IA. "
             "O Studio validará antes de aplicar e preservará o roteiro-base.\n"
         ))
+    from ai_package_v2 import generate_snapshot
+    from proxy_integrity import ensure_manifest_integrity
+    verified_manifest = ensure_manifest_integrity(
+        project_dir, manifest,
+        parameters_for=lambda row: proxy_generation_parameters(row, answers),
+        probe=proxy_probe_metadata, decode_video=decode_video_proxy,
+    )
+    generate_snapshot(
+        project_dir, answers, verified_manifest,
+        probe=lambda path: parse_probe(path, ffprobe(path)),
+    )
     return package
 
 
@@ -5187,37 +5318,100 @@ def split_large_proxy_for_handoff(
     segment_time = max(5.0, min(90.0, duration * ratio * 0.72))
     for attempt in range(4):
         attempt_dir = cache / f"tentativa_{attempt + 1}"
+        if attempt_dir.exists():
+            shutil.rmtree(attempt_dir)
         attempt_dir.mkdir(parents=True, exist_ok=True)
         pattern = attempt_dir / f"{slugify(source.stem)}_PARTE_%03d.mp4"
+        crf = 34 + attempt * 2
         run([
             "ffmpeg", "-y", "-nostdin", "-hide_banner", "-loglevel", "error",
             "-i", str(source),
             "-map", "0:v:0", "-map", "0:a?",
-            "-vf", "scale='if(gt(iw,ih),640,-2)':'if(gt(iw,ih),-2,640)',fps=20,setsar=1",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "34", "-pix_fmt", "yuv420p",
+            "-vf", "scale='if(gt(iw,ih),min(iw,640),-2)':'if(gt(iw,ih),-2,min(ih,640))',fps=20,setsar=1",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", str(crf), "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-ac", "1", "-b:a", "48k",
+            "-force_key_frames", f"expr:gte(t,n_forced*{segment_time:.6f})",
             "-f", "segment", "-segment_time", f"{segment_time:.3f}",
+            "-segment_time_delta", "0.05",
             "-reset_timestamps", "1", "-movflags", "+faststart", str(pattern),
         ])
         parts = sorted(path for path in attempt_dir.glob("*.mp4") if path.stat().st_size > 0)
         if parts and all(path.stat().st_size <= payload_budget for path in parts):
             return parts
-        segment_time = max(3.0, segment_time * 0.52)
+        segment_time = max(1.0, segment_time * 0.52)
     raise AutoEditeError(
         f"Mesmo após quatro tentativas, um trecho de {source.name} excedeu o limite do lote. "
         "Reduza proxy_long_side ou o tamanho máximo do lote."
     )
 
 
-def handoff_proxy_items(project_dir: Path, proxies: list[Path], payload_budget: int) -> list[Path]:
+def handoff_proxy_inventory(
+    project_dir: Path, proxies: list[Path], payload_budget: int,
+) -> tuple[list[Path], dict[str, Any]]:
+    from proxy_integrity import ProxyIntegrityError, file_sha256, validate_decoded_coverage
     result: list[Path] = []
+    entries: list[dict[str, Any]] = []
     for path in proxies:
         if path.stat().st_size <= payload_budget:
             result.append(path)
+            if path.suffix.lower() in VIDEO_EXTENSIONS:
+                metadata = proxy_probe_metadata(path)
+                duration = float(metadata.get("video_duration_sec") or metadata.get("duration_sec") or 0)
+                if duration <= 0:
+                    raise AutoEditeError(f"Proxy ilegível durante o empacotamento: {path.name}")
+                decoded = decode_video_proxy(path)
+                try:
+                    verified = validate_decoded_coverage(
+                        metadata, decoded, asset_id=path.name, expected_duration=duration,
+                    )
+                except ProxyIntegrityError as exc:
+                    raise AutoEditeError(str(exc)) from exc
+                coverage = (0.0, verified["decoded_coverage_end"])
+            else:
+                coverage = (None, None)
+            entries.append({
+                "source_proxy": rel(path, project_dir), "export_path": _chatgpt_arcname(path, project_dir),
+                "order": 1, "coverage_start": coverage[0], "coverage_end": coverage[1],
+                "sha256": file_sha256(path), "size_bytes": path.stat().st_size,
+            })
             continue
         if path.suffix.lower() in VIDEO_EXTENSIONS:
             warning(f"Proxy acima do orçamento do lote; dividindo: {path.name}")
-            result.extend(split_large_proxy_for_handoff(project_dir, path, payload_budget))
+            parts = split_large_proxy_for_handoff(project_dir, path, payload_budget)
+            source_meta = proxy_probe_metadata(path)
+            source_duration = float(
+                source_meta.get("video_duration_sec") or source_meta.get("duration_sec") or 0
+            )
+            fps = float(source_meta.get("fps") or 24)
+            tolerance = max(0.25, 4.0 / max(fps, 1.0))
+            cursor = 0.0
+            for order, part in enumerate(parts, 1):
+                part_meta = proxy_probe_metadata(part)
+                duration = float(part_meta.get("video_duration_sec") or part_meta.get("duration_sec") or 0)
+                if duration <= 0:
+                    raise AutoEditeError(f"Parte de proxy ilegível: {part.name}")
+                decoded = decode_video_proxy(part)
+                try:
+                    verified = validate_decoded_coverage(
+                        part_meta, decoded, asset_id=part.name, expected_duration=duration,
+                    )
+                except ProxyIntegrityError as exc:
+                    raise AutoEditeError(str(exc)) from exc
+                start = cursor
+                cursor += verified["decoded_coverage_end"]
+                entries.append({
+                    "source_proxy": rel(path, project_dir),
+                    "export_path": _chatgpt_arcname(part, project_dir),
+                    "order": order, "coverage_start": round(start, 6),
+                    "coverage_end": round(min(cursor, source_duration), 6),
+                    "sha256": file_sha256(part), "size_bytes": part.stat().st_size,
+                })
+            if source_duration <= 0 or abs(cursor - source_duration) > tolerance:
+                raise AutoEditeError(
+                    f"Cobertura incompleta ao dividir {path.name}: {cursor:.3f}s de "
+                    f"{source_duration:.3f}s; regenere o lote."
+                )
+            result.extend(parts)
             continue
         # Imagens anormalmente grandes são convertidas para uma prévia JPEG.
         try:
@@ -5231,9 +5425,25 @@ def handoff_proxy_items(project_dir: Path, proxies: list[Path], payload_budget: 
             if target.stat().st_size > payload_budget:
                 raise AutoEditeError(f"Imagem ainda grande demais: {path.name}")
             result.append(target)
+            entries.append({
+                "source_proxy": rel(path, project_dir),
+                "export_path": _chatgpt_arcname(target, project_dir), "order": 1,
+                "coverage_start": None, "coverage_end": None,
+                "sha256": file_sha256(target), "size_bytes": target.stat().st_size,
+                "transform": "jpeg-1800-quality-80",
+            })
         except Exception as exc:
             raise AutoEditeError(f"Não foi possível preparar {path.name} para o ChatGPT: {exc}") from exc
-    return result
+    inventory = {
+        "schema_version": 1, "integrity": "verified_m7",
+        "source_proxy_count": len(proxies), "export_file_count": len(result),
+        "entries": entries,
+    }
+    return result, inventory
+
+
+def handoff_proxy_items(project_dir: Path, proxies: list[Path], payload_budget: int) -> list[Path]:
+    return handoff_proxy_inventory(project_dir, proxies, payload_budget)[0]
 
 
 def _chatgpt_arcname(path: Path, project_dir: Path) -> str:
@@ -5293,26 +5503,11 @@ def create_chatgpt_package(
     max_mb = min(149.0, max(10.0, configured_mb))
     max_bytes = int(max_mb * 1024 * 1024)
     staging_dir = Path(tempfile.mkdtemp(prefix=".PACOTE_CHATGPT_NOVO_", dir=project_dir))
-    metadata_names = [
-        "00_LEIA_PRIMEIRO.md", "PROMPT_PRONTO_PARA_CHATGPT.md", "QUESTIONARIO_RESPONDIDO.json",
-        "MANIFESTO_MEDIA.json", "MANIFESTO_MEDIA.csv", "EDIT_PLAN.json", "EDIT_PLAN_AUTO.json",
-        "fr_brand_profile.json", "franco-romeu-logo.png", "EDIT_PLAN_SCHEMA.json",
-        "CONTEXTO_PROJETO.md", "CARD_STYLE.json", "FR_CONTENT_STRATEGY.json", "SOCIAL_PLAN.json",
-        "ROTEIRO_MESTRE_PARA_IA.md", "PUBLICACAO_SOCIAL.md", "PUBLICACAO_SOCIAL.json",
-        "RELATORIO_ANALISE_LOCAL.json", "RELATORIO_ORGANIZACAO.json", "CONTATO_GERAL_CODEX.jpg"
-    ]
-    metadata = [project_dir / name for name in metadata_names if (project_dir / name).is_file()]
-    metadata += [
-        package_root / name for name in (
-            "00_NAO_EDITAR_CONTEXTO_PROJETO.md",
-            "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md",
-            "02_NAO_EDITAR_MANIFESTO_MEDIA.json",
-            "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md",
-        ) if (package_root / name).is_file()
-    ]
-    metadata += sorted((project_dir / "contatos_visuais").glob("*.jpg"))
-    metadata += sorted((project_dir / "social" / "planos").glob("*.json"))
-    metadata += sorted(path for path in (project_dir / "fontes_contexto").glob("*") if path.is_file())
+    from ai_package_v2 import DETERMINISTIC_FILES
+    v2_root = package_root / "V2"
+    metadata = [v2_root / name for name in DETERMINISTIC_FILES]
+    if not all(path.is_file() for path in metadata):
+        raise AutoEditeError("O snapshot V2 não foi publicado por completo.")
     bundled_fonts = sorted(FONTS.glob("*.ttf"))
     base_size = sum(path.stat().st_size for path in metadata + bundled_fonts)
     safety = 3 * 1024 * 1024
@@ -5322,8 +5517,25 @@ def create_chatgpt_package(
             f"Os documentos fixos ocupam {base_size / 1024**2:.1f} MB e não cabem com segurança "
             f"num lote de {max_mb:.1f} MB. Remova anexos opcionais ou aumente o limite."
         )
-    proxies = sorted(path for path in (project_dir / "proxies").glob("*") if path.is_file())
-    payloads = handoff_proxy_items(project_dir, proxies, payload_budget)
+    descriptor = read_json(v2_root / "PACKAGE_DESCRIPTOR.json")
+    if descriptor.get("integrity_status") != "verified_m7":
+        raise AutoEditeError(
+            "O pacote V2 não possui integridade M7 completa; regenere os proxies antes de exportar."
+        )
+    proxies = []
+    for relative in descriptor.get("proxy_files", []):
+        path = (project_dir / relative).resolve()
+        try:
+            path.relative_to(project_dir.resolve())
+        except ValueError as exc:
+            raise AutoEditeError("Snapshot V2 contém proxy fora do projeto.") from exc
+        if not path.is_file():
+            raise AutoEditeError(f"Proxy do snapshot V2 desapareceu: {relative}")
+        proxies.append(path)
+    payloads, export_map = handoff_proxy_inventory(project_dir, proxies, payload_budget)
+    export_map_path = staging_dir / "PACKAGE_EXPORT_MAP.json"
+    write_json(export_map_path, export_map)
+    metadata.append(export_map_path)
     pending = partition_by_size(payloads, payload_budget) if payloads else [[]]
     staged: list[Path] = []
     index = 1
@@ -5368,8 +5580,7 @@ def create_chatgpt_package(
         "",
         *(f"{path}  |  {path.stat().st_size / 1024**2:.1f} MB" for path in canonical_outputs),
         "",
-        f"# Depois envie o conteúdo deste arquivo:",
-        str(package_root / "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md"),
+        "# O contrato de edição está em EDIT_TASK.json e EDIT_SCHEMA.json dentro dos lotes.",
     ]
     write_text(project_dir / "UPLOAD_LIST.txt", "\n".join(upload_lines) + "\n")
     shutil.copy2(project_dir / "UPLOAD_LIST.txt", package_dir / "UPLOAD_LIST.txt")
@@ -5382,9 +5593,8 @@ def create_chatgpt_package(
         "1. Abra `01_LISTA_EXATA_DE_ARQUIVOS.txt`.",
         "2. Anexe TODOS os lotes indicados na mesma conversa, sem extrair os ZIPs.",
         "3. Aguarde os anexos terminarem de carregar.",
-        "4. Envie o conteúdo de `02_PROMPT_PARA_ENVIAR.md`.",
-        "5. Para edição integral por qualquer IA, use `PACOTE_PARA_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md` e peça a devolução do mesmo Markdown preenchido.",
-        "6. Importe o Markdown respondido no Studio; ele atualiza filme, Reels e publicação com backup.", "",
+        "4. Peça uma resposta JSON conforme EDIT_SCHEMA.json, vinculada ao package_snapshot_id atual.",
+        "5. Importe a resposta JSON V2 ou, para compatibilidade, um Roteiro Mestre Markdown V1 no Studio.", "",
         f"Pasta dos lotes: `{package_dir}`", "",
         "Os lotes são múltiplos arquivos ZIP independentes; não são pedaços binários que precisem ser reconstruídos.",
     ]
@@ -6265,6 +6475,15 @@ def parser() -> argparse.ArgumentParser:
     replan.add_argument("--duracao-media", type=float)
     replan.add_argument("--seed", type=int, help="seed do modo aleatório")
     replan.add_argument("--recriar-social", action="store_true")
+    deterministic = commands.add_parser(
+        "autoeditar", help="propor AutoEdit local determinístico; aplicar somente com --aplicar",
+    )
+    deterministic.add_argument("--projeto", required=True)
+    deterministic.add_argument("--modo", choices=tuple(sorted(ORDER_MODES)))
+    deterministic.add_argument("--seed", type=int, help="seed explícita; sem valor, deriva uma seed estável")
+    deterministic.add_argument("--aplicar", action="store_true", help="publicar após validação e criar rollback")
+    deterministic.add_argument("--draft", action="store_true", help="renderizar prévia por proxies após aplicar")
+    deterministic.add_argument("--somente", choices=("both", "branded", "clean"), default="branded")
     pack = commands.add_parser("pacote-chatgpt", help="refazer apenas os lotes de upload")
     pack.add_argument("--projeto", required=True)
     pack.add_argument(
@@ -6524,6 +6743,20 @@ def main(argv: list[str] | None = None) -> int:
             generate_card_previews(project_dir, project_dir / "EDIT_PLAN.json")
             create_chatgpt_package(project_dir, answers)
             info(f"Projeto replanejado em modo {answers['edition']['order_mode']}: {project_dir}")
+            return 0
+        if args.command == "autoeditar":
+            from deterministic_autoedit import apply_plan, generate_plan
+            project_dir = expand_path(args.projeto)
+            if args.draft and not args.aplicar:
+                raise AutoEditeError("Use --draft junto com --aplicar; a proposta isolada não altera o projeto.")
+            if args.aplicar:
+                result = apply_plan(globals(), project_dir, mode=args.modo, seed=args.seed)
+                if args.draft:
+                    result["draft_outputs"] = [str(path) for path in render_draft(project_dir, only=args.somente)]
+            else:
+                plan, result = generate_plan(globals(), project_dir, mode=args.modo, seed=args.seed)
+                result["plan"] = plan
+            print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
         if args.command == "pacote-chatgpt":
             project_dir = expand_path(args.projeto)

@@ -240,13 +240,40 @@ def render_service_card(env, path, segment, plan, brand, style, project):
     elif visual:
         place_reference(visual, panel)
     else:
-        # Official service asset acts only as an illustration of the category.
+        # A CardInstance F3 pode apontar uma mídia real do manifesto. Se ela
+        # desaparecer depois da validação, o card continua renderizável com o
+        # fallback oficial do serviço e um aviso explícito no log.
         x,y,right,bottom = panel
         # O serviço é a âncora visual do card, com presença maior que os
         # elementos decorativos e sem invadir título, corpo ou rodapé.
         size = int(min(right-x,bottom-y)*.94)
         asset = c.ASSETS / service.get("asset", "")
-        if asset.is_file():
+        central = segment.get("card_instance", {}).get("central_media")
+        central_pasted = False
+        if isinstance(central, dict) and project:
+            try:
+                source = extract_reference(
+                    env, project,
+                    {
+                        "media_id": central["central_asset_id"],
+                        "time_sec": central.get("frame_time_sec", 0.0),
+                        "time_basis": "absolute_parent_media",
+                    },
+                    plan.get("output", {}).get("render_source") == "proxies",
+                )
+                cx, cy = int((x+right)/2), int((y+bottom)/2)
+                central_pasted = c.paste_service_symbol(
+                    canvas, source, (cx, cy), size, orange, gold,
+                    pal.get("border", "#123F34"),
+                    zoom=float(central.get("zoom", 1.0)),
+                    focal_x=float(central.get("focal_x", 0.5)),
+                    focal_y=float(central.get("focal_y", 0.5)),
+                )
+            except Exception as exc:
+                c.warning(
+                    "Mídia central indisponível; usando fallback do serviço: " + str(exc)
+                )
+        if not central_pasted and asset.is_file():
             shadow = max(5, int(unit*.012))
             cx, cy = int((x+right)/2), int((y+bottom)/2)
             draw.ellipse((cx-size//2-shadow, cy-size//2-shadow,

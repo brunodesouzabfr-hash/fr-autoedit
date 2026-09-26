@@ -9,6 +9,9 @@ import re
 from types import SimpleNamespace
 
 import project_scope as scope
+from ai_package_v2 import load_v2_response
+from balloon_engine import BalloonError, validate_balloon
+from card_timeline import CardTimelineError, validate_raw_card_instance, validate_ready_card_instance
 
 CARD_KINDS = {"intro", "service", "phase", "outro", "detail", "comparison"}
 ANIMATIONS = {"none", "soft_zoom", "forge_reveal", "zoom_out", "fade"}
@@ -47,6 +50,7 @@ SUPPORTED_SEGMENT_FIELDS = {
     "service_id", "service_name", "service_confidence", "service_card_enabled",
     "card_type", "card_family", "balloon_family", "visual_motif", "overlay_text",
     "voiceover_text", "caption_text", "transition_in", "transition_out", "balloon_texts",
+    "card_instance",
 }
 AI_FILLER_PREFIXES = (
     "aqui está", "aqui esta", "claro!", "certamente!", "como solicitado",
@@ -254,7 +258,7 @@ def validate_ready_video_contract(c, payload, manifest):
                 "message": "Justificativa aceita somente como metadado.",
                 "effect": "O texto rationale nunca será desenhado no vídeo.",
             })
-        normalized.append({
+        normalized_item = {
             "overlay_id": overlay_id, "kind": kind,
             "start_sec": round(start, 6), "end_sec": round(end, 6),
             "text": text, "body": clean_editorial_text(c, str(item.get("body") or ""), label + ".body"),
@@ -263,7 +267,38 @@ def validate_ready_video_contract(c, payload, manifest):
             "opacity": number(c, item.get("opacity", 1.0), label + ".opacity", 0, 1),
             "animation_in": animation_in, "animation_out": animation_out,
             "audio_policy": audio_policy, "rationale": rationale,
-        })
+        }
+        if "balloon" in item:
+            try:
+                balloon, balloon_notices = validate_balloon(
+                    item["balloon"], kind, label=label + ".balloon",
+                )
+            except BalloonError as exc:
+                fail(c, str(exc))
+            normalized_item["balloon"] = balloon
+            notices.extend(balloon_notices)
+            if balloon["reduced_motion"]:
+                normalized_item["animation_in"] = "none"
+                normalized_item["animation_out"] = "none"
+                notices.append({
+                    "level": "info", "block": label + ".balloon.reduced_motion",
+                    "message": "Redução de movimento aplicada.",
+                    "effect": "A camada permanece estática durante sua janela; timing e conteúdo não mudam.",
+                })
+            elif balloon["easing"] != "linear":
+                notices.append({
+                    "level": "info", "block": label + ".balloon.easing",
+                    "message": f"Easing {balloon['easing']} será aproximado pela duração do fade desta versão.",
+                    "effect": "Preview e master usam a mesma aproximação; não há movimento direcional prometido.",
+                })
+        if "card_instance" in item:
+            try:
+                normalized_item["card_instance"] = validate_ready_card_instance(
+                    item, label=label + ".card_instance", manifest=manifest,
+                )
+            except CardTimelineError as exc:
+                fail(c, str(exc))
+        normalized.append(normalized_item)
     global_audio = str(payload.get("audio_policy") or "preserve")
     if global_audio not in AUDIO_POLICIES:
         fail(c, "audio_policy: use preserve ou mix.")
@@ -497,11 +532,10 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
             })
             s["cut_style"] = "hard"
         sid = str(s.get("segment_id") or f"S{index:04d}")
-        # IDs identify occurrences, not source videos. Duplicates get stable new IDs.
-        if sid in seen or not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", sid):
-            sid = f"S{index:04d}"
-        while sid in seen:
-            sid += "x"
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", sid):
+            fail(c, p + ".segment_id: use 1–48 letras, números, hífen ou sublinhado.")
+        if sid in seen:
+            fail(c, p + f".segment_id: ID duplicado `{sid}`; IDs de instância devem ser estáveis e únicos.")
         s["segment_id"] = sid
         seen.add(sid)
         if s["type"] == "card":
@@ -541,6 +575,14 @@ def validate_plan(c, plan, manifest, label, trusted=None, *, legacy=False):
                     fail(c, p + ".comparison: use before e after.")
                 s["comparison"] = {k: media_ref(c, s["comparison"].get(k), manifest, p + ".comparison." + k)
                                    for k in ("before", "after")}
+            try:
+                instance = validate_raw_card_instance(
+                    s, index - 1, label=p + ".card_instance", manifest=manifest,
+                )
+            except CardTimelineError as exc:
+                fail(c, str(exc))
+            if instance is not None:
+                s["card_instance"] = instance
             continue
         mid = str(s.get("media_id") or "")
         row = trusted.get(mid) if s.get("external_asset") else rows.get(mid)
@@ -965,7 +1007,13 @@ def prepare_bundle(env, project, payload):
 
 def inspect_file(env, project, path):
     c = SimpleNamespace(**env)
-    return prepare_bundle(env, project, c.parse_ai_editing_brief(Path(path)))
+    path = Path(path)
+    try:
+        is_json = path.read_text(encoding="utf-8").lstrip().startswith("{")
+    except UnicodeDecodeError:
+        is_json = False
+    payload = load_v2_response(Path(project), path) if is_json else c.parse_ai_editing_brief(path)
+    return prepare_bundle(env, project, payload)
 
 
 def apply_file(env, project, path):
@@ -994,9 +1042,13 @@ def apply_file(env, project, path):
                  "ESTRATEGIA_IA.json": bundle["strategy"], "_CONTROLE/ROTEIRO_ATIVO.json": meta,
                  "social/planos/CARROSSEL_PLAN.json": bundle["carousel"], "social/planos/STORIES_PLAN.json": bundle["stories"],
                  "SOCIAL_PLAN.json": {"enabled": config["social"]["enabled"], "contract_version": 2,
-                                     "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]},
-                 "_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md": path.read_bytes(),
-                 "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md": path.read_bytes()}
+                                     "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]}}
+        if path.read_text(encoding="utf-8").lstrip().startswith("{"):
+            files["_ENTRADA/EDIT_PLAN_RESPONSE_V2.json"] = path.read_bytes()
+            files["PACOTE_PARA_IA/V2/EDIT_PLAN_RESPONSE.json"] = path.read_bytes()
+        else:
+            files["_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md"] = path.read_bytes()
+            files["PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md"] = path.read_bytes()
         if bundle.get("input_mode") == "ready_video":
             files["READY_VIDEO_PLAN.json"] = {
                 key: copy.deepcopy(bundle[key]) for key in (
@@ -1194,9 +1246,9 @@ def generate(env, project, answers=None, plan=None, manifest=None):
                 "overlay_safe_areas": sorted(OVERLAY_SAFE_AREAS), "overlay_animations": sorted(OVERLAY_ANIMATIONS),
                 "audio_policies": sorted(AUDIO_POLICIES),
                 "overlay_item_fields": [
-                    "overlay_id", "kind", "start_sec", "end_sec", "text", "service_key", "asset_id",
+                    "overlay_id", "kind", "start_sec", "end_sec", "text", "body", "service_key", "asset_id",
                     "presentation", "position", "safe_area", "opacity", "animation_in", "animation_out",
-                    "audio_policy", "rationale",
+                    "audio_policy", "rationale", "card_instance", "balloon",
                 ],
                 "style_pack_assets_installed": installed_style_assets,
                 "service_profiles": c.load_service_catalog(), "fonts": sorted(p.name for p in c.FONTS.glob("*.ttf")),
