@@ -1831,7 +1831,7 @@ def promote_timelapse_parents(
 
 def build_random_plan(
     project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any],
-    usable: list[dict[str, Any]], seed_override: int | None = None,
+    usable: list[dict[str, Any]], seed_override: int | None = None, *, publish: bool = True,
 ) -> dict[str, Any]:
     edition = answers.get("edition", {})
     config = answers.get("random_mode", {})
@@ -1989,13 +1989,17 @@ def build_random_plan(
         "card_style_path": "CARD_STYLE.json", "social": answers.get("social", {}), "segments": segments,
     }
     plan = apply_opening_closing_features(project_dir, answers, plan)
-    write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
-    write_json(project_dir / "EDIT_PLAN.json", plan)
+    if publish:
+        write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
+        write_json(project_dir / "EDIT_PLAN.json", plan)
     info(f"Modo aleatório: seed {seed}. Use esta seed para reproduzir a montagem.")
     return plan
 
 
-def build_auto_plan(project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+def build_auto_plan(
+    project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any], *,
+    publish: bool = True, seed_override: int | None = None,
+) -> dict[str, Any]:
     answers = normalize_answers(answers)
     edition = answers.get("edition", {})
     order_mode = normalize_order_mode(edition.get("order_mode", "automatico"))
@@ -2006,7 +2010,10 @@ def build_auto_plan(project_dir: Path, answers: dict[str, Any], manifest: dict[s
     if not usable:
         raise AutoEditeError("Nenhuma mídia válida para montar o plano.")
     if order_mode == "aleatorio":
-        return build_random_plan(project_dir, answers, manifest, usable)
+        return build_random_plan(
+            project_dir, answers, manifest, usable,
+            seed_override=seed_override, publish=publish,
+        )
     manifest_rows = {str(row.get("id")): row for row in manifest.get("media", [])}
     phases = sorted(answers.get("story", {}).get("chronology", []), key=lambda p: p.get("order", 0))
     if not phases:
@@ -2168,8 +2175,9 @@ def build_auto_plan(project_dir: Path, answers: dict[str, Any], manifest: dict[s
         "segments": segments,
     }
     plan = apply_opening_closing_features(project_dir, answers, plan)
-    write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
-    write_json(project_dir / "EDIT_PLAN.json", plan)
+    if publish:
+        write_json(project_dir / "EDIT_PLAN_AUTO.json", plan)
+        write_json(project_dir / "EDIT_PLAN.json", plan)
     return plan
 
 
@@ -6467,6 +6475,15 @@ def parser() -> argparse.ArgumentParser:
     replan.add_argument("--duracao-media", type=float)
     replan.add_argument("--seed", type=int, help="seed do modo aleatório")
     replan.add_argument("--recriar-social", action="store_true")
+    deterministic = commands.add_parser(
+        "autoeditar", help="propor AutoEdit local determinístico; aplicar somente com --aplicar",
+    )
+    deterministic.add_argument("--projeto", required=True)
+    deterministic.add_argument("--modo", choices=tuple(sorted(ORDER_MODES)))
+    deterministic.add_argument("--seed", type=int, help="seed explícita; sem valor, deriva uma seed estável")
+    deterministic.add_argument("--aplicar", action="store_true", help="publicar após validação e criar rollback")
+    deterministic.add_argument("--draft", action="store_true", help="renderizar prévia por proxies após aplicar")
+    deterministic.add_argument("--somente", choices=("both", "branded", "clean"), default="branded")
     pack = commands.add_parser("pacote-chatgpt", help="refazer apenas os lotes de upload")
     pack.add_argument("--projeto", required=True)
     pack.add_argument(
@@ -6726,6 +6743,20 @@ def main(argv: list[str] | None = None) -> int:
             generate_card_previews(project_dir, project_dir / "EDIT_PLAN.json")
             create_chatgpt_package(project_dir, answers)
             info(f"Projeto replanejado em modo {answers['edition']['order_mode']}: {project_dir}")
+            return 0
+        if args.command == "autoeditar":
+            from deterministic_autoedit import apply_plan, generate_plan
+            project_dir = expand_path(args.projeto)
+            if args.draft and not args.aplicar:
+                raise AutoEditeError("Use --draft junto com --aplicar; a proposta isolada não altera o projeto.")
+            if args.aplicar:
+                result = apply_plan(globals(), project_dir, mode=args.modo, seed=args.seed)
+                if args.draft:
+                    result["draft_outputs"] = [str(path) for path in render_draft(project_dir, only=args.somente)]
+            else:
+                plan, result = generate_plan(globals(), project_dir, mode=args.modo, seed=args.seed)
+                result["plan"] = plan
+            print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
         if args.command == "pacote-chatgpt":
             project_dir = expand_path(args.projeto)
