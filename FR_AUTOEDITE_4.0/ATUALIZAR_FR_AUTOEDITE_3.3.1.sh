@@ -8,6 +8,12 @@ fr_install_dir="$fr_data_base/fr-autoedite"
 fr_stage_dir="$fr_data_base/fr-autoedite.installing.$$"
 fr_backup_dir=""
 fr_applications_dir="$fr_data_base/applications"
+fr_expected_version="$(tr -d '\r\n' < "$fr_source_dir/VERSION")"
+case "$fr_expected_version" in
+  3.4.0|4.0.0-candidate) ;;
+  *) echo "Versão do pacote não suportada: $fr_expected_version" >&2; exit 2 ;;
+esac
+fr_expected_banner="FR AutoEdite $fr_expected_version"
 
 cleanup_stage() {
   if [[ -d "$fr_stage_dir" && "$fr_stage_dir" == "$fr_data_base"/fr-autoedite.installing.* ]]; then
@@ -16,7 +22,7 @@ cleanup_stage() {
 }
 trap cleanup_stage EXIT
 
-echo "FR AutoEdite 3.4.0 — atualização segura"
+echo "FR AutoEdite $fr_expected_version — atualização segura"
 echo "Projetos em ~/FR-AutoEdite/Studio serão preservados."
 
 for fr_command in python3 ffmpeg ffprobe; do
@@ -75,7 +81,7 @@ fr_desktop_file="$fr_applications_dir/fr-autoedite-studio.desktop"
 {
   echo '[Desktop Entry]'
   echo 'Type=Application'
-  echo 'Name=FR AutoEdite Studio 3.4.0'
+  echo "Name=FR AutoEdite Studio $fr_expected_version"
   echo 'Comment=Central local de preparação e edição Franco Romeu'
   echo "Exec=$fr_bin_dir/fr-autoedite studio"
   echo 'Terminal=true'
@@ -86,7 +92,7 @@ chmod 644 -- "$fr_desktop_file"
 
 echo "[5/5] Confirmando a versão instalada..."
 fr_version="$($fr_bin_dir/fr-autoedite --versao 2>&1)" || rollback
-if [[ "$fr_version" != "FR AutoEdite 3.4.0" ]]; then
+if [[ "$fr_version" != "$fr_expected_banner" ]]; then
   echo "Versão inesperada: $fr_version" >&2
   rollback
 fi

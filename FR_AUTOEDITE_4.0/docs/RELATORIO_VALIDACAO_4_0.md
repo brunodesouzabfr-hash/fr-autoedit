@@ -1,89 +1,117 @@
-# Relatório de validação — FR AutoEdite 4.0.0-candidate
+# Relatório de validação — FR AutoEdite 4.0 beta-next
 
-Data: 2026-09-22. Ambiente: cópia isolada do ZIP 3.4.0, sem projetos reais.
+Data: 2026-09-26. Identificador técnico: `4.0.0-candidate`. Distribuição:
+**FR AutoEdite 4.0 beta-next**. Ambiente: checkout Git local, projetos e mídias
+sintéticos, sem uso de projetos pessoais.
 
 ## Resultado executivo
 
 | Verificação | Resultado |
 |---|---|
-| CLI `--version` e `--versao` | aprovado |
-| Compilação `app/`, `scripts/`, `tests/` | aprovada |
-| Testes legados executáveis individualmente | aprovados |
-| Testes v4 via `unittest` | 8 aprovados |
-| Smoke visual v4 | aprovado |
-| Smoke integral 3.4.0 + v4 | `SMOKE TEST OK` |
-| Ready video | 13 aprovados |
-| Contrato mestre legado | 21 aprovados |
-| Preview/cache/seleção de mídia | 6 aprovados |
-| Pacote IA | 3 aprovados |
-| Studio HTTP e recuperação de job | aprovados |
-| QA técnico de cards | 56/56 com 100/100 |
-| CRC do ZIP de cards | obrigatório na finalização |
-| ZIP de código extraído e executado isoladamente | aprovado |
-| Instalador lado a lado em diretório temporário | aprovado |
-| Empacotamento determinístico | aprovado |
-| Varredura por padrões comuns de segredo | nenhum encontrado |
+| Milestones M1–M8 | aprovadas nos commits registrados abaixo |
+| Pytest completo | 128/128 aprovados em 182,15 s |
+| Suíte Python completa `*_test.py` | 93/93 aprovados em 159,8 s |
+| Studio HTTP | `STUDIO HTTP TEST OK` |
+| Card Editor ready-video HTTP | `CARD EDITOR READY HTTP TEST OK` |
+| Estado da UI do Studio | `STUDIO UI STATE TEST OK` |
+| Smoke fundação v4 | 27 aprovados; smoke concluído |
+| Smoke visual v4 | 8 aprovados; `SMOKE V4 VISUAL OK` |
+| Smoke integral raw/ready | `SMOKE TEST OK` na repetição limpa |
+| Testes de release hardening | 4/4 aprovados |
+| Empacotamento | allowlist `git ls-files`, CRC íntegro, nomes únicos |
+| Caminhos proibidos no ZIP | nenhum |
+| Compilação Python e sintaxe shell | aprovadas |
+| `git diff --check` | aprovado |
 | Aprovação visual para publicação | pendente de revisão humana |
 
-## Comandos executados
+## Milestones M1–M8
+
+| Milestone | Commit | Escopo validado |
+|---|---|---|
+| M1 | `56a5ed5` | bridge content-only e instalação modular local do Card Editor |
+| M2 | `e40246d` | placement de cards nos relógios raw/ready |
+| M3 | `3cee83a` | mídia de cards de serviço, crop, zoom, focal point e fallback |
+| M4 | `15a665e` | balões medidos, safe areas e conflitos explícitos |
+| M5 | `fcf2d92` | intent declarativa, validator, diff e confirmação |
+| M6 | `63ae9c7` | pacote IA V2 derivado do snapshot atual |
+| M7 | `4a00895` | lineage, hashes e cobertura decodificada dos proxies |
+| M8 | `44965df` | AutoEdit determinístico, offline e reversível |
+
+## Comandos executados no hardening
 
 ```bash
-./fr-autoedite --version
-./fr-autoedite --versao
+python3 -m pytest -q tests
+python3 -m unittest discover -s tests -p '*_test.py' -v
+python3 -m unittest tests.release_hardening_test -v
+python3 tests/studio_http_test.py
+python3 tests/card_editor_ready_http_test.py
+node tests/studio_ui_state_test.cjs
+bash tests/smoke_v4_foundation.sh
 bash tests/smoke_v4_visual.sh
 bash tests/smoke_test.sh
-python3 tests/ready_video_test.py
-python3 tests/master_contract_test.py
-python3 tests/card_preview_refresh_test.py
-python3 tests/phase2_ai_package_test.py
-python3 tests/ai_brief_window_test.py
-python3 tests/card_circle_test.py
-python3 tests/draft_concat_route_test.py
-python3 tests/preparation_resume_test.py
-python3 tests/studio_http_test.py
-python3 tests/studio_job_recovery_test.py
-python3 -m unittest tests.test_v4_contract_service tests.test_v4_editorial tests.test_v4_visual -v
-python3 -m compileall -q app scripts tests
 python3 scripts/empacotar_release_v4.py
-```
-
-## Incidentes encontrados e corrigidos durante QA
-
-1. A assinatura v2 de prévia incluía o plano inteiro e mudava sem alteração
-   visual. A assinatura passou a usar apenas dependências visuais, mantendo
-   invalidação por card, estilo, serviço, style pack e asset.
-2. `studio_http_test.py` esperava literalmente 3.4.0. O teste passou a conferir
-   o arquivo `VERSION`, sem enfraquecer o requisito de versão.
-3. O modelo Pydantic rejeitava `base_video_id`, embora o gerador v4 produzisse
-   esse campo. O campo opcional foi adicionado e ganhou regressão no round-trip.
-4. A publicação motion poderia aceitar arquivo temporário incompleto. Agora
-   usa retries determinísticos e FFprobe antes de `replace` atômico.
-5. Temporários de PNG interrompidos podiam permanecer no diretório gerado e
-   contaminar uma exportação avulsa. Gerador, normalizador, exportador e ZIP
-   agora limpam/ignoram temporários e exigem exatamente 56 cards separados.
-
-## Comandos que não puderam ser certificados neste ambiente
-
-`python -m pytest tests` retornou `No module named pytest`. A suíte funcional
-foi executada por `unittest`, scripts individuais e dois smoke tests, mas o
-comando pytest não é marcado como aprovado. Para reproduzi-lo:
-
-```bash
-python3 -m pip install -r requirements-dev.txt
-python3 -m pytest tests
-```
-
-`git diff --check` é não aplicável porque o ZIP recebido não contém `.git`.
-Na cópia real do repositório, execute:
-
-```bash
+python3 -m compileall -q app scripts tests
+bash -n install.sh INSTALAR_FR_AUTOEDITE_4.sh \
+  INSTALAR_EM_OUTRO_COMPUTADOR.sh ATUALIZAR_CORRECAO_CARDS.sh \
+  ATUALIZAR_FR_AUTOEDITE_3.3.1.sh ATUALIZAR_FR_AUTOEDITE_3.4.0.sh
 git diff --check
-git status --short
 ```
+
+O primeiro smoke integral, executado imediatamente depois das demais suítes,
+teve uma falha transitória do FFmpeg ao abrir o encoder AAC em uma junção social
+curta. Não houve alteração de código para mascará-la. Recursos e processos
+residuais foram conferidos, e uma repetição completa e isolada terminou com
+`SMOKE TEST OK`. O evento permanece registrado como risco operacional.
+
+## Hardening do pacote
+
+O empacotador seleciona nomes exclusivamente pela allowlist do Git e aplica uma
+segunda política de exclusão. Arquivos untracked, symlinks, caches, temporários,
+ZIPs, vídeos, diretórios de projeto e os seguintes materiais não podem entrar:
+
+- `CODEX_EXECUTION_PACK/`;
+- `README CODEX.TXT` e `promptcodexpart1.txt` a `promptcodexpart3.txt`;
+- `FR_CARD_EDITOR_UNIVERSAL_v1.1.0/` e `FR_CARD_EDITOR_STANDALONE.html`;
+- `Studio/`, `originais/`, `proxies/`, renders e mídias pessoais;
+- o manifesto histórico da raiz, substituído por um único manifesto gerado.
+
+O ZIP é reaberto antes da publicação, passa por CRC, comparação exata com a
+allowlist e verificação de nomes duplicados. `SHA256SUMS.txt` referencia somente
+o ZIP de código produzido; artefatos locais de `entrega/` não são copiados.
+
+## AutoEdit documentado e operacional
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo cronologico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo alfabetico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo aleatorio --seed 731
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico --aplicar --draft --somente both
+```
+
+Sem `--aplicar`, a operação apenas propõe e valida. Ao aplicar, cria snapshot e
+informa `rollback_version`; a recuperação usa `listar-roteiros` e
+`restaurar-roteiro --versao`. `ready_video` é bloqueado. A master de
+`raw_media` aponta para originais e somente o draft usa proxies validados.
+
+## Limitações e gates externos
+
+- revisão visual humana permanece obrigatória antes de publicação final;
+- assets modulares do Card Editor não integram o Git nem o ZIP; sua licença e
+  procedência continuam pendentes antes de publicação ou redistribuição externa;
+- controles do editor externo não suportados fielmente pelo renderer continuam
+  indisponíveis ou apenas como referência visual;
+- ferramentas opcionais marcadas como `discovery_only` ou `metadata_only` não
+  constituem pipelines implementados;
+- o AutoEdit determinístico não remonta `ready_video`, não classifica serviços
+  sem evidência e não depende de IA ou nuvem;
+- a falha transitória de inicialização AAC descrita acima merece observação em
+  máquinas com recursos limitados, embora a repetição integral tenha passado.
 
 ## Critério de promoção
 
-Promover de candidato para release somente após: pytest na máquina de destino,
-`git diff --check` no repositório real, inspeção das duas pranchas QA, execução
-de um projeto sintético instalado lado a lado e aprovação humana dos seis
-medalhões com fundo opaco preservado.
+O código e o pacote estão aptos para revisão da distribuição beta-next quando
+todos os checks deste relatório forem reproduzidos. Redistribuição dos assets
+externos do Card Editor exige verificação de licença separada; promoção para
+release visual final exige aprovação humana das saídas renderizadas.

@@ -7,7 +7,13 @@ fr_bin_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
 fr_bin_path="$fr_bin_dir/fr-autoedite"
 fr_installed_root="$fr_data_base/fr-autoedite"
 fr_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/fr-autoedite"
-fr_portable_log="$fr_state_dir/studio-3.4.0.log"
+fr_expected_version="$(tr -d '\r\n' < "$fr_portable_root/VERSION")"
+case "$fr_expected_version" in
+  3.4.0|4.0.0-candidate) ;;
+  *) echo "Versão do pacote não suportada: $fr_expected_version" >&2; exit 5 ;;
+esac
+fr_expected_banner="FR AutoEdite $fr_expected_version"
+fr_portable_log="$fr_state_dir/studio-$fr_expected_version.log"
 fr_open_studio=true
 fr_install_optionals=false
 fr_full_test=false
@@ -29,7 +35,7 @@ for fr_argument in "$@"; do
 done
 
 echo "============================================================"
-echo " FR AUTOEDITE 3.4.0 — INSTALAÇÃO PORTÁTIL GUIADA"
+echo " FR AUTOEDITE $fr_expected_version — INSTALAÇÃO PORTÁTIL GUIADA"
 echo "============================================================"
 echo "O instalador não apaga projetos nem originais. Uma instalação anterior"
 echo "é preservada como backup antes de ser substituída."
@@ -94,7 +100,7 @@ echo "Instalando o FR AutoEdite e preservando versões anteriores..."
 "$fr_portable_root/ATUALIZAR_CORRECAO_CARDS.sh" --sem-abrir
 
 fr_version_result="$($fr_bin_path --versao 2>&1 || true)"
-if [[ "$fr_version_result" != "FR AutoEdite 3.4.0" ]]; then
+if [[ "$fr_version_result" != "$fr_expected_banner" ]]; then
   echo "Falha na verificação de versão: $fr_version_result" >&2
   exit 5
 fi
@@ -127,7 +133,7 @@ if [[ "$fr_open_studio" == true ]]; then
     echo "Abra manualmente com: $fr_bin_path studio" >&2
     exit 6
   fi
-  echo "O Studio foi aberto no navegador. Confira: STUDIO 3.4.0 · ROTEIRO ISOLADO"
+  echo "O Studio $fr_expected_version foi aberto no navegador."
   echo "Log do painel: $fr_portable_log"
 else
   echo "Para abrir depois: $fr_bin_path studio"

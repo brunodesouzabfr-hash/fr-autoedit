@@ -1,5 +1,64 @@
 # Alterações
 
+## FR AutoEdite 4.0 beta-next — M1–M8 — 2026-09-26
+
+O nome da distribuição de homologação é **FR AutoEdite 4.0 beta-next**. O
+identificador técnico continua sendo `4.0.0-candidate`; nenhum schema ou
+contrato persistido foi renomeado apenas para refletir o rótulo da distribuição.
+
+### Milestones integradas
+
+- M1 `56a5ed5`: bridge content-only do Card Editor, instalação modular local e
+  proteção contra estado de outro projeto;
+- M2 `e40246d`: placement versionado de cards nos relógios próprios de
+  `raw_media` e `ready_video`;
+- M3 `3cee83a`: mídia central de cards de serviço, com crop, zoom, focal point
+  e fallback validados;
+- M4 `15a665e`: motor versionado de balões com medição, safe areas e detecção
+  explícita de colisões;
+- M5 `fcf2d92`: intents declarativas para edição assistida de cards, sempre com
+  validação, diff e confirmação antes de aplicar;
+- M6 `63ae9c7`: pacote de edição IA V2 gerado do snapshot atual;
+- M7 `4a00895`: lineage, hashes separados e cobertura decodificada de proxies,
+  incluindo rejeição de truncamento e corrupção;
+- M8 `44965df`: AutoEdit local, offline, determinístico e reversível, reutilizando
+  `build_auto_plan`/`build_random_plan`.
+
+### AutoEdit determinístico
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo cronologico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo alfabetico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo aleatorio --seed 731
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico --aplicar --draft --somente branded
+```
+
+`--aplicar` cria snapshot e informa `rollback_version`; `listar-roteiros` e
+`restaurar-roteiro --versao` fazem a reversão. `--somente` aceita
+`branded|clean|both`. O comando recusa `ready_video`, usa originais na master e
+proxies validados somente no draft.
+
+### Limitações reais
+
+- a revisão visual humana continua obrigatória;
+- o Card Editor externo é instalado apenas de uma fonte local fornecida pelo
+  proprietário; licença e procedência precisam ser resolvidas antes de
+  publicação ou redistribuição dos assets;
+- controles visuais do editor externo que o renderer não reproduz fielmente
+  continuam indisponíveis ou apenas como referência, sem persistência enganosa;
+- AutoEdit não remonta `ready_video`, não inventa serviços ou claims e não
+  depende de IA ou nuvem;
+- intents de IA permanecem propostas declarativas e não escrevem diretamente
+  na timeline, mídia ou filesystem do projeto.
+
+### Validação
+
+A matriz M1–M8, os testes HTTP/UI, os smokes e a auditoria do ZIP versionado
+foram incorporados ao procedimento de release. Resultados reproduzíveis e
+comandos estão em `docs/RELATORIO_VALIDACAO_4_0.md`.
+
 ## 4.0.0-candidate — FR Quiet Engineering Atelier — 2026-09-22
 
 - adiciona o sistema visual versionado F1–F6 com grid, safe areas, kernel 1:1,

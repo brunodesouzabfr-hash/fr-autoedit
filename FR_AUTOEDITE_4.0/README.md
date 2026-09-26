@@ -1,10 +1,11 @@
-# FR AutoEdite Studio 4.0 — candidato validável
+# FR AutoEdite Studio 4.0 beta-next
 
-Esta distribuição implementa o **FR Quiet Engineering Atelier** sobre a base
-3.4.0, preservando o pipeline FFmpeg, a CLI e o fluxo de projetos. O rótulo
-`candidate` significa que os testes automáticos foram executados no pacote,
-mas a aprovação visual e a instalação na máquina do usuário continuam sendo
-etapas explícitas.
+Esta distribuição **FR AutoEdite 4.0 beta-next** implementa o **FR Quiet
+Engineering Atelier** sobre a base 3.4.0, preservando o pipeline FFmpeg, a CLI
+e o fluxo de projetos. O identificador técnico em `VERSION` permanece
+`4.0.0-candidate`; `beta-next` identifica esta distribuição de homologação,
+sem alterar contratos persistidos. A aprovação visual e a instalação na
+máquina do usuário continuam sendo etapas explícitas.
 
 O FR AutoEdite é um estúdio local de preparação e edição assistida de conteúdo
 da Franco Romeu — Arte & Engenharia. Ele organiza fotos e vídeos de obras,
@@ -93,7 +94,7 @@ instalar dependências do sistema.
 
 ```bash
 git clone https://github.com/brunodesouzabfr-hash/fr-autoedit.git
-cd fr-autoedit/FR_AUTOEDITE_3.4.0_STUDIO
+cd fr-autoedit/FR_AUTOEDITE_4.0
 chmod +x install.sh fr-autoedite
 ./install.sh
 ```
@@ -151,7 +152,7 @@ local do repositório:
 cd /CAMINHO/PARA/fr-autoedit
 git switch main
 git pull --ff-only origin main
-cd FR_AUTOEDITE_3.4.0_STUDIO
+cd FR_AUTOEDITE_4.0
 ./install.sh
 fr-autoedite --version
 ```
@@ -159,8 +160,9 @@ fr-autoedite --version
 O `install.sh` guarda a instalação anterior em um diretório de backup. Ele não
 move nem apaga os projetos de `~/FR-AutoEdite/Studio/`.
 
-Para uma atualização distribuída em arquivo, também existe
-`ATUALIZAR_FR_AUTOEDITE_3.4.0.sh`. Consulte
+Para compatibilidade com instalações anteriores, o alias legado
+`ATUALIZAR_FR_AUTOEDITE_3.4.0.sh` detecta a versão pelo arquivo `VERSION` e
+também reconhece a estrutura 4.0. Consulte
 `LEIA_PRIMEIRO_OUTRO_COMPUTADOR.md` antes de usar outro método.
 
 ## Uso básico
@@ -201,6 +203,45 @@ fr-autoedite preview-video-pronto --projeto /CAMINHO/DO/PROJETO
 fr-autoedite render-video-pronto --projeto /CAMINHO/DO/PROJETO
 fr-autoedite reindexar-assets --projeto /CAMINHO/DO/PROJETO
 ```
+
+### AutoEdit determinístico (somente mídias brutas)
+
+O comando abaixo valida e mostra uma proposta sem alterar o projeto:
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO
+```
+
+Escolha explicitamente a ordenação quando necessário:
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo cronologico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo alfabetico
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo aleatorio --seed 731
+```
+
+`--aplicar` publica a proposta somente depois da validação e cria um snapshot
+recuperável. `--draft` exige `--aplicar` e renderiza uma prova pelos proxies;
+`--somente branded|clean|both` escolhe as versões dessa prova:
+
+```bash
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo automatico --aplicar
+fr-autoedite autoeditar --projeto /CAMINHO/DO/PROJETO --modo aleatorio --seed 731 --aplicar --draft --somente both
+```
+
+O JSON devolvido por `--aplicar` informa `rollback_version`. Para listar e
+restaurar snapshots:
+
+```bash
+fr-autoedite listar-roteiros --projeto /CAMINHO/DO/PROJETO
+fr-autoedite restaurar-roteiro --projeto /CAMINHO/DO/PROJETO --versao NOME_DO_SNAPSHOT
+```
+
+O AutoEdit determinístico é bloqueado em projetos `ready_video`, pois a
+timeline do vídeo-base é imutável. Em `raw_media`, a master continua apontando
+para os originais; proxies verificados são usados somente no `--draft`. O
+processo é local, offline e continua exigindo revisão visual humana.
 
 Os nomes e dimensões dos slots de arte estão em
 `assets/style_packs/fr_chiaroscuro_vintage_v1/ASSET_REQUIREMENTS.md`. Slots
