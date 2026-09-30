@@ -2700,7 +2700,10 @@ def card_image(
     style: dict[str, Any], project_dir: Path | None = None
 ) -> None:
     from fr_v4.bridge import render_legacy_card
-    v2 = render_legacy_card(path, segment, plan, brand, style, APP_ROOT)
+    v2 = render_legacy_card(
+        path, segment, plan, brand, style, APP_ROOT,
+        project_dir=project_dir, env=globals(),
+    )
     if v2.get("handled"):
         return
     from service_cards import render_service_card
