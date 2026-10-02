@@ -14,7 +14,7 @@ FINAL = ROOT.parent / "final"
 PREFIX = Path("FR_AUTOEDITE_4.0.0_CANDIDATO")
 EXCLUDED_PARTS = {
     ".git", ".pytest_cache", ".venv", "__pycache__", "CODEX_EXECUTION_PACK",
-    "FR_CARD_EDITOR_UNIVERSAL_v1.1.0", "Studio", "entrega", "originais",
+    "FR_CARD_EDITOR_UNIVERSAL_v1.1.0", "local_components", "Studio", "entrega", "originais",
     "proxies", "renders", "_ENTRADA", "_EDITAR", "_ENVIAR_CHATGPT",
     "_ENVIAR_IA", "_HISTORICO", "_RENDERIZACOES",
 }
@@ -35,10 +35,54 @@ BINARY_ASSET_SUFFIXES = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".wav", ".mp3",
     ".m4a", ".aac", ".flac", ".ttf", ".otf", ".woff", ".woff2",
 }
+EXTERNAL_COMPONENT_CONTRACT = Path("contracts/m9/fr_card_editor_1_1.json")
 
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def external_component_hashes(root: Path) -> set[str]:
+    """Carrega a denylist SHA-256 do componente local com licença pendente."""
+    contract_path = root / EXTERNAL_COMPONENT_CONTRACT
+    if not contract_path.is_file():
+        raise RuntimeError(
+            f"Contrato ausente do componente externo: {EXTERNAL_COMPONENT_CONTRACT}."
+        )
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        component = contract["component"]
+        if component["distribution"] != "local_only_pending_license":
+            raise ValueError("política de distribuição inesperada")
+        records = component["files"]
+        hashes = {record["sha256"] for record in records.values()}
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Contrato inválido do componente externo: {EXTERNAL_COMPONENT_CONTRACT}."
+        ) from exc
+    if not hashes or any(
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+        for value in hashes
+    ):
+        raise RuntimeError("Contrato do componente externo contém SHA-256 inválido.")
+    return hashes
+
+
+def audit_external_component_assets(root: Path, files: list[Path]) -> None:
+    """Falha fechado se bytes externos forem incluídos, mesmo sob outro nome."""
+    forbidden_hashes = external_component_hashes(root)
+    offenders = [
+        path.relative_to(root).as_posix()
+        for path in files
+        if digest(path) in forbidden_hashes
+    ]
+    if offenders:
+        raise RuntimeError(
+            "Assets externos do Card Editor detectados no payload versionado: "
+            + ", ".join(offenders[:5])
+        )
 
 
 def allowed(root: Path, path: Path) -> bool:
@@ -98,6 +142,7 @@ def create_code_archive(root: Path, target: Path, prefix: Path = PREFIX) -> dict
     partial = target.with_name("." + target.name + ".partial")
     partial.unlink(missing_ok=True)
     files = tracked_files(root)
+    audit_external_component_assets(root, files)
     records = [
         {
             "path": path.relative_to(root).as_posix(),
@@ -108,11 +153,12 @@ def create_code_archive(root: Path, target: Path, prefix: Path = PREFIX) -> dict
     ]
     manifest = {
         "schema_version": 1,
-        "version": "4.0.0-candidate",
-        "distribution": "FR AutoEdite 4.0 beta-next",
+        "version": "4.6.1-candidate",
+        "distribution": "FR AutoEdite 4.6.1 candidate",
         "source_base": "3.4.0",
         "generated_at": None,
         "selection": "git-ls-files-allowlist",
+        "external_component_asset_audit": "passed-by-path-and-sha256",
         "files": records,
         "count": len(records),
     }

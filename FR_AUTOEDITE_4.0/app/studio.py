@@ -29,7 +29,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 # O Studio também é carregado diretamente pelos testes e por integrações que
 # usam ``spec_from_file_location``.  Nesse caso o diretório ``app`` não fica
@@ -42,6 +42,10 @@ if _APP_DIR not in sys.path:
 
 import project_scope
 import card_editor_adapter
+import card_editor_adapter_v2
+import card_persistence_v2
+import universal_card_runtime
+import runtime_control
 
 
 CARD_EDITOR_SOURCE_DIR = "FR_CARD_EDITOR_UNIVERSAL_v1.1.0"
@@ -88,7 +92,7 @@ class StudioState:
     def __init__(self, app_root: Path, studio_root: Path) -> None:
         self.app_root = app_root.resolve()
         version_file = self.app_root / "VERSION"
-        self.app_version = version_file.read_text(encoding="utf-8").strip() if version_file.is_file() else "4.0.0-candidate"
+        self.app_version = version_file.read_text(encoding="utf-8").strip() if version_file.is_file() else "4.6.1-candidate"
         self.studio_root = studio_root.expanduser().resolve()
         self.studio_root.mkdir(parents=True, exist_ok=True)
         self.launcher = self.app_root / "fr-autoedite"
@@ -119,14 +123,28 @@ class StudioState:
         required = [] if root is None else [
             root / "index.html", *(root / "assets" / name for name in CARD_EDITOR_ASSETS)
         ]
+        renderer_available = False
+        renderer_reason = "Componente modular ausente."
+        if root is not None:
+            try:
+                universal_card_runtime.discover_font_root(self.app_root, root)
+                renderer_available = True
+                renderer_reason = "Renderer universal e fontes fixadas disponíveis."
+            except universal_card_runtime.UniversalCardRuntimeError as exc:
+                renderer_reason = str(exc)
         return {
             "available": root is not None and all(path.is_file() for path in required),
             "editor_version": "1.1.0",
             "adapter_version": card_editor_adapter.ADAPTER_VERSION,
-            "integration_mode": "same_origin_iframe_content_only",
+            "universal_adapter_version": card_editor_adapter_v2.ADAPTER_VERSION,
+            "integration_mode": "same_origin_iframe_v2_with_legacy_content_projection",
             "supported_fields": list(card_editor_adapter.SUPPORTED_FIELDS),
-            "unsupported": ["geometry", "lines", "crop", "images", "data_urls"],
+            "universal_state_sections": ["assets", "layers", "gridStyle", "fields", "lines"],
+            "renderer_available": renderer_available,
+            "renderer_reason": renderer_reason,
+            "unsupported": ["animation", "duration", "timeline", "data_urls", "new_field_ids", "new_line_ids"],
             "provenance": "user_supplied_local_publication_pending",
+            "external_distribution_allowed": False,
             "component_source": source,
         }
 
@@ -157,27 +175,46 @@ class StudioState:
         bridge = r'''
 <style id="fr-autoedite-bridge-style">
 @font-face{font-family:"Stardos Stencil";src:url('/asset/font-title.ttf')}@font-face{font-family:Rokkitt;src:url('/asset/font-body.ttf')}@font-face{font-family:"Cormorant Garamond";src:url('/asset/font-body.ttf')}@font-face{font-family:"Share Tech Mono";src:url('/asset/font-mono.ttf')}
-.app{grid-template-columns:minmax(0,1fr)!important}.panel{display:none!important}.workspace{padding-top:62px!important}#card{pointer-events:none!important}body:not(.fr-integrated-loaded) .stage-wrap{visibility:hidden}.fr-integration-ribbon{position:fixed;z-index:100;left:12px;right:12px;top:10px;padding:9px 12px;border:1px solid #d6a64b;border-radius:8px;color:#e6d6b5;background:#071d18f2;font:12px/1.35 "Share Tech Mono",monospace;box-shadow:0 8px 24px #0008}.fr-integration-ribbon b{color:#f6a700}
+body:not(.fr-v2) .app{grid-template-columns:minmax(0,1fr)!important}body:not(.fr-v2) .panel{display:none!important}.workspace{padding-top:62px!important}body:not(.fr-v2) #card{pointer-events:none!important}body:not(.fr-integrated-loaded) .stage-wrap{visibility:hidden}.fr-integration-ribbon{position:fixed;z-index:100;left:12px;right:12px;top:10px;padding:9px 12px;border:1px solid #d6a64b;border-radius:8px;color:#e6d6b5;background:#071d18f2;font:12px/1.35 "Share Tech Mono",monospace;box-shadow:0 8px 24px #0008}.fr-integration-ribbon b{color:#f6a700}body.fr-v2 #addField,body.fr-v2 #deleteField,body.fr-v2 #addLine,body.fr-v2 #deleteLine,body.fr-v2 #saveLocal,body.fr-v2 #exportJson,body.fr-v2 #importJson,body.fr-v2 #exportPng,body.fr-v2 #backgroundUpload,body.fr-v2 #logoUpload,body.fr-v2 #visualUpload{display:none!important}
 </style>
 <script id="fr-autoedite-bridge">
 (()=>{"use strict";
-const ORIGIN=window.location.origin,ADAPTER="fr-autoedite-card-content/1",TYPE_LOAD="fr-autoedite:load-card";
-const ribbon=document.createElement("div");ribbon.className="fr-integration-ribbon";ribbon.innerHTML="<b>Prévia visual de referência.</b> Somente título e corpo são editáveis no Studio; o preview salvo pelo renderer F1–F6 é a autoridade visual.";document.body.appendChild(ribbon);
-function notify(type,extra={}){window.parent.postMessage({type,bridge_version:ADAPTER,...extra},ORIGIN)}
+const ORIGIN=window.location.origin,LEGACY="fr-autoedite-card-content/1",V2="fr-autoedite-card/2";
+const ribbon=document.createElement("div");ribbon.className="fr-integration-ribbon";ribbon.innerHTML="<b>Aguardando o estado do projeto atual.</b> localStorage está desativado.";document.body.appendChild(ribbon);
+function notify(adapter,type,extra={}){window.parent.postMessage({type,bridge_version:adapter,...extra},ORIGIN)}
 function loadCard(message){
- if(message.adapter_version!==ADAPTER||!message.project||!message.segment_id||!message.fields||typeof message.fields.title!=="string"||typeof message.fields.body!=="string"){notify("fr-autoedite:editor-error",{error:"Payload de conteúdo inválido."});return}
+ if(message.adapter_version!==LEGACY||!message.project||!message.segment_id||!message.fields||typeof message.fields.title!=="string"||typeof message.fields.body!=="string"){notify(LEGACY,"fr-autoedite:editor-error",{error:"Payload de conteúdo inválido."});return}
  try{
   window.FRCardEditor.reset();
   const config=window.FRCardEditor.getConfig();
   config.assets.visual="";config.assets.visualOpacity=0;
   for(const field of config.fields){if(field.role==="variable")field.visible=field.id==="title"||field.id==="subtitle";if(field.id==="title")field.text=message.fields.title;if(field.id==="subtitle")field.text=message.fields.body}
   window.FRCardEditor.applyConfig(config);setEditing(false);
+  document.body.classList.remove("fr-v2");
   document.body.classList.add("fr-integrated-loaded");document.body.dataset.project=message.project;document.body.dataset.segmentId=message.segment_id;
-  notify("fr-autoedite:card-loaded",{project:message.project,segment_id:message.segment_id});
- }catch(error){notify("fr-autoedite:editor-error",{error:String(error&&error.message||error)})}
+  ribbon.innerHTML="<b>Fallback explícito de compatibilidade M9.9.</b> Somente título/corpo; consulte no relatório por que este card não pôde usar fr-universal-card.";
+  notify(LEGACY,"fr-autoedite:card-loaded",{project:message.project,segment_id:message.segment_id});
+ }catch(error){notify(LEGACY,"fr-autoedite:editor-error",{error:String(error&&error.message||error)})}
 }
-window.addEventListener("message",event=>{if(event.origin!==ORIGIN||event.source!==window.parent)return;const message=event.data||{};if(message.type===TYPE_LOAD)loadCard(message)});
-notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
+function loadV2(message){
+ if(message.adapter_version!==V2||!message.project||!message.instance_id||!message.editor_state){notify(V2,"fr-autoedite:editor-error",{error:"Payload v2 inválido."});return}
+ try{
+  window.FRCardEditor.applyConfig(message.editor_state);setEditing(true);
+  document.body.classList.add("fr-v2","fr-integrated-loaded");document.body.dataset.project=message.project;document.body.dataset.segmentId=message.instance_id;
+  ribbon.innerHTML="<b>Card universal v2.</b> Estado veio do projeto; salvar retorna o estado estruturado ao backend. Upload/Data URL, novos IDs, duração e animação permanecem bloqueados.";
+  notify(V2,"fr-autoedite:card-v2-loaded",{project:message.project,instance_id:message.instance_id});
+ }catch(error){notify(V2,"fr-autoedite:editor-error",{error:String(error&&error.message||error)})}
+}
+function returnV2(message){
+ try{
+  const editor_state=window.FRCardEditor.getConfig();
+  for(const name of ["background","logo","visual"]){const value=editor_state.assets[name];if(typeof value==="string"&&value.toLowerCase().startsWith("data:"))throw Error("Uploads Data URL não são persistíveis; selecione um asset validado no Studio.")}
+  notify(V2,"fr-autoedite:card-v2-state",{request_id:message.request_id,project:document.body.dataset.project,instance_id:document.body.dataset.segmentId,editor_state});
+ }catch(error){notify(V2,"fr-autoedite:editor-error",{request_id:message.request_id,error:String(error&&error.message||error)})}
+}
+window.addEventListener("message",event=>{if(event.origin!==ORIGIN||event.source!==window.parent)return;const message=event.data||{};if(message.type==="fr-autoedite:load-card")loadCard(message);else if(message.type==="fr-autoedite:load-card-v2")loadV2(message);else if(message.type==="fr-autoedite:request-card-v2")returnV2(message)});
+notify(LEGACY,"fr-autoedite:editor-ready",{editor_version:"1.1.0"});
+notify(V2,"fr-autoedite:editor-ready",{editor_version:"1.1.0"});
 })();
 </script>
 '''
@@ -414,7 +451,7 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             ("STUDIO EDITA · plano", "EDIT_PLAN.json", "Prefira editar pela timeline"),
             ("STUDIO EDITA · overlays do vídeo pronto", "READY_VIDEO_PLAN.json", "Timeline bloqueada; edite somente as camadas"),
             ("STUDIO EDITA · design", "CARD_STYLE.json", "Prefira editar em Cards e marca"),
-            ("IA EDITA E DEVOLVE · roteiro", "_ENVIAR_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md", "Único Markdown que a IA deve alterar"),
+            ("IA · PROMPT MESTRE AUTÔNOMO", "PACOTE_PARA_IA/01_PROMPT_MESTRE_AUTONOMO.md", "Prompt virgem: fatos + capacidades; não contém decisões editoriais anteriores"),
             ("PACOTE PARA IA · pasta canônica", "PACOTE_PARA_IA", "Contexto, roteiro, manifesto, lotes, instruções e resposta"),
             ("Intro personalizada", "_ENTRADA/INTRO_PERSONALIZADA", "Foto ou vídeo opcional"),
             ("Outro personalizado", "_ENTRADA/OUTRO_PERSONALIZADO", "Foto ou vídeo opcional"),
@@ -441,19 +478,13 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
 
     def ai_files(self, project: Path) -> list[dict[str, Any]]:
         """Uma única lista, com ação inequívoca, para o fluxo manual com IA."""
-        canonical = project / "PACOTE_PARA_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md"
-        legacy = project / "_ENVIAR_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md"
-        editable_relative = (
-            str(canonical.relative_to(project)) if canonical.is_file()
-            else str(legacy.relative_to(project)) if legacy.is_file()
-            else str(canonical.relative_to(project))
-        )
         rows: list[tuple[str, str, str]] = [
-            ("NÃO EDITAR · CONTEXTO", "PACOTE_PARA_IA/00_NAO_EDITAR_CONTEXTO_PROJETO.md", "read_only"),
-            ("EDITAR E DEVOLVER", editable_relative, "edit_return"),
-            ("NÃO EDITAR · MANIFESTO", "PACOTE_PARA_IA/02_NAO_EDITAR_MANIFESTO_MEDIA.json", "read_only"),
-            ("NÃO EDITAR · INSTRUÇÕES", "PACOTE_PARA_IA/04_NAO_EDITAR_INSTRUCOES_PARA_IA.md", "read_only"),
-            ("RESPOSTA · IMPORTAR AQUI", "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md", "response"),
+            ("PROMPT MESTRE · ENVIAR", "PACOTE_PARA_IA/01_PROMPT_MESTRE_AUTONOMO.md", "prompt_master"),
+            ("FATOS · NÃO EDITAR", "PACOTE_PARA_IA/V3/FACTS.json", "read_only"),
+            ("MÍDIAS ELEGÍVEIS · NÃO EDITAR", "PACOTE_PARA_IA/V3/MEDIA_MANIFEST.json", "read_only"),
+            ("CAPACIDADES · NÃO EDITAR", "PACOTE_PARA_IA/V3/CAPABILITIES.json", "read_only"),
+            ("CONTRATO DE RESPOSTA · NÃO EDITAR", "PACOTE_PARA_IA/V3/RESPONSE_SCHEMA.json", "read_only"),
+            ("RESPOSTA V3 · IMPORTAR AQUI", "PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.json", "response"),
         ]
         package = project / "PACOTE_PARA_IA" / "03_NAO_EDITAR_LOTES_DE_PROXIES"
         if package.is_dir():
@@ -524,6 +555,20 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             except Exception:
                 pass
         ready_video_plan = project_scope.read(project / "READY_VIDEO_PLAN.json", {})
+        card_migration: dict[str, Any] = {}
+        card_migration_error = ""
+        active_plan = (
+            project / "READY_VIDEO_PLAN.json"
+            if (manifest or {}).get("input_mode") == "ready_video"
+            else project / "EDIT_PLAN.json"
+        )
+        if manifest and active_plan.is_file():
+            try:
+                card_migration = universal_card_runtime.activate_project_cards(
+                    project, app_root=self.app_root,
+                )
+            except universal_card_runtime.UniversalCardRuntimeError as exc:
+                card_migration_error = str(exc)
         reel_plans: dict[str, dict[str, Any]] = {}
         reel_root = project / "social" / "planos"
         if reel_root.is_dir():
@@ -584,6 +629,12 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             compositor = compositor_capabilities()
         except Exception:
             compositor = {"ffmpeg": bool(shutil.which("ffmpeg")), "moviepy": False, "preview_backend": "ffmpeg"}
+        universal_cards: list[dict[str, Any]] = []
+        universal_card_error = ""
+        try:
+            universal_cards = universal_card_runtime.list_universal_cards(project)
+        except universal_card_runtime.UniversalCardRuntimeError as exc:
+            universal_card_error = str(exc)
         return {
             "application_version": self.app_version,
             "roteiro_versions": project_scope.list_versions(project),
@@ -604,6 +655,10 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             "ai_files": self.ai_files(project),
             "artifact_conflicts": self.artifact_conflicts(project),
             "card_previews": card_previews,
+            "universal_cards": universal_cards,
+            "universal_card_error": universal_card_error,
+            "card_migration": card_migration,
+            "card_migration_error": card_migration_error,
             "style_pack": style_pack,
             "capabilities": {
                 "rclone": bool(shutil.which("rclone")),
@@ -1083,9 +1138,16 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
                         "Depois clique novamente em Gerar Markdown; o Studio preparará as mídias automaticamente."
                     )
                 return [
-                str(self.launcher), "preparar", "--respostas", str(questionnaire),
+                    str(self.launcher), "preparar-ia", "--respostas", str(questionnaire),
                     "--zip", str(zip_path), "--projeto", str(project),
                 ]
+            # Se uma execução anterior preparou o manifesto mas falhou antes de
+            # publicar os lotes, "Tentar novamente" deve retomar o pacote em vez
+            # de gerar apenas o Markdown e deixar o projeto pela metade.
+            lots_dir = project / "PACOTE_PARA_IA" / "03_NAO_EDITAR_LOTES_DE_PROXIES"
+            has_lots = lots_dir.is_dir() and any(lots_dir.glob("FR_AUTOEDITE_LOTE_*.zip"))
+            if not has_lots:
+                return [str(self.launcher), "pacote-chatgpt", "--projeto", str(project), "--conflito", "replace"]
             return [str(self.launcher), "gerar-roteiro-ia", "--projeto", str(project)]
         if action == "brief-apply":
             import_record = project_scope.read(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {})
@@ -1126,6 +1188,7 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             current = self.jobs.get(project.name)
             if current and current.get("running"):
                 raise StudioError("Já existe uma tarefa em execução neste projeto.")
+            runtime_control.clear_skip(project)
             stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
             log_path = project / "_CONTROLE" / "logs" / f"{stamp}_{_slugify(action)}.log"
             self.jobs[project.name] = {
@@ -1141,6 +1204,8 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
         def worker() -> None:
             log_path.parent.mkdir(parents=True, exist_ok=True)
             try:
+                child_env = os.environ.copy()
+                child_env["FR_AUTOEDITE_PROJECT_DIR"] = str(project)
                 process = subprocess.Popen(
                     command,
                     cwd=str(project),
@@ -1149,6 +1214,7 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
                     text=True,
                     bufsize=1,
                     start_new_session=True,
+                    env=child_env,
                 )
             except OSError as exc:
                 with self.lock:
@@ -1249,6 +1315,23 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
         except OSError as exc:
             raise StudioError(f"Não foi possível cancelar a tarefa: {exc}") from exc
 
+    def skip_current_item(self, project: Path) -> dict[str, Any]:
+        with self.lock:
+            job = self.jobs.get(project.name)
+            process = self.processes.get(project.name)
+            if not job or not job.get("running") or process is None:
+                raise StudioError("Não há tarefa ativa para pular item.")
+            current_item = str(job.get("current_item") or "").strip()
+            if not current_item:
+                raise StudioError("A etapa atual não expôs um item individual que possa ser pulado com segurança.")
+            request = runtime_control.request_skip(project, current_item)
+            job["skip_requested"] = True
+            job["skip_target"] = current_item
+            self._append_job_line_locked(
+                project, f"[STUDIO] Pular item solicitado: {current_item}. O job continuará no próximo item.",
+            )
+            return request
+
     @staticmethod
     def _validate_segment_controls(segment: dict[str, Any], index: int, label: str) -> None:
         if segment.get("type") != "media" or not segment.get("editorial_timelapse"):
@@ -1293,6 +1376,13 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             if item_id not in old_cards or item_id not in new_cards
             or self._card_preview_state(old_cards[item_id]) != self._card_preview_state(new_cards[item_id])
         }
+        # Conteúdo visual de uma CardInstance v2 vive exclusivamente no store
+        # universal. Projeções legadas (title/body/service_key) no plano não
+        # podem invalidar seu preview enquanto o mesmo ID continuar na
+        # timeline; o save v2 escreve o preview pelo state_digest atualizado.
+        for item_id in affected & set(old_cards) & set(new_cards):
+            if universal_card_runtime.universal_state_digest(project, item_id) is not None:
+                affected.discard(item_id)
         if not affected:
             return []
         registry_path = project / "_CONTROLE" / "CARD_PREVIEWS.json"
@@ -1352,7 +1442,22 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
             raise StudioError("A timeline salva não coincide com o snapshot validado.")
         shutil.copy2(target, project / "_EDITAR" / "02_PLANO_DA_EDICAO.json")
         invalidated = self._invalidate_card_previews(project, previous, reloaded)
-        return {"plan": reloaded, "invalidated_card_ids": invalidated}
+        migration = {}
+        if (project / "_CONTROLE/CARD_MIGRATION_V99.json").is_file():
+            try:
+                migration = universal_card_runtime.activate_project_cards(
+                    project, app_root=self.app_root,
+                )
+            except universal_card_runtime.UniversalCardRuntimeError as exc:
+                raise StudioError(str(exc)) from exc
+        return {
+            "plan": reloaded,
+            "invalidated_card_ids": invalidated,
+            "card_migration": migration,
+            "universal_cards": (
+                universal_card_runtime.list_universal_cards(project) if migration else []
+            ),
+        }
 
     def card_content(
         self, project: Path, segment_id: str, input_mode: str = "raw_media",
@@ -1394,6 +1499,73 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
         if input_mode == "ready_video":
             return card_editor_adapter.export_ready_card_content(saved, item_id)
         return card_editor_adapter.export_card_content(saved, item_id)
+
+    def _card_v2_binding(
+        self, project: Path, project_id: str, instance_id: str, asset_id: str,
+    ) -> str:
+        return "/api/card-v2-asset?" + urlencode({
+            "token": self.token,
+            "project": project.name,
+            "project_id": project_id,
+            "instance_id": instance_id,
+            "asset_id": asset_id,
+        })
+
+    def open_universal_card(self, project: Path, instance_id: str) -> dict[str, Any]:
+        editor_root, _source = self.card_editor_root()
+        if editor_root is None:
+            raise StudioError("FR Card Editor Universal modular não está instalado.")
+        try:
+            context = card_persistence_v2.project_context(project)
+            project_id = str(context["project_id"])
+            return universal_card_runtime.open_editor_session(
+                project,
+                instance_id,
+                expected_project_id=project_id,
+                editor_root=editor_root,
+                binding_builder=lambda asset_id: self._card_v2_binding(
+                    project, project_id, instance_id, asset_id,
+                ),
+            )
+        except (ValueError, universal_card_runtime.UniversalCardRuntimeError) as exc:
+            raise StudioError(str(exc)) from exc
+
+    def save_universal_card(self, project: Path, payload: dict[str, Any]) -> dict[str, Any]:
+        editor_root, _source = self.card_editor_root()
+        if editor_root is None:
+            raise StudioError("FR Card Editor Universal modular não está instalado.")
+        instance_id = str(payload.get("instance_id") or "")
+        try:
+            context = card_persistence_v2.project_context(project)
+            project_id = str(context["project_id"])
+            return universal_card_runtime.save_editor_session(
+                project,
+                payload,
+                expected_project_id=project_id,
+                editor_root=editor_root,
+                binding_builder=lambda asset_id: self._card_v2_binding(
+                    project, project_id, instance_id, asset_id,
+                ),
+            )
+        except (ValueError, universal_card_runtime.UniversalCardRuntimeError) as exc:
+            raise StudioError(str(exc)) from exc
+
+    def universal_card_asset(
+        self, project: Path, instance_id: str, asset_id: str, project_id: str,
+    ) -> Path:
+        editor_root, _source = self.card_editor_root()
+        if editor_root is None:
+            raise StudioError("FR Card Editor Universal modular não está instalado.")
+        try:
+            return universal_card_runtime.asset_source(
+                project,
+                instance_id,
+                asset_id,
+                expected_project_id=project_id,
+                editor_root=editor_root,
+            )
+        except (ValueError, universal_card_runtime.UniversalCardRuntimeError) as exc:
+            raise StudioError(str(exc)) from exc
 
     def review_ai_card_intent(self, project: Path, intent: dict[str, Any]) -> dict[str, Any]:
         """Valida e calcula diff sem escrever no projeto."""
@@ -1507,7 +1679,22 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
         reloaded = project_scope.read(target, {})
         if reloaded != validated:
             raise StudioError("O plano de overlays salvo não coincide com o snapshot validado.")
-        return {"plan": reloaded, "notices": notices}
+        migration = {}
+        if (project / "_CONTROLE/CARD_MIGRATION_V99.json").is_file():
+            try:
+                migration = universal_card_runtime.activate_project_cards(
+                    project, app_root=self.app_root,
+                )
+            except universal_card_runtime.UniversalCardRuntimeError as exc:
+                raise StudioError(str(exc)) from exc
+        return {
+            "plan": reloaded,
+            "notices": notices,
+            "card_migration": migration,
+            "universal_cards": (
+                universal_card_runtime.list_universal_cards(project) if migration else []
+            ),
+        }
 
     def save_reel_plan(self, project: Path, plan: dict[str, Any]) -> Path:
         if (project / "MANIFESTO_MEDIA.json").is_file():
@@ -1559,7 +1746,7 @@ notify("fr-autoedite:editor-ready",{editor_version:"1.1.0"});
 
 
 class StudioHandler(BaseHTTPRequestHandler):
-    server_version = "FR-AutoEdite-Studio/4.0.0-candidate"
+    server_version = "FR-AutoEdite-Studio/4.6.1-candidate"
 
     @property
     def state(self) -> StudioState:
@@ -1706,7 +1893,7 @@ class StudioHandler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/":
                 template = (self.state.app_root / "assets" / "studio" / "index.html").read_text(encoding="utf-8")
-                body = template.replace("__FR_TOKEN__", self.state.token).encode("utf-8")
+                body = (template.replace("__FR_TOKEN__", self.state.token).replace("__FR_APP_VERSION__", self.state.app_version)).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -1791,6 +1978,24 @@ class StudioHandler(BaseHTTPRequestHandler):
                 project = self._project(query)
                 self._json(self.state.library_state(project))
                 return
+            if parsed.path == "/api/card-v2":
+                project = self._project(query)
+                instance_id = query.get("instance_id", [""])[0]
+                self._json({
+                    "ok": True,
+                    "card": self.state.open_universal_card(project, instance_id),
+                })
+                return
+            if parsed.path == "/api/card-v2-asset":
+                project = self._project(query)
+                target = self.state.universal_card_asset(
+                    project,
+                    query.get("instance_id", [""])[0],
+                    query.get("asset_id", [""])[0],
+                    query.get("project_id", [""])[0],
+                )
+                self._send_file(target)
+                return
             if parsed.path == "/api/card-content":
                 project = self._project(query)
                 segment_id = query.get("segment_id", [""])[0]
@@ -1829,7 +2034,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "project": restored})
                 return
             project = self._project(query)
-            if parsed.path not in {"/api/cancel", "/api/open-folder"}:
+            if parsed.path not in {"/api/cancel", "/api/skip-current", "/api/open-folder"}:
                 with self.state.lock:
                     busy = self.state.jobs.get(project.name, {}).get("running")
                 if busy:
@@ -1980,14 +2185,24 @@ class StudioHandler(BaseHTTPRequestHandler):
                 except UnicodeDecodeError as exc:
                     incoming.unlink(missing_ok=True)
                     raise StudioError("A resposta precisa ser Markdown ou JSON UTF-8.") from exc
-                is_v2 = content.lstrip().startswith("{")
-                if not is_v2 and (
-                    "FR_AUTOEDITE_JSON_BEGIN" not in content or "FR_AUTOEDITE_JSON_END" not in content
-                ):
+                is_json = content.lstrip().startswith("{")
+                response_schema = 0
+                if is_json:
+                    try:
+                        parsed_response = json.loads(content)
+                        response_schema = int(parsed_response.get("schema_version") or 0) if isinstance(parsed_response, dict) else 0
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        response_schema = 0
+                    if response_schema not in {2, 3}:
+                        incoming.unlink(missing_ok=True)
+                        raise StudioError("Resposta JSON exige schema_version=3 (Direção Autônoma) ou 2 (compatibilidade).")
+                elif "FR_AUTOEDITE_JSON_BEGIN" not in content or "FR_AUTOEDITE_JSON_END" not in content:
                     incoming.unlink(missing_ok=True)
                     raise StudioError("O Markdown não contém os marcadores do Roteiro Mestre.")
                 target = project / "_ENTRADA" / (
-                    "EDIT_PLAN_RESPONSE_V2.json" if is_v2 else "ROTEIRO_MESTRE_RESPONDIDO.md"
+                    "AI_DIRECTOR_RESPONSE_V3.json" if response_schema == 3 else
+                    "EDIT_PLAN_RESPONSE_V2.json" if response_schema == 2 else
+                    "ROTEIRO_MESTRE_RESPONDIDO.md"
                 )
                 import fr_autoedite as fr
                 from master_contract import inspect_file
@@ -2004,7 +2219,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                     project_scope.write(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {
                         "relative_path": target.relative_to(project).as_posix(),
                         "sha256": self.state._sha256(target),
-                        "format": "v2_json" if is_v2 else "v1_markdown",
+                        "format": "v3_json" if response_schema == 3 else "v2_json" if response_schema == 2 else "v1_markdown",
                     })
                     review = copy.deepcopy(review)
                     review.setdefault("notices", []).append({
@@ -2018,7 +2233,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                     return
                 if target.is_file():
                     history_name = (
-                        f"EDIT_PLAN_RESPONSE_V2_{stamp}.json" if is_v2
+                        f"AI_DIRECTOR_RESPONSE_V3_{stamp}.json" if response_schema == 3
+                        else f"EDIT_PLAN_RESPONSE_V2_{stamp}.json" if response_schema == 2
                         else f"ROTEIRO_MESTRE_RESPONDIDO_{stamp}.md"
                     )
                     shutil.copy2(target, project / "_HISTORICO" / history_name)
@@ -2026,7 +2242,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                 project_scope.write(project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json", {
                     "relative_path": target.relative_to(project).as_posix(),
                     "sha256": self.state._sha256(target),
-                    "format": "v2_json" if is_v2 else "v1_markdown",
+                    "format": "v3_json" if response_schema == 3 else "v2_json" if response_schema == 2 else "v1_markdown",
                 })
                 project_scope.write(project / "_CONTROLE/REVISAO_ROTEIRO.json", review)
                 self._json({"ok": True, "path": str(target), "size_bytes": size, "review": review})
@@ -2042,6 +2258,21 @@ class StudioHandler(BaseHTTPRequestHandler):
                     "card": card,
                     "preview_job_started": True,
                     "preview_action": preview_action,
+                })
+                return
+            if parsed.path == "/api/card-v2":
+                data = self._read_json(limit=2 * 1024 * 1024)
+                result = self.state.save_universal_card(project, data.get("session") or {})
+                self._json({
+                    "ok": True,
+                    "result": result,
+                    "preview_job_started": False,
+                    "preview_url": "/api/file?" + urlencode({
+                        "token": self.state.token,
+                        "project": project.name,
+                        "path": result["preview"]["relative"],
+                        "v": result["preview"]["version"],
+                    }),
                 })
                 return
             if parsed.path == "/api/ai-card-intent-review":
@@ -2099,6 +2330,10 @@ class StudioHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/cancel":
                 self.state.cancel_job(project)
                 self._json({"ok": True})
+                return
+            if parsed.path == "/api/skip-current":
+                request = self.state.skip_current_item(project)
+                self._json({"ok": True, "request": request})
                 return
             if parsed.path == "/api/trash-files":
                 result = self.state.trash_files(project, data.get("paths") or [])

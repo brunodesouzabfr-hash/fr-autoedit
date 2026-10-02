@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FR AutoEdite CardInstance v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "instance_id",
+    "definition_ref",
+    "edit_origin",
+    "placement",
+    "state",
+    "state_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "instance_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+    },
+    "definition_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definition_id", "definition_version"],
+      "properties": {
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "definition_version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "edit_origin": {"enum": ["manual", "ai_assisted", "deterministic_auto"]},
+    "placement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timebase", "sequence_index", "duration_sec"],
+          "properties": {
+            "timebase": {"const": "raw_sequence"},
+            "sequence_index": {"type": "integer", "minimum": 0},
+            "duration_sec": {"type": "number", "exclusiveMinimum": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timebase", "start_sec", "end_sec"],
+          "properties": {
+            "timebase": {"const": "ready_video_base"},
+            "start_sec": {"type": "number", "minimum": 0},
+            "end_sec": {"type": "number", "exclusiveMinimum": 0}
+          }
+        }
+      ]
+    },
+    "state": {"$ref": "card_state_v2.schema.json"},
+    "state_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "service_key": {
+      "enum": [
+        "alvenaria",
+        "criacoes",
+        "eletrica",
+        "hidraulica",
+        "iluminacao",
+        "instalacao",
+        "manutencao",
+        "moveis",
+        "pintura",
+        "producoes",
+        "projetos_3d",
+        "revestimentos",
+        "textura"
+      ]
+    }
+  },
+  "$comment": "A relação end_sec > start_sec, a igualdade de definition_ref, os IDs únicos, o catálogo de assets e state_digest são aplicados pelo validator produtivo."
+}

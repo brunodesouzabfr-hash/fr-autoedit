@@ -74,6 +74,10 @@ def main() -> int:
         "render_source": "proxies",
     })
     answers["handoff"].update({"chatgpt_lot_max_mb": 25, "proxy_long_side": 360})
+    # Previews, cache e master 4K universais têm cobertura focada própria.
+    # O smoke end-to-end valida o card novamente dentro do vídeo final e evita
+    # repetir 13 masters 2160x3840 antes de chegar aos renders regressivos.
+    answers["cards"]["generate_previews"] = False
     answers["local_analysis"] = {
         "enabled": True,
         "deduplicate_bursts": True,

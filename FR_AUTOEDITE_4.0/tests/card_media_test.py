@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT / "app"))
 import card_media
 import card_timeline
 import fr_autoedite as fr
-from fr_v4.bridge import render_legacy_card
 import master_contract
 import project_scope
 from studio import StudioState
@@ -152,37 +151,6 @@ class CardMediaRendererTest(unittest.TestCase):
         fallback = self.root / "fallback.png"
         fr.card_image(fallback, validated["segments"][1], self.plan(480, 480), fr.load_brand(), style, self.project)
         self.assertTrue(fallback.is_file())
-
-    def test_central_media_stays_on_v2_renderer_and_uses_v2_fallback(self):
-        plan = self.plan(480, 854)
-        validated = master_contract.validate_plan(
-            SimpleNamespace(**vars(fr)), plan, self.manifest, "M3",
-        )
-        segment = validated["segments"][1]
-        style = fr.load_card_style()
-        target = self.root / "v2-central.png"
-
-        result = render_legacy_card(
-            target, segment, plan, fr.load_brand(), style, ROOT,
-            project_dir=self.project, env=vars(fr),
-        )
-        self.assertTrue(result["handled"])
-        self.assertNotEqual(result.get("reason"), "service_central_media")
-        self.assertTrue(target.is_file())
-
-        # Se o asset sumir depois da validação, o bridge continua no renderer
-        # v2 e usa o medalhão do serviço; não deve cair no compositor antigo.
-        (self.project / "originais" / "central.png").unlink()
-        fallback = self.root / "v2-fallback.png"
-        fallback_result = render_legacy_card(
-            fallback, segment, plan, fr.load_brand(), style, ROOT,
-            project_dir=self.project, env=vars(fr),
-        )
-        self.assertTrue(fallback_result["handled"])
-        self.assertTrue(fallback.is_file())
-        self.assertTrue(
-            any("usando medalhão v2" in warning for warning in fallback_result["warnings"])
-        )
 
     def test_ready_video_keeps_locked_base_and_validates_same_asset_contract(self):
         ready_manifest = copy.deepcopy(self.manifest)

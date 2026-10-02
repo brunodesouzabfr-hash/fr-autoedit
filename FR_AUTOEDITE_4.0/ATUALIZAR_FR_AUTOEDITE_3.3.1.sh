@@ -10,7 +10,7 @@ fr_backup_dir=""
 fr_applications_dir="$fr_data_base/applications"
 fr_expected_version="$(tr -d '\r\n' < "$fr_source_dir/VERSION")"
 case "$fr_expected_version" in
-  3.4.0|4.0.0-candidate) ;;
+  3.4.0|4.*-candidate) ;;
   *) echo "Versão do pacote não suportada: $fr_expected_version" >&2; exit 2 ;;
 esac
 fr_expected_banner="FR AutoEdite $fr_expected_version"

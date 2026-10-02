@@ -9,7 +9,7 @@ fr_bin_path="$fr_bin_dir/fr-autoedite"
 fr_log_dir="${XDG_STATE_HOME:-$HOME/.local/state}/fr-autoedite"
 fr_expected_version="$(tr -d '\r\n' < "$fr_update_root/VERSION")"
 case "$fr_expected_version" in
-  3.4.0|4.0.0-candidate) ;;
+  3.4.0|4.*-candidate) ;;
   *) echo "Versão do pacote não suportada: $fr_expected_version" >&2; exit 4 ;;
 esac
 fr_expected_banner="FR AutoEdite $fr_expected_version"

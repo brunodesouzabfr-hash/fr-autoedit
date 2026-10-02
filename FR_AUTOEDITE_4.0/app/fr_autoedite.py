@@ -20,6 +20,7 @@ import os
 import random
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -32,12 +33,14 @@ from pathlib import Path
 from typing import Any
 
 
-APP_VERSION = "4.0.0-candidate"
+APP_VERSION = "4.6.1-candidate"
 APP_ROOT = Path(__file__).resolve().parent.parent
 if str(APP_ROOT / "app") not in sys.path:
     sys.path.insert(0, str(APP_ROOT / "app"))
+import project_scope
 from project_scope import isolated_render
 from media_frames import source_signatures
+from runtime_control import SkipCurrentItem, checkpoint as skip_checkpoint, consume_skip
 TEMPLATES = APP_ROOT / "templates"
 ASSETS = APP_ROOT / "assets"
 FONTS = ASSETS / "fonts"
@@ -350,14 +353,14 @@ def write_text(path: Path, content: str) -> None:
 
 def run(
     command: list[str], *, capture: bool = False, check: bool = True,
-    timeout: float | None = None, operation: str = "",
+    timeout: float | None = None, operation: str = "", allow_skip: bool = False,
+    item_id: str = "",
 ) -> subprocess.CompletedProcess[str]:
-    """Executa um comando externo sem permitir espera infinita.
+    """Executa comando externo com timeout e skip cooperativo por item.
 
-    O limite global pode ser ajustado por ``FR_AUTOEDITE_COMMAND_TIMEOUT_SEC``.
-    Chamadas curtas, como FFprobe e miniaturas, informam limites menores. O
-    ``subprocess.run`` encerra o processo ao expirar e os arquivos ``.partial``
-    continuam sendo removidos pelos chamadores.
+    ``allow_skip`` é usado apenas em operações independentes por mídia/cena.
+    Quando o Studio solicita ``Pular item atual``, somente o subprocesso desse
+    item é encerrado e ``SkipCurrentItem`` permite ao laço superior continuar.
     """
     if timeout is None:
         try:
@@ -365,22 +368,63 @@ def run(
         except ValueError:
             timeout = 7200.0
     timeout = None if timeout <= 0 else max(1.0, timeout)
+    stdout_target = subprocess.PIPE if capture else subprocess.DEVNULL
+    stderr_target = subprocess.PIPE if capture else subprocess.DEVNULL
+    started = time.monotonic()
+    process = subprocess.Popen(
+        command, text=True, stdin=subprocess.DEVNULL, stdout=stdout_target,
+        stderr=stderr_target, start_new_session=True,
+    )
+    stdout = stderr = None
     try:
-        result = subprocess.run(
-            command,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-            stderr=subprocess.PIPE if capture else subprocess.DEVNULL,
-            check=False,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired as exc:
-        label = operation.strip() or Path(command[0]).name
-        raise AutoEditeError(
-            f"Tempo limite excedido em {label} após {int(timeout or 0)} s. "
-            "O item foi interrompido com segurança; execute novamente para retomar os demais."
-        ) from exc
+        while True:
+            try:
+                stdout, stderr = process.communicate(timeout=0.5)
+                break
+            except subprocess.TimeoutExpired:
+                if allow_skip:
+                    payload = consume_skip(item_id=item_id)
+                    if payload is not None:
+                        try:
+                            os.killpg(process.pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                        try:
+                            process.communicate(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            try:
+                                os.killpg(process.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            process.communicate()
+                        target = str(payload.get("target_item") or item_id or Path(command[0]).name)
+                        raise SkipCurrentItem(f"{target}: item pulado manualmente pelo usuário.")
+                if timeout is not None and time.monotonic() - started >= timeout:
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        process.communicate(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        process.communicate()
+                    label = operation.strip() or Path(command[0]).name
+                    raise AutoEditeError(
+                        f"Tempo limite excedido em {label} após {int(timeout or 0)} s. "
+                        "O item foi interrompido com segurança; os demais podem continuar."
+                    )
+    except BaseException:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        raise
+    result = subprocess.CompletedProcess(command, int(process.returncode or 0), stdout, stderr)
     if check and result.returncode != 0:
         tail = (result.stderr or "").strip()[-1800:]
         raise AutoEditeError(f"Falha ao executar {command[0]} (código {result.returncode}).\n{tail}")
@@ -861,12 +905,15 @@ def proxy_probe_metadata(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def decode_video_proxy(path: Path) -> dict[str, Any]:
+def decode_video_proxy(path: Path, item_id: str = "") -> dict[str, Any]:
+    if not item_id:
+        match = re.search(r"\b(M\d{4})\b", path.name)
+        item_id = match.group(1) if match else path.stem
     result = run([
         "ffmpeg", "-v", "warning", "-xerror", "-err_detect", "explode",
         "-nostdin", "-i", str(path), "-map", "0:v:0", "-an",
         "-progress", "pipe:1", "-nostats", "-f", "null", "-",
-    ], capture=True, check=False, timeout=1800, operation=f"decodificação integral de {path.name}")
+    ], capture=True, check=False, timeout=1800, operation=f"decodificação integral de {path.name}", allow_skip=True, item_id=item_id)
     progress: dict[str, str] = {}
     for line in (result.stdout or "").splitlines():
         key, separator, value = line.partition("=")
@@ -964,7 +1011,7 @@ def sha256_short(path: Path) -> str:
 
 def create_video_proxy(
     source: Path, target: Path, long_side: int, fps: int,
-    source_duration: float = 0.0,
+    source_duration: float = 0.0, item_id: str = "",
 ) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_name(target.stem + ".partial.mp4")
@@ -978,7 +1025,7 @@ def create_video_proxy(
     ]
     timeout = max(600.0, min(7200.0, float(source_duration or 0) * 6.0 + 180.0))
     try:
-        run(command, timeout=timeout, operation=f"proxy de {source.name}")
+        run(command, timeout=timeout, operation=f"proxy de {source.name}", allow_skip=True, item_id=item_id)
         if not temp.is_file() or temp.stat().st_size == 0:
             raise AutoEditeError(f"Proxy vazio para {source.name}")
         temp.replace(target)
@@ -986,7 +1033,7 @@ def create_video_proxy(
         temp.unlink(missing_ok=True)
 
 
-def create_image_proxy(source: Path, target: Path, long_side: int = 1600) -> None:
+def create_image_proxy(source: Path, target: Path, long_side: int = 1600, item_id: str = "") -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_name(target.stem + ".partial.jpg")
     try:
@@ -1001,7 +1048,7 @@ def create_image_proxy(source: Path, target: Path, long_side: int = 1600) -> Non
             run([
                 "ffmpeg", "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(source),
                 "-vf", vf, "-frames:v", "1", "-q:v", "3", str(temp)
-            ], timeout=180, operation=f"proxy de imagem {source.name}")
+            ], timeout=180, operation=f"proxy de imagem {source.name}", allow_skip=True, item_id=item_id)
         if not temp.is_file() or temp.stat().st_size == 0:
             raise AutoEditeError(f"Proxy de imagem vazio para {source.name}")
         temp.replace(target)
@@ -1009,7 +1056,7 @@ def create_image_proxy(source: Path, target: Path, long_side: int = 1600) -> Non
         temp.unlink(missing_ok=True)
 
 
-def create_thumbnail(source: Path, target: Path, media_type: str, duration: float) -> None:
+def create_thumbnail(source: Path, target: Path, media_type: str, duration: float, item_id: str = "") -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_name(target.stem + ".partial.jpg")
     seek = max(0.0, duration * 0.35)
@@ -1023,7 +1070,7 @@ def create_thumbnail(source: Path, target: Path, media_type: str, duration: floa
         "-frames:v", "1", "-q:v", "3", str(temp)
     ]
     try:
-        run(command, timeout=180, operation=f"miniatura de {source.name}")
+        run(command, timeout=180, operation=f"miniatura de {source.name}", allow_skip=True, item_id=item_id)
         if not temp.is_file() or temp.stat().st_size == 0:
             raise AutoEditeError(f"Miniatura vazia para {source.name}")
         temp.replace(target)
@@ -1031,7 +1078,7 @@ def create_thumbnail(source: Path, target: Path, media_type: str, duration: floa
         temp.unlink(missing_ok=True)
 
 
-def create_thumbnail_at(source: Path, target: Path, seek: float) -> None:
+def create_thumbnail_at(source: Path, target: Path, seek: float, item_id: str = "") -> None:
     """Miniatura de um instante exato, usada pelos clipes virtuais de cena."""
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_name(target.stem + ".partial.jpg")
@@ -1041,7 +1088,7 @@ def create_thumbnail_at(source: Path, target: Path, seek: float) -> None:
             "-ss", f"{max(0.0, seek):.3f}", "-i", str(source),
             "-vf", "scale=360:240:force_original_aspect_ratio=decrease,pad=360:240:(ow-iw)/2:(oh-ih)/2:color=101713",
             "-frames:v", "1", "-q:v", "3", str(temp),
-        ], timeout=180, operation=f"miniatura de cena {target.name}")
+        ], timeout=180, operation=f"miniatura de cena {target.name}", allow_skip=True, item_id=item_id)
         if not temp.is_file() or temp.stat().st_size == 0:
             raise AutoEditeError(f"Miniatura de cena vazia: {target.name}")
         temp.replace(target)
@@ -1064,24 +1111,38 @@ def apply_local_analysis(
     if not config.get("enabled", True):
         return rows, {"enabled": False}
     mark_burst_duplicates, scene_ranges, video_quality_signals = _local_analysis_module()
-    report: dict[str, Any] = {"enabled": True, "videos_analyzed": 0, "scene_clips": 0}
+    report: dict[str, Any] = {
+        "enabled": True, "videos_analyzed": 0, "scene_clips": 0,
+        "scene_clips_clamped": 0, "scene_clips_discarded": 0,
+        "items_skipped_by_user": 0,
+    }
     if config.get("deduplicate_bursts", True):
-        report.update(mark_burst_duplicates(rows, project_dir))
+        try:
+            report.update(mark_burst_duplicates(rows, project_dir))
+        except Exception as exc:
+            warning(f"Deduplicação local ignorada após erro isolado: {exc}")
     if config.get("detect_stability", True):
         videos = [row for row in rows if row.get("media_type") == "video" and row.get("status") == "ok"]
         for index, row in enumerate(videos, 1):
             proxy = project_dir / str(row.get("proxy_path") or "")
-            info(f"Análise técnica {index}/{len(videos)}: processando {row['id']} · {row.get('filename', '')}")
+            item_id = str(row.get("id") or "")
+            info(f"Análise técnica {index}/{len(videos)}: processando {item_id} · {row.get('filename', '')}")
             try:
-                signals = video_quality_signals(proxy, float(row.get("duration_sec") or 0))
+                skip_checkpoint(item_id)
+                signals = video_quality_signals(proxy, float(row.get("duration_sec") or 0), item_id=item_id)
                 row.update(signals)
                 if signals.get("needs_stabilization"):
                     row["quality_score"] = max(0.0, round(float(row.get("quality_score") or 0) - 5.0, 1))
                 report["videos_analyzed"] += 1
-                info(f"Análise técnica {index}/{len(videos)}: {row['id']} concluído")
+                info(f"Análise técnica {index}/{len(videos)}: {item_id} concluído")
+            except SkipCurrentItem as exc:
+                report["items_skipped_by_user"] += 1
+                row["analysis_skipped"] = True
+                warning(str(exc))
+                info(f"Análise técnica {index}/{len(videos)}: {item_id} pulado; continuando")
             except Exception as exc:
                 row["analysis_error"] = str(exc)[:500]
-                warning(f"Análise técnica ignorada em {row['id']}: {exc}")
+                warning(f"Análise técnica ignorada em {item_id}: {exc}")
     expanded = list(rows)
     if config.get("scene_detection", True):
         max_scan = float(config.get("max_scene_scan_sec", 180))
@@ -1093,49 +1154,101 @@ def apply_local_analysis(
             and float(row.get("duration_sec") or 0) > 30
         ]
         for row in videos:
+            item_id = str(row.get("id") or "")
             proxy = project_dir / str(row.get("proxy_path") or "")
-            ranges = scene_ranges(
-                proxy, float(row.get("duration_sec") or 0),
-                minimum=float(config.get("minimum_scene_sec", 3.0)),
-                maximum=float(config.get("maximum_scene_sec", 8.0)),
-                threshold=threshold, max_scan_seconds=max_scan, max_clips=max_clips,
-            )
+            try:
+                skip_checkpoint(item_id)
+                ranges = scene_ranges(
+                    proxy, float(row.get("duration_sec") or 0),
+                    minimum=float(config.get("minimum_scene_sec", 3.0)),
+                    maximum=float(config.get("maximum_scene_sec", 8.0)),
+                    threshold=threshold, max_scan_seconds=max_scan, max_clips=max_clips, item_id=item_id,
+                )
+            except SkipCurrentItem as exc:
+                report["items_skipped_by_user"] += 1
+                warning(str(exc))
+                continue
+            except Exception as exc:
+                row["scene_detection_error"] = str(exc)[:500]
+                warning(f"Detecção de cenas ignorada em {item_id}: {exc}")
+                continue
             if not ranges:
                 continue
-            row["scene_split_parent"] = True
-            row["excluded_from_auto_edit"] = True
-            row["exclusion_reason"] = "substituído por clipes virtuais detectados localmente"
-            for scene_index, (start, duration) in enumerate(ranges, 1):
+            integrity = row.get("proxy_integrity") if isinstance(row.get("proxy_integrity"), dict) else {}
+            candidates = [
+                float(value) for value in (
+                    row.get("duration_sec"), integrity.get("source_duration"),
+                    integrity.get("proxy_duration"), integrity.get("decoded_coverage_end"),
+                ) if isinstance(value, (int, float)) and float(value) > 0
+            ]
+            available_end = min(candidates) if candidates else float(row.get("duration_sec") or 0)
+            fps = float(row.get("fps") or 24.0) or 24.0
+            minimum_viable = max(0.10, 2.0 / max(fps, 1.0))
+            valid_children: list[dict[str, Any]] = []
+            for scene_index, (raw_start, raw_duration) in enumerate(ranges, 1):
+                child_id = f"{item_id}C{scene_index:03d}"
+                start_sec = max(0.0, float(raw_start))
+                requested_end = start_sec + max(0.0, float(raw_duration))
+                end_sec = min(requested_end, available_end)
+                if end_sec - start_sec < minimum_viable:
+                    report["scene_clips_discarded"] += 1
+                    warning(
+                        f"{child_id}: cena vazia/fora da cobertura real "
+                        f"({start_sec:.3f}–{requested_end:.3f}s; disponível até {available_end:.3f}s); descartada."
+                    )
+                    continue
+                if end_sec + 0.0005 < requested_end:
+                    report["scene_clips_clamped"] += 1
+                    warning(
+                        f"{child_id}: cena recortada de {start_sec:.3f}–{requested_end:.3f}s "
+                        f"para {start_sec:.3f}–{end_sec:.3f}s conforme cobertura realmente decodificável."
+                    )
+                duration = end_sec - start_sec
                 child = copy.deepcopy(row)
-                child_id = f"{row['id']}C{scene_index:03d}"
                 thumb = project_dir / "miniaturas" / "cenas" / f"{child_id}.jpg"
                 try:
-                    if not thumb.is_file():
-                        create_thumbnail_at(proxy, thumb, start + duration * 0.5)
+                    skip_checkpoint(child_id)
+                    if not thumb.is_file() or thumb.stat().st_size == 0:
+                        seek = min(end_sec - minimum_viable * 0.25, start_sec + duration * 0.5)
+                        create_thumbnail_at(proxy, thumb, max(start_sec, seek), item_id=child_id)
+                except SkipCurrentItem as exc:
+                    report["items_skipped_by_user"] += 1
+                    report["scene_clips_discarded"] += 1
+                    warning(str(exc))
+                    continue
                 except Exception as exc:
-                    warning(f"Miniatura da cena {child_id}: {exc}")
+                    # Uma miniatura vazia indica que a janela não produziu frame
+                    # confiável. A cena é descartada, mas o vídeo pai e o job seguem.
+                    report["scene_clips_discarded"] += 1
+                    warning(f"Miniatura da cena {child_id}: {exc}; cena descartada e processamento continua.")
+                    continue
                 child.update({
                     "id": child_id,
                     "filename": f"{row['filename']} [cena {scene_index:03d}]",
                     "duration_sec": round(duration, 3),
                     "parent_video": row["id"],
-                    "scene_start_sec": round(start, 3),
-                    "scene_end_sec": round(start + duration, 3),
-                    "thumbnail_path": rel(thumb, project_dir) if thumb.is_file() else row.get("thumbnail_path", ""),
+                    "scene_start_sec": round(start_sec, 3),
+                    "scene_end_sec": round(end_sec, 3),
+                    "thumbnail_path": rel(thumb, project_dir),
                     "scene_split_parent": False,
                     "excluded_from_auto_edit": False,
                     "exclusion_reason": "",
-                    "selection_basis": "mudança de cena local + janela de 3–8 segundos",
+                    "selection_basis": "mudança de cena local + janela recortada à cobertura real",
                 })
                 if isinstance(child.get("proxy_integrity"), dict):
                     child["proxy_integrity"] = copy.deepcopy(child["proxy_integrity"])
                     child["proxy_integrity"].update({
                         "source_asset_id": row["id"],
-                        "coverage_start": round(start, 6),
-                        "coverage_end": round(start + duration, 6),
+                        "coverage_start": round(start_sec, 6),
+                        "coverage_end": round(end_sec, 6),
                     })
-                expanded.append(child)
-                report["scene_clips"] += 1
+                valid_children.append(child)
+            if valid_children:
+                row["scene_split_parent"] = True
+                row["excluded_from_auto_edit"] = True
+                row["exclusion_reason"] = "substituído por clipes virtuais detectados localmente"
+                expanded.extend(valid_children)
+                report["scene_clips"] += len(valid_children)
     write_json(project_dir / "RELATORIO_ANALISE_LOCAL.json", report)
     return expanded, report
 
@@ -1189,18 +1302,44 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
             and proxy.is_file() and proxy.stat().st_size > 0
             and isinstance(cached.get("proxy_integrity"), dict)
         ):
+            info(f"Preparação {index}/{len(sources)}: validando cache {media_id} · {source.name}")
             try:
+                skip_checkpoint(media_id)
                 cached_integrity = verify_asset(
                     project_dir, cached,
                     generation_parameters=generation_parameters,
                     probe=proxy_probe_metadata, decode_video=decode_video_proxy,
                     expected=cached["proxy_integrity"],
                 )
+            except SkipCurrentItem as exc:
+                warning(str(exc))
+                row = copy.deepcopy(cached)
+                row.update({
+                    "id": media_id, "filename": source.name, "source_path": source_relative,
+                    "status": "skipped", "error": str(exc),
+                    "excluded_from_auto_edit": True,
+                    "exclusion_reason": "pulado manualmente pelo usuário",
+                })
+                rows.append(row)
+                info(f"Preparação {index}/{len(sources)}: {media_id} pulado manualmente · {source.name}")
+                continue
             except ProxyIntegrityError as exc:
                 warning(f"{media_id}: cache de proxy invalidado: {exc}")
         if cached_integrity:
-            if not thumb.is_file() or thumb.stat().st_size == 0:
-                create_thumbnail(proxy, thumb, kind, float(cached.get("duration_sec") or 0))
+            try:
+                if not thumb.is_file() or thumb.stat().st_size == 0:
+                    create_thumbnail(proxy, thumb, kind, float(cached.get("duration_sec") or 0), item_id=media_id)
+            except SkipCurrentItem as exc:
+                warning(str(exc))
+                row = copy.deepcopy(cached)
+                row.update({
+                    "id": media_id, "filename": source.name, "source_path": source_relative,
+                    "status": "skipped", "error": str(exc), "excluded_from_auto_edit": True,
+                    "exclusion_reason": "pulado manualmente pelo usuário",
+                })
+                rows.append(row)
+                info(f"Preparação {index}/{len(sources)}: {media_id} pulado manualmente · {source.name}")
+                continue
             row = copy.deepcopy(cached)
             row.update({
                 "id": media_id,
@@ -1223,6 +1362,25 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
             continue
 
         info(f"Preparação {index}/{len(sources)}: processando {media_id} · {source.name}")
+        try:
+            skip_checkpoint(media_id)
+        except SkipCurrentItem as exc:
+            warning(str(exc))
+            row = {
+                "id": media_id, "media_type": kind, "filename": source.name,
+                "source_path": source_relative, "relative_album_path": rel(source.parent, originals),
+                "extension": source.suffix.lower(), "size_bytes": source.stat().st_size,
+                "sha256_16": "", "capture_time": "", "capture_time_source": "",
+                "duration_sec": 0.0, "width": 0, "height": 0, "fps": 0.0,
+                "video_codec": "", "pixel_format": "", "has_audio": False,
+                "audio_codec": "", "rotation": 0, "probe_error": "",
+                "proxy_path": "", "thumbnail_path": "", "status": "skipped",
+                "error": str(exc), "excluded_from_auto_edit": True,
+                "exclusion_reason": "pulado manualmente pelo usuário", "quality_score": 0.0,
+            }
+            rows.append(row)
+            info(f"Preparação {index}/{len(sources)}: {media_id} pulado manualmente · {source.name}")
+            continue
         probe_data = ffprobe(source)
         metadata = parse_probe(source, probe_data)
         taken_at, date_source = capture_time(source, probe_data)
@@ -1233,11 +1391,11 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
             if kind == "video":
                 create_video_proxy(
                     source, proxy, long_side, proxy_fps,
-                    source_duration=float(metadata.get("duration_sec") or 0),
+                    source_duration=float(metadata.get("duration_sec") or 0), item_id=media_id,
                 )
             else:
-                create_image_proxy(source, proxy)
-            create_thumbnail(proxy, thumb, kind, metadata["duration_sec"])
+                create_image_proxy(source, proxy, item_id=media_id)
+            create_thumbnail(proxy, thumb, kind, metadata["duration_sec"], item_id=media_id)
             integrity = verify_asset(
                 project_dir, {
                     "id": media_id, "media_type": kind,
@@ -1246,6 +1404,12 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
                 generation_parameters=generation_parameters,
                 probe=proxy_probe_metadata, decode_video=decode_video_proxy,
             )
+        except SkipCurrentItem as exc:
+            status = "skipped"
+            error = str(exc)
+            warning(f"{media_id} {source.name}: {exc}")
+            proxy.unlink(missing_ok=True)
+            thumb.unlink(missing_ok=True)
         except Exception as exc:
             status = "error"
             error = str(exc)
@@ -1274,6 +1438,12 @@ def build_manifest(project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]
             "status": status,
             "error": error,
         }
+        if status == "skipped":
+            row["excluded_from_auto_edit"] = True
+            row["exclusion_reason"] = "pulado manualmente pelo usuário"
+        elif status != "ok":
+            row["excluded_from_auto_edit"] = True
+            row["exclusion_reason"] = "erro técnico isolado; demais mídias continuam"
         if integrity:
             row["proxy_integrity"] = integrity
         row["quality_score"] = media_quality_score(row, answers)
@@ -2699,11 +2869,35 @@ def card_image(
     path: Path, segment: dict[str, Any], plan: dict[str, Any], brand: dict[str, Any],
     style: dict[str, Any], project_dir: Path | None = None
 ) -> None:
+    # 4.5.2: fr-universal-card é o caminho produtivo padrão. O renderer
+    # F1--F6 somente pode ser alcançado quando o runtime universal registra
+    # explicitamente um compatibility_fallback para esta instância.
+    if project_dir is not None:
+        instance_id = str(segment.get("segment_id") or segment.get("overlay_id") or "").strip()
+        if instance_id:
+            from universal_card_runtime import (
+                UniversalCardRuntimeError, render_timeline_card,
+            )
+            output = plan.get("output", {}) if isinstance(plan, dict) else {}
+            render_size = (
+                int(output.get("width") or 1080),
+                int(output.get("height") or 1920),
+            )
+            try:
+                rendered_universal = render_timeline_card(
+                    project_dir, instance_id, path, render_size, app_root=APP_ROOT,
+                )
+            except UniversalCardRuntimeError:
+                # Instância sem rota universal nem fallback registrado é erro de
+                # contrato. Não mascarar o problema produzindo um card legado.
+                raise
+            if rendered_universal:
+                return
+            # False significa exclusivamente fallback legado explicitamente
+            # registrado pelo universal_card_runtime.
+
     from fr_v4.bridge import render_legacy_card
-    v2 = render_legacy_card(
-        path, segment, plan, brand, style, APP_ROOT,
-        project_dir=project_dir, env=globals(),
-    )
+    v2 = render_legacy_card(path, segment, plan, brand, style, APP_ROOT)
     if v2.get("handled"):
         return
     from service_cards import render_service_card
@@ -3343,7 +3537,16 @@ def render_card_segment(
     target.parent.mkdir(parents=True, exist_ok=True)
     namespace = slugify(plan.get("project", {}).get("slug") or plan.get("project", {}).get("name", "projeto"))
     card_path = project_dir / "cards_editaveis" / namespace / f"{segment['segment_id']}.png"
-    card_image(card_path, segment, plan, brand, style, project_dir)
+    from universal_card_runtime import render_timeline_card
+    rendered_universal = render_timeline_card(
+        project_dir,
+        str(segment["segment_id"]),
+        card_path,
+        (int(plan["output"]["width"]), int(plan["output"]["height"])),
+        app_root=APP_ROOT,
+    )
+    if not rendered_universal:
+        card_image(card_path, segment, plan, brand, style, project_dir)
     temporary = target.with_name(target.stem + ".partial.mp4")
     temporary.unlink(missing_ok=True)
     sfx_enabled = bool(plan.get("audio", {}).get("enable_sfx"))
@@ -3571,6 +3774,28 @@ def render_segments_for_version(plan: dict[str, Any], version: str) -> list[dict
 def render_plan(project_dir: Path, plan_path: Path, use_proxies: bool = False, only: str = "both") -> list[Path]:
     check_runtime()
     plan = read_json(plan_path)
+    if any(segment.get("type") == "card" for segment in plan.get("segments", [])):
+        # A migração é um writer serial. Faça-a uma única vez no snapshot
+        # imutável antes de abrir o pool; cada worker passa então apenas pelo
+        # fast path idempotente e nunca disputa o lock de publicação.
+        from universal_card_runtime import (
+            UniversalCardRuntimeError,
+            activate_project_cards,
+            register_derived_plan_fallbacks,
+        )
+        try:
+            activate_project_cards(project_dir, app_root=APP_ROOT)
+            active_plan = (project_dir / "EDIT_PLAN.json").resolve()
+            if plan_path.resolve() != active_plan:
+                try:
+                    plan_label = plan_path.resolve().relative_to(project_dir.resolve()).as_posix()
+                except ValueError:
+                    plan_label = plan_path.name
+                register_derived_plan_fallbacks(
+                    project_dir, plan, plan_label=plan_label,
+                )
+        except UniversalCardRuntimeError as exc:
+            raise AutoEditeError(str(exc)) from exc
     use_proxies = bool(use_proxies or plan.get("output", {}).get("render_source") == "proxies")
     brand = load_brand()
     style = load_card_style(project_dir)
@@ -3605,9 +3830,30 @@ def render_plan(project_dir: Path, plan_path: Path, use_proxies: bool = False, o
                 f"{version} item {index}/{len(selected)}: iniciando "
                 f"{segment.get('segment_id', '')} · {item_label}"
             )
+            universal_state = None
+            if segment.get("type") == "card":
+                from universal_card_runtime import universal_state_digest
+                universal_state = universal_state_digest(
+                    project_dir, str(segment.get("segment_id") or ""),
+                )
+            segment_signature = segment
+            if universal_state is not None:
+                # title/body/geometry legados não são fonte visual de uma
+                # CardInstance v2. Mantemos somente propriedades que afetam o
+                # clipe (duração, inclusão, transição e áudio narrado).
+                segment_signature = {
+                    key: copy.deepcopy(segment.get(key))
+                    for key in (
+                        "segment_id", "type", "enabled", "include_in",
+                        "duration_sec", "transition", "transition_duration_sec",
+                        "card_kind", "narration", "narration_text",
+                    )
+                    if key in segment
+                }
             signature_payload = json.dumps(
                 {
-                    "segment": segment, "output": plan.get("output"), "version": version,
+                    "segment": segment_signature, "output": plan.get("output"), "version": version,
+                    "universal_state_digest": universal_state,
                     "proxies": use_proxies, "visual_signature": visual_signature,
                     "audio": plan.get("audio"), "visual_effects": plan.get("visual_effects"),
                     "export_quality": plan.get("export_quality"), "application": APP_VERSION,
@@ -3704,12 +3950,19 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
     output_dir = project_dir / "cards_editaveis" / namespace
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
-    pending: list[tuple[Path, Path, dict[str, Any], bool]] = []
+    pending: list[tuple[Path, Path, dict[str, Any], bool, str]] = []
     card_segments = [segment for segment in plan.get("segments", []) if segment.get("type") == "card"]
     make_masters = bool(style.get("cards", {}).get("always_generate_4k_masters", True))
     total = len(card_segments) * (2 if make_masters else 1)
     completed = 0
     generation_stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    active_project_plan = (
+        (project_dir / "MANIFESTO_MEDIA.json").is_file()
+        and plan_path.resolve() == (project_dir / "EDIT_PLAN.json").resolve()
+    )
+    if active_project_plan:
+        from universal_card_runtime import activate_project_cards
+        activate_project_cards(project_dir, app_root=APP_ROOT)
 
     def stage_preview(target: Path, segment: dict[str, Any], target_plan: dict[str, Any], master: bool) -> None:
         nonlocal completed
@@ -3718,11 +3971,35 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
         temporary.unlink(missing_ok=True)
         info(f"Cards {completed + 1}/{total}: gerando {target.name}")
         try:
-            card_image(temporary, segment, target_plan, brand, style, project_dir)
+            rendered_universal = False
+            target_output = target_plan.get("output", {})
+            preview_width = int(target_output.get("width") or 941)
+            preview_height = int(target_output.get("height") or 1672)
+            if active_project_plan:
+                from universal_card_runtime import render_timeline_card
+                rendered_universal = render_timeline_card(
+                    project_dir,
+                    str(segment["segment_id"]),
+                    temporary,
+                    (preview_width, preview_height),
+                    app_root=APP_ROOT,
+                    allow_migration_preview_cache=not master,
+                )
+            elif target_plan.get("preview_only"):
+                from universal_card_runtime import render_preview_plan_card
+                render_preview_plan_card(
+                    project_dir, segment, temporary,
+                    (preview_width, preview_height), app_root=APP_ROOT,
+                    source_index=card_segments.index(segment),
+                )
+                rendered_universal = True
+            if not rendered_universal:
+                card_image(temporary, segment, target_plan, brand, style, project_dir)
+            renderer_id = "fr-universal-card" if rendered_universal else "fr-v4-f1-f6"
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise
-        pending.append((temporary, target, segment, master))
+        pending.append((temporary, target, segment, master, renderer_id))
         completed += 1
 
     try:
@@ -3749,16 +4026,16 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
 
         # Publicação somente depois de o lote inteiro ter sido construído.
         # Assim uma falha não faz uma prévia antiga parecer uma geração nova.
-        for temporary, target, _segment, _master in pending:
+        for temporary, target, _segment, _master, _renderer_id in pending:
             temporary.replace(target)
             outputs.append(target)
-        expected = {target.resolve() for _temporary, target, _segment, _master in pending}
+        expected = {target.resolve() for _temporary, target, _segment, _master, _renderer_id in pending}
         stale_candidates = list(output_dir.glob("*.png")) + list((output_dir / "4K_MASTERS").glob("*.png"))
         for stale in stale_candidates:
             if stale.resolve() not in expected:
                 stale.unlink(missing_ok=True)
     finally:
-        for temporary, _target, _segment, _master in pending:
+        for temporary, _target, _segment, _master, _renderer_id in pending:
             temporary.unlink(missing_ok=True)
 
     plan_digest = hashlib.sha256(
@@ -3766,7 +4043,7 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
     ).hexdigest()
     visual_digest = style_signature(brand, style, project_dir, plan)
     records = []
-    for _temporary, target, segment, master in pending:
+    for _temporary, target, segment, master, renderer_id in pending:
         stat = target.stat()
         records.append({
             "relative": rel(target, project_dir),
@@ -3776,6 +4053,8 @@ def generate_card_previews(project_dir: Path, plan_path: Path) -> list[Path]:
             "service_key": str(segment.get("service_key") or segment.get("service_id") or ""),
             "card_family": str(segment.get("card_family") or ""),
             "balloon_family": str(segment.get("balloon_family") or ""),
+            "renderer_id": renderer_id,
+            "definition_version": 2 if renderer_id == "fr-universal-card" else None,
             "is_4k_master": master,
         })
     try:
@@ -5133,6 +5412,159 @@ Este pacote foi preparado pelo **FR AutoEdite {APP_VERSION} Universal** para o p
     write_text(project_dir / "00_LEIA_PRIMEIRO.md", guide)
 
 
+
+def autonomous_ai_capabilities() -> dict[str, Any]:
+    """Universo fechado de capacidades que a IA pode usar sem inventar recursos."""
+    from master_contract import (
+        CARD_KINDS, CARD_MODES, ANIMATIONS, OVERLAY_KINDS, OVERLAY_PRESENTATIONS,
+        OVERLAY_POSITIONS, OVERLAY_SAFE_AREAS, OVERLAY_ANIMATIONS, AUDIO_POLICIES,
+    )
+    services = load_service_catalog()
+    service_rows = []
+    for key, row in sorted(services.items()):
+        if not isinstance(row, dict):
+            continue
+        service_rows.append({
+            "service_key": str(row.get("key") or key),
+            "label": str(row.get("label") or row.get("title") or key),
+            "structure": str(row.get("structure") or ""),
+            "context_help": str(row.get("context_help") or ""),
+        })
+    return {
+        "schema_version": 3,
+        "closed_world": True,
+        "transitions": sorted(TRANSITION_MAP),
+        "card": {
+            "renderer_id": "fr-universal-card",
+            "card_kinds": sorted(CARD_KINDS),
+            "card_modes": sorted(CARD_MODES),
+            "animations": sorted(ANIMATIONS),
+            "central_media": {
+                "optional": True,
+                "asset_rule": "somente eligible_asset_id existente; nunca criar mídia sintética",
+                "shape": "circle",
+                "crop": "1:1",
+                "zoom_range": [1.0, 3.0],
+                "focal_range": [0.0, 1.0],
+            },
+        },
+        "ready_video_overlays": {
+            "kinds": sorted(OVERLAY_KINDS),
+            "presentations": sorted(OVERLAY_PRESENTATIONS),
+            "positions": sorted(OVERLAY_POSITIONS),
+            "safe_areas": sorted(OVERLAY_SAFE_AREAS),
+            "animations": sorted(OVERLAY_ANIMATIONS),
+            "audio_policies": sorted(AUDIO_POLICIES),
+        },
+        "effects": {
+            "playback_speed_range": [0.25, 30.0],
+            "editorial_timelapse_speed_range": [1.25, 30.0],
+            "stabilization": ["off", "auto", "all"],
+            "stabilization_strength": ["low", "medium", "high"],
+            "image_animation": ["none", "zoom_in", "zoom_out"],
+        },
+        "output": {
+            "formats": ["vertical", "horizontal", "quadrado"],
+            "fps_range": [12, 60],
+            "render_source": ["originals", "proxies"],
+            "versions": ["branded", "clean"],
+        },
+        "social": {
+            "reel_duration_range_sec": [5, 600],
+            "stories_supported": True,
+            "carousel_supported": True,
+        },
+        "services": service_rows,
+        "fonts": sorted(path.name for path in FONTS.glob("*.ttf")),
+        "truth_rules": {
+            "unknown_fact_placeholder": "[DADO A CONFIRMAR]",
+            "never_invent": [
+                "asset_id", "media_id", "service_key", "material", "marca", "medida",
+                "preço", "prazo", "resultado", "depoimento", "arquivo", "URL", "capability",
+            ],
+        },
+    }
+
+
+def autonomous_director_template(
+    project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Template estrutural virgem; não reutiliza plano/card/effects atuais do projeto."""
+    base = normalize_answers(read_json(TEMPLATES / "questionario_base.json"))
+    current = normalize_answers(answers)
+    for field in ("name", "client", "location"):
+        base.setdefault("project", {})[field] = current.get("project", {}).get(field, "")
+    input_mode = str(current.get("input", {}).get("mode") or manifest.get("input_mode") or "raw_media")
+    base_video_id = str(current.get("input", {}).get("base_video_id") or manifest.get("base_video_id") or "")
+    base["input"] = {
+        "mode": input_mode,
+        "base_video_id": base_video_id,
+        "timeline_locked": input_mode == "ready_video",
+        "allow_duration_extension": False,
+        "style_pack_id": "fr_chiaroscuro_vintage_v1",
+    }
+    # Remova conteúdo editorial predefinido: a IA deve decidir, não herdar uma narrativa anterior.
+    base["story"] = {"objective": "", "audience": "", "priority": "", "must_include": [], "must_avoid": [], "chronology": []}
+    base["context"] = {"summary": "", "content_pillar": "", "desired_message": "", "facts_confirmed": [], "facts_to_confirm": [], "cta": "", "notes": ""}
+    base["service_intro"].update({"enabled": False, "custom_title": "", "custom_body": ""})
+    base["external_intro_outro"].update({"intro_enabled": False, "outro_enabled": False})
+    base["editing_brief"].update({"publication_title": "", "publication_caption": "", "hashtags": [], "complementary_information": ""})
+    # Estes grupos são obrigatórios na resposta V3; os valores abaixo são apenas fallback técnico.
+    base["edition"].update({"order_mode": "automatico", "target_duration_sec": 360, "max_media_segments": 80})
+    base["social"].update({"enabled": True, "reels_enabled": True, "reel_durations_sec": [30, 60, 90], "stories_enabled": True, "carousel_enabled": True})
+    base["visual_effects"].update({"transitions": ["cut", "fade"], "transition_duration_sec": 0.35, "enable_stabilization": False, "speed_ramping": False})
+    base["audio_design"].update({"auto_ducking": True, "enable_sfx": False, "tts_voiceover": False})
+    provenance = project_scope.identity(project_dir, manifest)
+    main = {"contract_version": 2, "project": {"slug": current.get("project", {}).get("slug", project_dir.name)}, "segments": []}
+    overlays: list[dict[str, Any]] = []
+    if input_mode == "ready_video":
+        base_row = next((row for row in manifest.get("media", []) if row.get("id") == (base_video_id or "READY_VIDEO_BASE")), None)
+        if not isinstance(base_row, dict):
+            base_row = next((row for row in manifest.get("media", []) if row.get("id") == "READY_VIDEO_BASE"), None)
+        duration = float((base_row or {}).get("duration_sec") or 0)
+        if base_row and duration > 0:
+            base_video_id = str(base_row.get("id") or "READY_VIDEO_BASE")
+            main["segments"] = [{
+                "segment_id": "S0001", "type": "media", "enabled": True,
+                "include_in": ["branded", "clean"], "media_id": base_video_id,
+                "start_sec": 0.0, "duration_sec": duration, "playback_speed": 1.0,
+                "transition": "cut",
+            }]
+    return {
+        "schema_version": 2,
+        "application": f"FR AutoEdite {APP_VERSION}",
+        "roteiro": {"id": "ai-autonomous", "name": "Direção Autônoma", "revision": 1, **provenance},
+        "input_mode": input_mode,
+        "base_video_id": base_video_id,
+        "timeline_locked": input_mode == "ready_video",
+        "allow_duration_extension": False,
+        "style_pack_id": "fr_chiaroscuro_vintage_v1",
+        "audio_policy": "preserve",
+        "overlays": overlays,
+        "configuration": {
+            key: copy.deepcopy(base[key]) for key in (
+                "input", "project", "context", "story", "edition", "social", "service_intro",
+                "external_intro_outro", "editing_brief", "cards", "visual_effects", "audio_design",
+                "export_quality", "handoff", "local_analysis", "random_mode",
+            ) if key in base
+        },
+        "main_timeline": main,
+        "reels": {},
+        "carousel": {"enabled": False, "slides": []},
+        "stories": {"enabled": False},
+        "card_style": read_json(TEMPLATES / "card_style.json"),
+        "publication": {
+            "video_title": "", "caption": "", "hashtags": [], "complementary_information": "",
+            "overlay_typography": {
+                "title_font": "StardosStencil-Bold.ttf", "body_font": "Rokkitt-Regular.ttf",
+                "technical_font": "ShareTechMono-Regular.ttf",
+            },
+        },
+        "strategy": {"editorial": {}, "retention": {}, "ethical_marketing_growth": {}, "ethical_neuromarketing": {}, "final_copy": {}, "evidence": [], "facts_to_confirm": []},
+        "executive_summary": [],
+    }
+
+
 def external_ai_package_prompt(answers: dict[str, Any]) -> str:
     project_name = str(answers.get("project", {}).get("name") or "Projeto Franco Romeu")
     input_mode = str(answers.get("input", {}).get("mode") or "raw_media")
@@ -5205,9 +5637,10 @@ devolvido deve poder ser salvo diretamente como `05_RESPOSTA_DA_IA_IMPORTAR_AQUI
 
 
 def refresh_ai_package_documents(
-    project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any], document: str,
+    project_dir: Path, answers: dict[str, Any], manifest: dict[str, Any], document: str | None = None,
+    *, include_legacy_v2: bool = False,
 ) -> Path:
-    """Atualiza os documentos canônicos sem tocar na resposta já recebida nem nas mídias."""
+    """Publica o snapshot V3 autônomo; V2 só é atualizado quando solicitado explicitamente."""
     package = project_dir / "PACOTE_PARA_IA"
     lots = package / "03_NAO_EDITAR_LOTES_DE_PROXIES"
     lots.mkdir(parents=True, exist_ok=True)
@@ -5226,28 +5659,56 @@ def refresh_ai_package_documents(
         + (context.strip() or "Nenhum contexto adicional foi informado; use somente fatos visíveis nas mídias.")
         + "\n"
     )
-    write_text(package / "00_NAO_EDITAR_CONTEXTO_PROJETO.md", context_doc)
-    write_text(package / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md", document)
-    write_json(package / "02_NAO_EDITAR_MANIFESTO_MEDIA.json", manifest)
-    write_text(package / "04_NAO_EDITAR_INSTRUCOES_PARA_IA.md", external_ai_package_prompt(answers))
-    response = package / "05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md"
-    if not response.exists():
-        write_text(response, (
-            "# RESPOSTA DA IA — IMPORTE AQUI\n\n"
-            "Substitua este conteúdo pelo Markdown completo devolvido pela IA. "
-            "O Studio validará antes de aplicar e preservará o roteiro-base.\n"
-        ))
-    from ai_package_v2 import generate_snapshot
+    from ai_director_v3 import generate_snapshot as generate_v3_snapshot
     from proxy_integrity import ensure_manifest_integrity
+    info("Pacote IA: validando integridade das mídias elegíveis com tolerância por item")
     verified_manifest = ensure_manifest_integrity(
         project_dir, manifest,
         parameters_for=lambda row: proxy_generation_parameters(row, answers),
         probe=proxy_probe_metadata, decode_video=decode_video_proxy,
+        continue_on_error=True,
+        progress=lambda current, total, row: info(
+            f"Integridade IA {current}/{total}: {row.get('id', 'item')} · {row.get('filename', '')}"
+        ),
     )
-    generate_snapshot(
+    integrity_report = verified_manifest.get("integrity_report", {})
+    if integrity_report.get("clamped_scenes"):
+        warning(f"{integrity_report['clamped_scenes']} cena(s) foram recortadas à cobertura realmente disponível.")
+    if integrity_report.get("skipped_scenes"):
+        warning(f"{integrity_report['skipped_scenes']} cena(s) vazias/fora da cobertura foram descartadas.")
+    if integrity_report.get("errors"):
+        warning(f"{integrity_report['errors']} item(ns) com erro técnico foram isolados; o pacote continuará sem eles.")
+    write_json(project_dir / "MANIFESTO_MEDIA.json", verified_manifest)
+    if include_legacy_v2:
+        from ai_package_v2 import generate_snapshot as generate_v2_snapshot
+        if document:
+            write_text(package / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md", document)
+        generate_v2_snapshot(
+            project_dir, answers, verified_manifest,
+            probe=lambda path: parse_probe(path, ffprobe(path)),
+        )
+    v3_root = generate_v3_snapshot(
         project_dir, answers, verified_manifest,
+        capabilities=autonomous_ai_capabilities(),
+        director_template=autonomous_director_template(project_dir, answers, verified_manifest),
+        app_version=APP_VERSION,
         probe=lambda path: parse_probe(path, ffprobe(path)),
     )
+    # Superfícies simples para o usuário: prompt autônomo + destino da resposta.
+    prompt_v3 = (v3_root / "PROMPT_MESTRE_AUTONOMO.md").read_text(encoding="utf-8")
+    write_text(package / "01_PROMPT_MESTRE_AUTONOMO.md", prompt_v3)
+    write_text(project_dir / "PROMPT_PRONTO_PARA_CHATGPT.md", prompt_v3)
+    response_v3 = package / "05_RESPOSTA_DA_IA_IMPORTAR_AQUI.json"
+    if not response_v3.exists():
+        write_json(response_v3, {
+            "schema_version": 3,
+            "package_snapshot_id": "PREENCHIDO_PELA_IA_A_PARTIR_DO_PACKAGE_DESCRIPTOR",
+            "mode": "autonomous_new_edit",
+            "asset_decisions": [],
+            "director_plan": {},
+            "facts_to_confirm": [],
+            "executive_summary": [],
+        })
     return package
 
 
@@ -5317,9 +5778,12 @@ def split_large_proxy_for_handoff(
     duration = float(parsed.get("duration_sec") or 0)
     if duration <= 0:
         raise AutoEditeError(f"Não foi possível dividir o proxy grande: {source.name}")
+    match = re.search(r"\b(M\d{4})\b", source.name)
+    item_id = match.group(1) if match else source.stem
     ratio = payload_budget / max(1, source.stat().st_size)
     segment_time = max(5.0, min(90.0, duration * ratio * 0.72))
     for attempt in range(4):
+        skip_checkpoint(item_id)
         attempt_dir = cache / f"tentativa_{attempt + 1}"
         if attempt_dir.exists():
             shutil.rmtree(attempt_dir)
@@ -5337,7 +5801,7 @@ def split_large_proxy_for_handoff(
             "-f", "segment", "-segment_time", f"{segment_time:.3f}",
             "-segment_time_delta", "0.05",
             "-reset_timestamps", "1", "-movflags", "+faststart", str(pattern),
-        ])
+        ], allow_skip=True, item_id=item_id, operation=f"divisão do proxy {source.name}")
         parts = sorted(path for path in attempt_dir.glob("*.mp4") if path.stat().st_size > 0)
         if parts and all(path.stat().st_size <= payload_budget for path in parts):
             return parts
@@ -5350,97 +5814,116 @@ def split_large_proxy_for_handoff(
 
 def handoff_proxy_inventory(
     project_dir: Path, proxies: list[Path], payload_budget: int,
+    *, continue_on_error: bool = False,
 ) -> tuple[list[Path], dict[str, Any]]:
     from proxy_integrity import ProxyIntegrityError, file_sha256, validate_decoded_coverage
     result: list[Path] = []
     entries: list[dict[str, Any]] = []
-    for path in proxies:
-        if path.stat().st_size <= payload_budget:
-            result.append(path)
-            if path.suffix.lower() in VIDEO_EXTENSIONS:
-                metadata = proxy_probe_metadata(path)
-                duration = float(metadata.get("video_duration_sec") or metadata.get("duration_sec") or 0)
-                if duration <= 0:
-                    raise AutoEditeError(f"Proxy ilegível durante o empacotamento: {path.name}")
-                decoded = decode_video_proxy(path)
-                try:
+    skipped: list[dict[str, Any]] = []
+    for index, path in enumerate(proxies, 1):
+        match = re.search(r"\b(M\d{4})\b", path.name)
+        item_id = match.group(1) if match else path.stem
+        source_relative = rel(path, project_dir)
+        info(f"Pacote IA {index}/{len(proxies)}: validando {item_id} · {path.name}")
+        try:
+            skip_checkpoint(item_id)
+            local_result: list[Path] = []
+            local_entries: list[dict[str, Any]] = []
+            if path.stat().st_size <= payload_budget:
+                if path.suffix.lower() in VIDEO_EXTENSIONS:
+                    metadata = proxy_probe_metadata(path)
+                    duration = float(metadata.get("video_duration_sec") or metadata.get("duration_sec") or 0)
+                    if duration <= 0:
+                        raise AutoEditeError(f"Proxy ilegível durante o empacotamento: {path.name}")
+                    decoded = decode_video_proxy(path, item_id=item_id)
                     verified = validate_decoded_coverage(
                         metadata, decoded, asset_id=path.name, expected_duration=duration,
                     )
-                except ProxyIntegrityError as exc:
-                    raise AutoEditeError(str(exc)) from exc
-                coverage = (0.0, verified["decoded_coverage_end"])
-            else:
-                coverage = (None, None)
-            entries.append({
-                "source_proxy": rel(path, project_dir), "export_path": _chatgpt_arcname(path, project_dir),
-                "order": 1, "coverage_start": coverage[0], "coverage_end": coverage[1],
-                "sha256": file_sha256(path), "size_bytes": path.stat().st_size,
-            })
-            continue
-        if path.suffix.lower() in VIDEO_EXTENSIONS:
-            warning(f"Proxy acima do orçamento do lote; dividindo: {path.name}")
-            parts = split_large_proxy_for_handoff(project_dir, path, payload_budget)
-            source_meta = proxy_probe_metadata(path)
-            source_duration = float(
-                source_meta.get("video_duration_sec") or source_meta.get("duration_sec") or 0
-            )
-            fps = float(source_meta.get("fps") or 24)
-            tolerance = max(0.25, 4.0 / max(fps, 1.0))
-            cursor = 0.0
-            for order, part in enumerate(parts, 1):
-                part_meta = proxy_probe_metadata(part)
-                duration = float(part_meta.get("video_duration_sec") or part_meta.get("duration_sec") or 0)
-                if duration <= 0:
-                    raise AutoEditeError(f"Parte de proxy ilegível: {part.name}")
-                decoded = decode_video_proxy(part)
-                try:
+                    coverage = (0.0, verified["decoded_coverage_end"])
+                else:
+                    coverage = (None, None)
+                local_result.append(path)
+                local_entries.append({
+                    "source_proxy": source_relative, "export_path": _chatgpt_arcname(path, project_dir),
+                    "order": 1, "coverage_start": coverage[0], "coverage_end": coverage[1],
+                    "sha256": file_sha256(path), "size_bytes": path.stat().st_size,
+                })
+            elif path.suffix.lower() in VIDEO_EXTENSIONS:
+                warning(f"Proxy acima do orçamento do lote; dividindo: {path.name}")
+                parts = split_large_proxy_for_handoff(project_dir, path, payload_budget)
+                source_meta = proxy_probe_metadata(path)
+                source_duration = float(
+                    source_meta.get("video_duration_sec") or source_meta.get("duration_sec") or 0
+                )
+                fps = float(source_meta.get("fps") or 24)
+                tolerance = max(0.25, 4.0 / max(fps, 1.0))
+                cursor = 0.0
+                for order, part in enumerate(parts, 1):
+                    skip_checkpoint(item_id)
+                    part_meta = proxy_probe_metadata(part)
+                    duration = float(part_meta.get("video_duration_sec") or part_meta.get("duration_sec") or 0)
+                    if duration <= 0:
+                        raise AutoEditeError(f"Parte de proxy ilegível: {part.name}")
+                    decoded = decode_video_proxy(part, item_id=item_id)
                     verified = validate_decoded_coverage(
                         part_meta, decoded, asset_id=part.name, expected_duration=duration,
                     )
-                except ProxyIntegrityError as exc:
-                    raise AutoEditeError(str(exc)) from exc
-                start = cursor
-                cursor += verified["decoded_coverage_end"]
-                entries.append({
-                    "source_proxy": rel(path, project_dir),
-                    "export_path": _chatgpt_arcname(part, project_dir),
-                    "order": order, "coverage_start": round(start, 6),
-                    "coverage_end": round(min(cursor, source_duration), 6),
-                    "sha256": file_sha256(part), "size_bytes": part.stat().st_size,
+                    start_sec = cursor
+                    cursor += verified["decoded_coverage_end"]
+                    local_entries.append({
+                        "source_proxy": source_relative,
+                        "export_path": _chatgpt_arcname(part, project_dir),
+                        "order": order, "coverage_start": round(start_sec, 6),
+                        "coverage_end": round(min(cursor, source_duration), 6),
+                        "sha256": file_sha256(part), "size_bytes": part.stat().st_size,
+                    })
+                if source_duration <= 0 or abs(cursor - source_duration) > tolerance:
+                    raise AutoEditeError(
+                        f"Cobertura incompleta ao dividir {path.name}: {cursor:.3f}s de "
+                        f"{source_duration:.3f}s."
+                    )
+                local_result.extend(parts)
+            else:
+                from PIL import Image, ImageOps
+                target = project_dir / "_CHATGPT_CACHE" / "imagens_reduzidas" / f"{path.stem}.jpg"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with Image.open(path) as opened:
+                    image = ImageOps.exif_transpose(opened).convert("RGB")
+                    image.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
+                    image.save(target, "JPEG", quality=80, optimize=True)
+                if target.stat().st_size > payload_budget:
+                    raise AutoEditeError(f"Imagem ainda grande demais: {path.name}")
+                local_result.append(target)
+                local_entries.append({
+                    "source_proxy": source_relative,
+                    "export_path": _chatgpt_arcname(target, project_dir), "order": 1,
+                    "coverage_start": None, "coverage_end": None,
+                    "sha256": file_sha256(target), "size_bytes": target.stat().st_size,
+                    "transform": "jpeg-1800-quality-80",
                 })
-            if source_duration <= 0 or abs(cursor - source_duration) > tolerance:
-                raise AutoEditeError(
-                    f"Cobertura incompleta ao dividir {path.name}: {cursor:.3f}s de "
-                    f"{source_duration:.3f}s; regenere o lote."
-                )
-            result.extend(parts)
-            continue
-        # Imagens anormalmente grandes são convertidas para uma prévia JPEG.
-        try:
-            from PIL import Image, ImageOps
-            target = project_dir / "_CHATGPT_CACHE" / "imagens_reduzidas" / f"{path.stem}.jpg"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(path) as opened:
-                image = ImageOps.exif_transpose(opened).convert("RGB")
-                image.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
-                image.save(target, "JPEG", quality=80, optimize=True)
-            if target.stat().st_size > payload_budget:
-                raise AutoEditeError(f"Imagem ainda grande demais: {path.name}")
-            result.append(target)
-            entries.append({
-                "source_proxy": rel(path, project_dir),
-                "export_path": _chatgpt_arcname(target, project_dir), "order": 1,
-                "coverage_start": None, "coverage_end": None,
-                "sha256": file_sha256(target), "size_bytes": target.stat().st_size,
-                "transform": "jpeg-1800-quality-80",
+            result.extend(local_result)
+            entries.extend(local_entries)
+            info(f"Pacote IA {index}/{len(proxies)}: {item_id} concluído")
+        except SkipCurrentItem as exc:
+            warning(f"{item_id}: pulado manualmente; os demais itens continuarão.")
+            skipped.append({
+                "source_proxy": source_relative, "item_id": item_id,
+                "reason": str(exc), "kind": "manual_skip",
             })
-        except Exception as exc:
-            raise AutoEditeError(f"Não foi possível preparar {path.name} para o ChatGPT: {exc}") from exc
+            if not continue_on_error:
+                raise
+        except (ProxyIntegrityError, AutoEditeError, OSError, ValueError) as exc:
+            if not continue_on_error:
+                raise
+            warning(f"{item_id}: falha isolada no pacote: {exc}; continuando sem este item.")
+            skipped.append({
+                "source_proxy": source_relative, "item_id": item_id,
+                "reason": str(exc), "kind": "technical_error",
+            })
     inventory = {
-        "schema_version": 1, "integrity": "verified_m7",
+        "schema_version": 2, "integrity": "verified_m7_tolerant",
         "source_proxy_count": len(proxies), "export_file_count": len(result),
-        "entries": entries,
+        "skipped_source_count": len(skipped), "entries": entries, "skipped": skipped,
     }
     return result, inventory
 
@@ -5492,27 +5975,23 @@ def _write_chatgpt_archive(
 
 def create_chatgpt_package(
     project_dir: Path, answers: dict[str, Any], conflict_policy: str = "replace",
+    _recovery_round: int = 0,
 ) -> list[Path]:
     answers = normalize_answers(answers)
     manifest = read_json(project_dir / "MANIFESTO_MEDIA.json")
-    if not (project_dir / "PROMPT_PRONTO_PARA_CHATGPT.md").is_file():
-        write_handoff_files(project_dir, answers, manifest)
-    canonical_brief = project_dir / "PACOTE_PARA_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md"
-    if not canonical_brief.is_file():
-        generate_ai_editing_brief(project_dir, answers=answers, manifest=manifest)
-    document = canonical_brief.read_text(encoding="utf-8")
-    package_root = refresh_ai_package_documents(project_dir, answers, manifest, document)
+    package_root = refresh_ai_package_documents(project_dir, answers, manifest)
     configured_mb = float(answers.get("handoff", {}).get("chatgpt_lot_max_mb", 145))
     max_mb = min(149.0, max(10.0, configured_mb))
     max_bytes = int(max_mb * 1024 * 1024)
     staging_dir = Path(tempfile.mkdtemp(prefix=".PACOTE_CHATGPT_NOVO_", dir=project_dir))
-    from ai_package_v2 import DETERMINISTIC_FILES
-    v2_root = package_root / "V2"
-    metadata = [v2_root / name for name in DETERMINISTIC_FILES]
+    from ai_director_v3 import DETERMINISTIC_FILES
+    v3_root = package_root / "V3"
+    metadata = [v3_root / name for name in DETERMINISTIC_FILES]
     if not all(path.is_file() for path in metadata):
-        raise AutoEditeError("O snapshot V2 não foi publicado por completo.")
-    bundled_fonts = sorted(FONTS.glob("*.ttf"))
-    base_size = sum(path.stat().st_size for path in metadata + bundled_fonts)
+        raise AutoEditeError("O snapshot V3 autônomo não foi publicado por completo.")
+    # Fontes são referenciadas por nome em CAPABILITIES.json; não precisam viajar como binários.
+    bundled_fonts: list[Path] = []
+    base_size = sum(path.stat().st_size for path in metadata)
     safety = 3 * 1024 * 1024
     payload_budget = max_bytes - base_size - safety
     if payload_budget < 5 * 1024 * 1024:
@@ -5520,22 +5999,56 @@ def create_chatgpt_package(
             f"Os documentos fixos ocupam {base_size / 1024**2:.1f} MB e não cabem com segurança "
             f"num lote de {max_mb:.1f} MB. Remova anexos opcionais ou aumente o limite."
         )
-    descriptor = read_json(v2_root / "PACKAGE_DESCRIPTOR.json")
-    if descriptor.get("integrity_status") != "verified_m7":
-        raise AutoEditeError(
-            "O pacote V2 não possui integridade M7 completa; regenere os proxies antes de exportar."
-        )
+    descriptor = read_json(v3_root / "PACKAGE_DESCRIPTOR.json")
+    if descriptor.get("editorial_state") != "virgin":
+        raise AutoEditeError("O pacote V3 não está marcado como editorialmente virgem.")
     proxies = []
     for relative in descriptor.get("proxy_files", []):
         path = (project_dir / relative).resolve()
         try:
             path.relative_to(project_dir.resolve())
         except ValueError as exc:
-            raise AutoEditeError("Snapshot V2 contém proxy fora do projeto.") from exc
+            raise AutoEditeError("Snapshot V3 contém proxy fora do projeto.") from exc
         if not path.is_file():
-            raise AutoEditeError(f"Proxy do snapshot V2 desapareceu: {relative}")
+            raise AutoEditeError(f"Proxy do snapshot V3 desapareceu: {relative}")
         proxies.append(path)
-    payloads, export_map = handoff_proxy_inventory(project_dir, proxies, payload_budget)
+    payloads, export_map = handoff_proxy_inventory(
+        project_dir, proxies, payload_budget, continue_on_error=True,
+    )
+    skipped_sources = export_map.get("skipped", []) if isinstance(export_map, dict) else []
+    if skipped_sources:
+        if _recovery_round >= max(1, len(proxies)):
+            raise AutoEditeError("Não foi possível estabilizar o conjunto elegível do pacote após isolar itens com erro.")
+        skipped_map = {
+            str(item.get("source_proxy") or ""): item
+            for item in skipped_sources if isinstance(item, dict)
+        }
+        changed = 0
+        manifest_now = read_json(project_dir / "MANIFESTO_MEDIA.json")
+        for row in manifest_now.get("media", []):
+            if not isinstance(row, dict):
+                continue
+            key = str(row.get("proxy_path") or "")
+            failure = skipped_map.get(key)
+            if not failure:
+                continue
+            row["status"] = "skipped" if failure.get("kind") == "manual_skip" else "error"
+            row["excluded_from_auto_edit"] = True
+            row["exclusion_reason"] = (
+                "pulado manualmente durante a preparação do pacote"
+                if failure.get("kind") == "manual_skip"
+                else "falha técnica isolada durante a preparação do pacote"
+            )
+            row["error"] = str(failure.get("reason") or "falha isolada")[:1000]
+            changed += 1
+        if changed:
+            write_json(project_dir / "MANIFESTO_MEDIA.json", manifest_now)
+            warning(f"Pacote IA: {changed} mídia(s) foram isoladas; regenerando o snapshot sem interromper as demais.")
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            return create_chatgpt_package(
+                project_dir, answers, conflict_policy=conflict_policy,
+                _recovery_round=_recovery_round + 1,
+            )
     export_map_path = staging_dir / "PACKAGE_EXPORT_MAP.json"
     write_json(export_map_path, export_map)
     metadata.append(export_map_path)
@@ -5583,7 +6096,7 @@ def create_chatgpt_package(
         "",
         *(f"{path}  |  {path.stat().st_size / 1024**2:.1f} MB" for path in canonical_outputs),
         "",
-        "# O contrato de edição está em EDIT_TASK.json e EDIT_SCHEMA.json dentro dos lotes.",
+        "# O Prompt Mestre e o contrato fechado estão em PROMPT_MESTRE_AUTONOMO.md / CAPABILITIES.json dentro dos lotes.",
     ]
     write_text(project_dir / "UPLOAD_LIST.txt", "\n".join(upload_lines) + "\n")
     shutil.copy2(project_dir / "UPLOAD_LIST.txt", package_dir / "UPLOAD_LIST.txt")
@@ -5596,8 +6109,8 @@ def create_chatgpt_package(
         "1. Abra `01_LISTA_EXATA_DE_ARQUIVOS.txt`.",
         "2. Anexe TODOS os lotes indicados na mesma conversa, sem extrair os ZIPs.",
         "3. Aguarde os anexos terminarem de carregar.",
-        "4. Peça uma resposta JSON conforme EDIT_SCHEMA.json, vinculada ao package_snapshot_id atual.",
-        "5. Importe a resposta JSON V2 ou, para compatibilidade, um Roteiro Mestre Markdown V1 no Studio.", "",
+        "4. Cole/envie PROMPT_MESTRE_AUTONOMO.md e peça a resposta JSON V3 vinculada ao package_snapshot_id atual.",
+        "5. Importe AI_DIRECTOR_RESPONSE_V3.json no Studio. JSON V2/Markdown V1 continuam apenas como compatibilidade.", "",
         f"Pasta dos lotes: `{package_dir}`", "",
         "Os lotes são múltiplos arquivos ZIP independentes; não são pedaços binários que precisem ser reconstruídos.",
     ]
@@ -5606,14 +6119,13 @@ def create_chatgpt_package(
     ai_dir.mkdir(parents=True, exist_ok=True)
     ai_guide = [
         "# ATALHOS LEGADOS — O PACOTE CANÔNICO É `../PACOTE_PARA_IA/`", "",
-        "## EDITE E DEVOLVA", "",
-        "- `01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md` — este é o ÚNICO arquivo que a IA deve alterar.", "",
+        "## PROMPT MESTRE AUTÔNOMO", "",
+        "- `02_NAO_EDITAR_APENAS_ENVIAR_PROMPT.md` — envie este Prompt Mestre à IA.", "",
         "## APENAS ENVIE; NÃO EDITE", "",
-        "- `02_NAO_EDITAR_APENAS_ENVIAR_PROMPT.md` — instrução inicial para a IA.",
         "- `03_NAO_EDITAR_LISTA_DE_LOTES.txt` — lista dos ZIPs de mídia que devem acompanhar o roteiro.",
         "- Os lotes `FR_AUTOEDITE_LOTE_*.zip` ficam em `../pacote_chatgpt/` e têm menos de 150 MB.", "",
         "## DEVOLUÇÃO", "",
-        "Salve a resposta da IA como Markdown e importe-a no botão `Enviar resposta` do Studio.",
+        "Salve a resposta como JSON V3 e importe-a no botão `Enviar resposta` do Studio.",
         "O FR AutoEdite valida IDs, tempos, transições e limites antes de aplicar qualquer mudança.",
     ]
     write_text(ai_dir / "00_COMECE_AQUI_O_QUE_EDITAR_E_ENVIAR.md", "\n".join(ai_guide) + "\n")
@@ -5849,6 +6361,51 @@ def project_paths(answers: dict[str, Any], project_override: str | None = None) 
         root = expand_path(answers["project"].get("workspace_root") or DEFAULT_WORKSPACE)
         project_dir = root / slugify(answers["project"].get("slug") or answers["project"]["name"])
     return zip_path, project_dir
+
+
+def prepare_for_ai_director(zip_path: Path, project_dir: Path, answers: dict[str, Any]) -> dict[str, Any]:
+    """Prepara somente fatos/mídias/proxies para a Direção Autônoma V3.
+
+    Não cria EDIT_PLAN, cards, planos sociais ou escolhas editoriais.
+    """
+    check_runtime()
+    answers = normalize_answers(answers)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    for folder in ("_ENTRADA", "_EDITAR", "_ENVIAR_IA", "_ENVIAR_CHATGPT", "_HISTORICO"):
+        (project_dir / folder).mkdir(parents=True, exist_ok=True)
+    central_zip = project_dir / "_ENTRADA" / "FR_AUTOEDITE_ENTRADA.zip"
+    if zip_path.resolve() != central_zip.resolve() and not central_zip.exists():
+        _safe_media_link(zip_path, central_zip)
+    write_json(project_dir / "QUESTIONARIO_RESPONDIDO.json", answers)
+    write_json(project_dir / "FR_AUTOEDITE_PROJECT.json", {
+        "application_version": APP_VERSION,
+        "created_or_updated_at": now_iso(),
+        "zip_path": str(zip_path),
+        "project_dir": str(project_dir),
+        "preparation_mode": "ai_director_v3_media_only",
+    })
+    info(f"Extraindo com segurança para Direção Autônoma: {zip_path}")
+    safe_extract(zip_path, project_dir / "originais")
+    info("Catalogando mídias e criando proxies sem montar timeline")
+    manifest = build_manifest(project_dir, answers)
+    create_chatgpt_package(project_dir, answers)
+    editable = project_dir / "_EDITAR" / "01_CONFIGURACOES_DO_PROJETO.json"
+    shutil.copy2(project_dir / "QUESTIONARIO_RESPONDIDO.json", editable)
+    info("Direção Autônoma pronta: proxies + snapshot V3; nenhuma decisão editorial foi criada.")
+    return manifest
+
+
+def generate_autonomous_ai_prompt(project_dir: Path) -> Path:
+    """Atualiza somente o Prompt Mestre/snapshot V3 a partir do estado factual atual."""
+    project_dir = Path(project_dir).resolve()
+    answers = normalize_answers(read_json(project_dir / "QUESTIONARIO_RESPONDIDO.json"))
+    manifest = read_json(project_dir / "MANIFESTO_MEDIA.json")
+    if not manifest.get("media"):
+        raise AutoEditeError("MANIFESTO_MEDIA ausente ou vazio; prepare as mídias para a IA primeiro.")
+    package = refresh_ai_package_documents(project_dir, answers, manifest)
+    target = package / "01_PROMPT_MESTRE_AUTONOMO.md"
+    info(f"Prompt Mestre Autônomo V3 gerado: {target}")
+    return target
 
 
 def prepare(zip_path: Path, project_dir: Path, answers: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -6409,6 +6966,10 @@ def parser() -> argparse.ArgumentParser:
     q.add_argument("--saida", default="./questionario.json")
     q.add_argument("--cozinha-carreira", action="store_true")
     q.add_argument("--sem-perguntas", action="store_true")
+    ai_prep = commands.add_parser("preparar-ia", help="extrair, catalogar e criar proxies/pacote V3 sem decisões editoriais")
+    ai_prep.add_argument("--respostas", required=True, help="questionário JSON do projeto")
+    ai_prep.add_argument("--zip", dest="zip_path", help="substitui o caminho do ZIP do questionário")
+    ai_prep.add_argument("--projeto", required=True, help="pasta do projeto")
     prep = commands.add_parser("preparar", help="extrair, catalogar, criar proxies, plano e pacote ChatGPT")
     prep.add_argument("--respostas", required=True, help="questionário JSON respondido")
     prep.add_argument("--zip", dest="zip_path", help="substitui o caminho do ZIP do questionário")
@@ -6622,6 +7183,13 @@ def main(argv: list[str] | None = None) -> int:
                 embed_metadata=not args.sem_metadados_internos,
             )
             return 0
+        if args.command == "preparar-ia":
+            answers = normalize_answers(read_json(expand_path(args.respostas)))
+            zip_path, _ = project_paths(answers, args.projeto)
+            if args.zip_path:
+                zip_path = expand_path(args.zip_path)
+            prepare_for_ai_director(zip_path, expand_path(args.projeto), answers)
+            return 0
         if args.command == "preparar-video-pronto":
             answers = normalize_answers(read_json(expand_path(args.respostas)))
             answers.setdefault("input", {})["mode"] = "ready_video"
@@ -6715,6 +7283,16 @@ def main(argv: list[str] | None = None) -> int:
                 plan_path = expand_path(args.plano)
             elif (project_dir / "EDIT_PLAN.json").is_file():
                 plan_path = project_dir / "EDIT_PLAN.json"
+                current_plan = read_json(plan_path)
+                has_cards = any(
+                    isinstance(row, dict) and row.get("type") == "card"
+                    for row in current_plan.get("segments", [])
+                )
+                if not has_cards and answers is not None:
+                    # ready_video e projetos ainda sem cards temporizados precisam
+                    # conseguir revisar o design. Geramos CARD_PREVIEW_PLAN sem
+                    # alterar a timeline produtiva.
+                    plan_path = build_card_preview_plan(project_dir, answers)
             elif answers is not None:
                 plan_path = build_card_preview_plan(project_dir, answers)
             else:
@@ -6813,7 +7391,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "gerar-roteiro-ia":
             project_dir = expand_path(args.projeto)
-            generate_ai_editing_brief(project_dir)
+            generate_autonomous_ai_prompt(project_dir)
             return 0
         if args.command == "aplicar-roteiro-ia":
             apply_ai_editing_brief(expand_path(args.projeto), expand_path(args.arquivo))

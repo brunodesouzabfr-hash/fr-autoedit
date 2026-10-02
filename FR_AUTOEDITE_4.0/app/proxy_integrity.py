@@ -6,6 +6,8 @@ import hashlib
 from pathlib import Path
 from typing import Any, Callable
 
+from runtime_control import SkipCurrentItem
+
 
 INTEGRITY_VERSION = "fr-proxy-integrity/1"
 VERIFIED_STATES = {"verified", "verified_legacy"}
@@ -13,6 +15,11 @@ VERIFIED_STATES = {"verified", "verified_legacy"}
 
 class ProxyIntegrityError(ValueError):
     pass
+
+
+class SceneCoverageUnavailable(ProxyIntegrityError):
+    """Cena virtual sem nenhum intervalo útil dentro da mídia realmente decodificável."""
+
 
 
 def file_sha256(path: Path) -> str:
@@ -171,7 +178,26 @@ def verify_asset(
         )
         coverage_start = float(row.get("scene_start_sec") or 0)
         coverage_end = float(row.get("scene_end_sec") or source_duration)
-        if coverage_start < 0 or coverage_end <= coverage_start or coverage_end > source_duration + tolerance:
+        if row.get("parent_video"):
+            available_candidates = [
+                value for value in (source_duration, proxy_duration, float(decoded_coverage.get("decoded_coverage_end") or 0))
+                if value > 0
+            ]
+            available_end = min(available_candidates) if available_candidates else source_duration
+            requested = (coverage_start, coverage_end)
+            coverage_start = max(0.0, coverage_start)
+            coverage_end = min(coverage_end, available_end)
+            minimum_viable = max(0.10, 2.0 / max(float(proxy_probe.get("fps") or 24.0), 1.0))
+            if coverage_end - coverage_start < minimum_viable:
+                raise SceneCoverageUnavailable(
+                    f"{asset_id}: cena sem cobertura decodificável útil "
+                    f"({requested[0]:.3f}–{requested[1]:.3f}s; disponível até {available_end:.3f}s)."
+                )
+            if coverage_end + 0.0005 < requested[1] or coverage_start > requested[0] + 0.0005:
+                decoded_coverage["coverage_adjusted"] = True
+                decoded_coverage["coverage_requested_start"] = round(requested[0], 6)
+                decoded_coverage["coverage_requested_end"] = round(requested[1], 6)
+        elif coverage_start < 0 or coverage_end <= coverage_start or coverage_end > source_duration + tolerance:
             raise ProxyIntegrityError(
                 f"{asset_id}: cobertura {coverage_start:.3f}–{coverage_end:.3f}s inválida; "
                 "regenere o manifesto sem tocar no original."
@@ -207,28 +233,137 @@ def ensure_manifest_integrity(
     parameters_for: Callable[[dict[str, Any]], dict[str, Any]],
     probe: Callable[[Path], dict[str, Any]],
     decode_video: Callable[[Path], dict[str, Any]],
+    continue_on_error: bool = False,
+    progress: Callable[[int, int, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    """Valida proxies sem repetir a decodificação para cada cena virtual.
+
+    Cenas que compartilham o mesmo proxy pai reutilizam uma verificação-base.
+    Janelas que ultrapassam a cobertura real são recortadas; cenas sem nenhum
+    intervalo útil são marcadas como ``skipped``. Em modo tolerante, uma mídia
+    defeituosa é isolada e o restante do pacote continua.
+    """
     result = copy.deepcopy(manifest)
-    for row in result.get("media", []):
-        if (
-            not isinstance(row, dict) or row.get("status", "ok") != "ok"
-            or row.get("excluded_from_auto_edit")
-            or row.get("media_type") not in {"image", "video"}
-        ):
-            continue
+    verification_cache: dict[tuple[str, str, str], dict[str, Any]] = {}
+    failure_cache: dict[tuple[str, str, str], str] = {}
+    report = {"verified": 0, "clamped_scenes": 0, "skipped_scenes": 0, "errors": 0}
+    candidates = [
+        row for row in result.get("media", [])
+        if isinstance(row, dict) and row.get("status", "ok") == "ok"
+        and not row.get("excluded_from_auto_edit")
+        and row.get("media_type") in {"image", "video"}
+    ]
+
+    for current_index, row in enumerate(candidates, 1):
+        asset_id = str(row.get("id") or "item-sem-id")
+        if progress is not None:
+            progress(current_index, len(candidates), row)
         expected = row.get("proxy_integrity") if isinstance(row.get("proxy_integrity"), dict) else None
         legacy = expected is None
         parameters = (
             copy.deepcopy(expected.get("generation_parameters")) if expected
             else {"pipeline_version": "legacy-unknown", "verification": "m7-migrated"}
         )
-        if expected and expected.get("generation_parameters") != parameters_for(row):
-            raise ProxyIntegrityError(
-                f"{row.get('id')}: parâmetros atuais diferem do proxy registrado; "
-                "execute novamente a preparação para regenerá-lo."
-            )
-        row["proxy_integrity"] = verify_asset(
-            project, row, generation_parameters=parameters, probe=probe,
-            decode_video=decode_video, expected=expected, legacy=legacy,
+        try:
+            if expected and expected.get("generation_parameters") != parameters_for(row):
+                raise ProxyIntegrityError(
+                    f"{asset_id}: parâmetros atuais diferem do proxy registrado; "
+                    "execute novamente a preparação para regenerá-lo."
+                )
+            source_key = str(row.get("source_path") or "")
+            proxy_key = str(row.get("proxy_path") or "")
+            cache_key = (source_key, proxy_key, repr(sorted(parameters.items())))
+            if cache_key in failure_cache:
+                raise ProxyIntegrityError(failure_cache[cache_key])
+
+            if row.get("media_type") == "video" and row.get("parent_video"):
+                if cache_key not in verification_cache:
+                    base_row = copy.deepcopy(row)
+                    base_row.pop("scene_start_sec", None)
+                    base_row.pop("scene_end_sec", None)
+                    base_row.pop("parent_video", None)
+                    base_row["id"] = str(row.get("parent_video") or asset_id)
+                    try:
+                        verification_cache[cache_key] = verify_asset(
+                            project, base_row, generation_parameters=parameters, probe=probe,
+                            decode_video=decode_video, expected=expected, legacy=legacy,
+                        )
+                    except SkipCurrentItem:
+                        raise
+                    except ProxyIntegrityError as exc:
+                        failure_cache[cache_key] = str(exc)
+                        raise
+                record = copy.deepcopy(verification_cache[cache_key])
+                record["source_asset_id"] = str(row.get("parent_video") or asset_id)
+                start = max(0.0, float(row.get("scene_start_sec") or 0))
+                requested_end = float(row.get("scene_end_sec") or record.get("source_duration") or 0)
+                available_values = [
+                    float(v) for v in (
+                        record.get("source_duration"), record.get("proxy_duration"), record.get("decoded_coverage_end")
+                    ) if isinstance(v, (int, float)) and float(v) > 0
+                ]
+                available_end = min(available_values) if available_values else 0.0
+                end = min(requested_end, available_end)
+                fps = 24.0
+                tolerance = float(record.get("duration_tolerance_sec") or 0.125)
+                minimum_viable = max(0.10, tolerance)
+                if end - start < minimum_viable:
+                    raise SceneCoverageUnavailable(
+                        f"{asset_id}: cena sem cobertura útil ({start:.3f}–{requested_end:.3f}s; "
+                        f"disponível até {available_end:.3f}s)."
+                    )
+                record["coverage_start"] = round(start, 6)
+                record["coverage_end"] = round(end, 6)
+                if end + 0.0005 < requested_end:
+                    record["coverage_adjusted"] = True
+                    record["coverage_requested_end"] = round(requested_end, 6)
+                    row["scene_end_sec"] = round(end, 6)
+                    row["duration_sec"] = round(end - start, 6)
+                    row["integrity_notice"] = (
+                        f"cena recortada automaticamente até {end:.3f}s, limite realmente decodificável"
+                    )
+                    report["clamped_scenes"] += 1
+                row["proxy_integrity"] = record
+            else:
+                record = verify_asset(
+                    project, row, generation_parameters=parameters, probe=probe,
+                    decode_video=decode_video, expected=expected, legacy=legacy,
+                )
+                verification_cache[cache_key] = copy.deepcopy(record)
+                row["proxy_integrity"] = record
+            report["verified"] += 1
+        except SkipCurrentItem as exc:
+            row["status"] = "skipped"
+            row["excluded_from_auto_edit"] = True
+            row["exclusion_reason"] = "pulado manualmente pelo usuário"
+            row["error"] = str(exc)
+            report["errors"] += 1
+            if not continue_on_error:
+                raise
+        except SceneCoverageUnavailable as exc:
+            row["status"] = "skipped"
+            row["excluded_from_auto_edit"] = True
+            row["exclusion_reason"] = "cena vazia/fora da cobertura real; descartada automaticamente"
+            row["error"] = str(exc)
+            report["skipped_scenes"] += 1
+        except ProxyIntegrityError as exc:
+            if not continue_on_error:
+                raise
+            row["status"] = "error"
+            row["excluded_from_auto_edit"] = True
+            row["exclusion_reason"] = "falha técnica isolada de integridade; demais itens continuam"
+            row["error"] = str(exc)
+            report["errors"] += 1
+
+    result["integrity_report"] = report
+    summary = result.setdefault("summary", {})
+    if isinstance(summary, dict):
+        summary["integrity_errors"] = report["errors"]
+        summary["scene_clips_clamped"] = report["clamped_scenes"]
+        summary["scene_clips_discarded_integrity"] = report["skipped_scenes"]
+        summary["errors"] = sum(
+            isinstance(row, dict) and row.get("status", "ok") not in {"ok"}
+            for row in result.get("media", [])
         )
     return result
+

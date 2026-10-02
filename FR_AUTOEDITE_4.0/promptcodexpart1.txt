@@ -1,0 +1,2173 @@
+# PROMPT MESTRE — FR AUTOEDITE NEXT GENERATION
+
+## Reconcepção completa, arquitetura, IA, automação de edição e plano executável pelo Codex
+
+Você deve atuar simultaneamente como:
+
+* Principal Software Architect;
+* Staff/Principal Engineer de sistemas multimídia;
+* engenheiro de IA aplicada a vídeo, áudio e visão computacional;
+* arquiteto de aplicações desktop/web híbridas;
+* especialista em FFmpeg e pipelines audiovisuais;
+* especialista em visão computacional;
+* especialista em processamento de áudio;
+* especialista em LLMs multimodais;
+* especialista em UX de softwares profissionais de edição;
+* editor de vídeo e diretor de montagem;
+* estrategista de conteúdo para redes sociais;
+* engenheiro de automação;
+* engenheiro DevOps;
+* especialista em performance CPU/GPU;
+* especialista em sistemas locais/offline-first;
+* arquiteto de dados;
+* product designer;
+* product manager técnico;
+* especialista em branding e conteúdo da Franco Romeu.
+
+---
+
+# 1. MISSÃO
+
+Sua missão NÃO é modificar a aplicação atual.
+
+Sua missão NÃO é escrever imediatamente uma nova aplicação.
+
+Sua missão NÃO é simplesmente sugerir algumas funcionalidades adicionais.
+
+Sua missão é **reconceber intelectualmente a FR AutoEdite do zero** e produzir a especificação técnica, funcional, arquitetural e estratégica mais completa possível para que, posteriormente, o **Codex implemente essa nova geração da aplicação**.
+
+Quero que você responda à seguinte questão:
+
+> Se hoje tivéssemos de criar, do zero, a melhor aplicação possível para automatizar a transformação de grandes volumes de vídeos, fotos, áudio e informações de projetos da Franco Romeu em conteúdos profissionais para redes sociais, como ela deveria funcionar?
+
+Considere a FR AutoEdite 4.0 existente somente como uma fonte de requisitos e aprendizados.
+
+## REGRA FUNDAMENTAL
+
+**Não preserve a arquitetura atual por compatibilidade emocional ou histórica.**
+
+A versão existente deve ser tratada como:
+
+`fonte de requisitos → não como fonte de arquitetura`
+
+Você pode:
+
+* substituir tecnologias;
+* abandonar módulos;
+* dividir módulos;
+* fundir módulos;
+* reconstruir interfaces;
+* alterar linguagens;
+* alterar frameworks;
+* transformar scripts em serviços;
+* substituir o sistema de timeline;
+* substituir o sistema de render;
+* substituir o modelo de projeto;
+* adicionar banco de dados;
+* adicionar indexação vetorial;
+* criar arquitetura de plugins;
+* usar IA local;
+* usar IA externa;
+* criar modos híbridos;
+* introduzir workers;
+* introduzir filas;
+* criar um novo formato interno de projeto.
+
+Desde que consiga justificar tecnicamente a decisão.
+
+---
+
+# 2. NÃO EXECUTE A IMPLEMENTAÇÃO
+
+Nesta resposta:
+
+* NÃO modifique repositórios;
+* NÃO gere commits;
+* NÃO altere arquivos;
+* NÃO faça deploy;
+* NÃO tente criar a aplicação completa;
+* NÃO trate a primeira solução imaginada como definitiva.
+
+Você deverá entregar uma **análise de engenharia e especificação mestre para o Codex executar posteriormente**.
+
+Código é permitido apenas quando necessário para demonstrar:
+
+* arquitetura;
+* interfaces;
+* contratos;
+* estruturas;
+* schemas;
+* pseudocódigo;
+* modelos de dados;
+* exemplos de API.
+
+O objetivo desta etapa é **PENSAR ANTES DE PROGRAMAR**.
+
+---
+
+# 3. PRINCÍPIO DE PROJETO
+
+A aplicação não deve ser simplesmente um:
+
+> “script que junta vídeos usando FFmpeg”.
+
+Ela deve ser concebida como um:
+
+# MEDIA INTELLIGENCE + EDITING AUTOMATION SYSTEM
+
+ou seja, um sistema composto por diferentes motores especializados.
+
+Mentalmente, considere algo semelhante a:
+
+```text
+MÍDIAS
+   ↓
+INGESTÃO
+   ↓
+ANÁLISE
+   ↓
+MEDIA INTELLIGENCE INDEX
+   ↓
+ENTENDIMENTO DO PROJETO
+   ↓
+SELEÇÃO DE MOMENTOS
+   ↓
+PLANEJAMENTO NARRATIVO
+   ↓
+PLANO DE EDIÇÃO
+   ↓
+TIMELINE
+   ↓
+GRAPHICS / CARDS / TEXTOS
+   ↓
+ÁUDIO
+   ↓
+RENDER
+   ↓
+VERSÕES SOCIAIS
+   ↓
+CONTROLE DE QUALIDADE
+   ↓
+EXPORTAÇÃO
+```
+
+Mas não aceite essa divisão automaticamente.
+
+Questione-a e proponha arquitetura melhor se existir.
+
+---
+
+# 4. CONTEXTO PRINCIPAL DE USO
+
+A aplicação é destinada principalmente à produção de conteúdo audiovisual da **Franco Romeu**.
+
+Utilize todo o contexto disponível sobre:
+
+* Franco Romeu;
+* posicionamento da marca;
+* serviços;
+* obras;
+* reformas;
+* arquitetura;
+* interiores;
+* projetos 3D;
+* mobiliário;
+* elétrica;
+* hidráulica;
+* revestimentos;
+* iluminação;
+* pintura;
+* construção;
+* produção;
+* manutenção;
+* processos técnicos;
+* demonstrações;
+* antes/depois;
+* bastidores;
+* materiais;
+* soluções técnicas;
+* redes sociais;
+* identidade visual;
+* branding;
+* linguagem;
+* conteúdo educacional;
+* conteúdo comercial;
+* conteúdo institucional.
+
+Entretanto:
+
+**não transforme o software em algo incapaz de editar outros assuntos.**
+
+A Franco Romeu deve ser implementada como:
+
+```text
+CORE UNIVERSAL DE EDIÇÃO
+          +
+FR DOMAIN PACK
+          +
+FR BRAND PACK
+          +
+FR CONTENT STRATEGY
+```
+
+Isso permitirá futuramente adicionar outros:
+
+* Brand Packs;
+* Domain Packs;
+* Style Packs;
+* Content Packs.
+
+---
+
+# 5. PRIMEIRA FASE — PROBLEMA ANTES DA SOLUÇÃO
+
+Antes de propor arquitetura, faça uma decomposição completa do problema.
+
+Identifique:
+
+### Entrada
+
+Que tipos de dados o sistema poderá receber?
+
+Exemplos:
+
+* vídeos;
+* fotos;
+* imagens renderizadas;
+* áudio;
+* voice-over;
+* música;
+* documentos;
+* roteiro;
+* briefing;
+* manifesto de mídia;
+* informações do projeto;
+* identidade visual;
+* legendas;
+* metadados;
+* comentários humanos;
+* marcações manuais.
+
+### Processamento
+
+O que realmente precisa ser descoberto?
+
+### Decisão
+
+Quais decisões hoje exigem um editor humano?
+
+### Automação
+
+Quais delas podem ser:
+
+* determinísticas;
+* heurísticas;
+* estatísticas;
+* feitas por visão computacional;
+* feitas por modelos multimodais;
+* feitas por LLM;
+* feitas manualmente;
+* feitas em sistema híbrido.
+
+### Saída
+
+Quais produtos audiovisuais devem ser possíveis?
+
+---
+
+# 6. TRÊS MODOS FUNDAMENTAIS
+
+A aplicação deverá considerar seriamente três paradigmas.
+
+## MODO 1 — MANUAL ASSISTIDO
+
+O usuário controla tudo, mas o software elimina tarefas repetitivas.
+
+Exemplos:
+
+* detectar cenas;
+* eliminar silêncio;
+* marcar problemas;
+* gerar proxies;
+* sugerir crop;
+* encontrar takes semelhantes;
+* gerar legenda;
+* adaptar formato;
+* gerar cards.
+
+---
+
+## MODO 2 — IA ASSISTIDA
+
+A IA sugere decisões.
+
+Exemplo:
+
+```text
+Este trecho parece mostrar instalação elétrica.
+
+Confiança: 91%
+
+Ação detectada:
+instalação de luminária
+
+Sugestão:
+usar entre 00:43 e 00:51
+
+Motivo:
+ação completa + enquadramento estável + boa iluminação
+```
+
+O humano pode:
+
+* aceitar;
+* editar;
+* rejeitar.
+
+---
+
+## MODO 3 — AUTOPILOT
+
+O sistema recebe:
+
+```text
+/pasta-do-projeto
+```
+
+e devolve automaticamente:
+
+* vídeo principal;
+* Reel;
+* Shorts;
+* Stories;
+* teaser;
+* antes/depois;
+* versões sem texto;
+* versões com cards;
+* versões técnicas;
+* versões comerciais.
+
+Analise profundamente como esses três modos poderiam compartilhar o mesmo core.
+
+---
+
+# 7. PRINCÍPIO CRÍTICO — EDIÇÃO NÃO DESTRUTIVA
+
+Investigue uma arquitetura em que **nenhuma decisão destrua o material original**.
+
+Considere um sistema baseado em:
+
+```text
+SOURCE MEDIA
++
+MEDIA INDEX
++
+EDIT DECISIONS
++
+TIMELINE
++
+RENDER GRAPH
+```
+
+A timeline deve representar decisões, não arquivos renderizados intermediários sempre que possível.
+
+Analise conceitos como:
+
+* EDL;
+* OTIO/OpenTimelineIO;
+* timeline intermediária própria;
+* composition graph;
+* render graph;
+* DAG;
+* nodes;
+* clips;
+* tracks;
+* overlays;
+* effects;
+* keyframes.
+
+Determine a melhor abordagem.
+
+---
+
+# 8. MEDIA INTELLIGENCE ENGINE
+
+Projete conceitualmente um motor capaz de analisar cada mídia uma única vez e reutilizar posteriormente os resultados.
+
+Exemplo conceitual:
+
+```text
+VIDEO
+ ├── technical metadata
+ ├── scenes
+ ├── shots
+ ├── speech
+ ├── silence
+ ├── motion
+ ├── objects
+ ├── people
+ ├── tools
+ ├── materials
+ ├── actions
+ ├── quality
+ ├── embeddings
+ ├── semantic description
+ └── recommended segments
+```
+
+Pesquise e determine como detectar:
+
+* cenas;
+* mudanças de câmera;
+* cortes;
+* silêncio;
+* fala;
+* música;
+* ruído;
+* black frames;
+* frames congelados;
+* exposição ruim;
+* imagens desfocadas;
+* câmera excessivamente instável;
+* takes duplicados;
+* vídeos praticamente iguais;
+* regiões sem informação;
+* momentos mortos;
+* períodos sem ação;
+* enquadramentos ruins;
+* melhores takes;
+* início e fim de uma ação;
+* mãos;
+* pessoas;
+* ferramentas;
+* materiais;
+* ambientes;
+* objetos;
+* movimento;
+* transformação física;
+* antes/depois;
+* execução de serviço.
+
+---
+
+# 9. O CONCEITO DE “ÁREA MORTA”
+
+Não trate “área morta” apenas como silêncio.
+
+Defina uma taxonomia.
+
+Exemplos:
+
+### Dead Audio
+
+silêncio ou áudio inútil.
+
+### Dead Motion
+
+imagem praticamente parada sem função narrativa.
+
+### Dead Action
+
+pessoa se preparando para realizar uma ação, mas nada relevante acontece.
+
+### Dead Camera
+
+reposicionamento de câmera.
+
+### Dead Narrative
+
+trecho tecnicamente aceitável que não acrescenta informação.
+
+### Dead Duplicate
+
+informação já exibida anteriormente.
+
+### Dead Transition
+
+tempo excessivo entre dois acontecimentos.
+
+### Dead Visual
+
+imagem desfocada, obstruída ou sem informação útil.
+
+Crie métricas para detectar cada categoria.
+
+---
+
+# 10. SISTEMA DE SCORING
+
+Não quero somente “IA escolhe o melhor trecho”.
+
+Quero que você determine se é adequado criar um modelo explicável.
+
+Exemplo:
+
+```text
+segment_score =
+    visual_quality
+  + action_score
+  + semantic_value
+  + novelty
+  + narrative_relevance
+  + technical_relevance
+  + branding_value
+  - duplicate_penalty
+  - blur_penalty
+  - dead_time_penalty
+```
+
+Cada trecho poderia possuir algo semelhante a:
+
+```json
+{
+  "segment": "00:42.100-00:48.700",
+  "visual_quality": 0.93,
+  "action_score": 0.88,
+  "semantic_value": 0.91,
+  "novelty": 0.84,
+  "duplicate_penalty": 0.12,
+  "confidence": 0.89
+}
+```
+
+Analise se esse conceito é adequado ou proponha sistema superior.
+
+---
+
+# 11. ENTENDIMENTO SEMÂNTICO
+
+A aplicação deve ser capaz de entender, quando possível, não apenas:
+
+> “homem segurando uma ferramenta”
+
+mas:
+
+> “profissional realizando acabamento de massa em parede antes da pintura”
+
+ou:
+
+> “instalação do sistema hidráulico da cuba”
+
+ou:
+
+> “montagem do mobiliário planejado”
+
+ou:
+
+> “teste do sistema de iluminação LED”.
+
+Projete a arquitetura necessária.
+
+Considere combinação de:
+
+* visão computacional;
+* modelos de detecção;
+* modelos multimodais;
+* embeddings;
+* LLM;
+* ontologia da Franco Romeu;
+* contexto fornecido pelo projeto.
+
+---
+
+# 12. MEDIA MEMORY
+
+Analise a criação de uma memória persistente das mídias.
+
+Por exemplo:
+
+```text
+Media Library
+   ↓
+Semantic Index
+   ↓
+Vector Search
+```
+
+Permitindo buscas como:
+
+> “mostre todos os vídeos onde aparece instalação da ilha da cozinha”
+
+ou:
+
+> “encontre as melhores imagens da bancada antes da instalação”
+
+ou:
+
+> “localize cenas de iluminação LED”
+
+ou:
+
+> “quais vídeos mostram a transformação mais evidente?”
+
+Analise:
+
+* banco relacional;
+* documentos JSON;
+* SQLite;
+* DuckDB;
+* PostgreSQL;
+* vector database;
+* FAISS;
+* Qdrant;
+* LanceDB;
+* alternativas atuais.
+
+Escolha tecnicamente.
+
+---
+
+# 13. ENTENDIMENTO DE PROJETO
+
+A aplicação deve conseguir separar:
+
+```text
+MÍDIA
+```
+
+de:
+
+```text
+SIGNIFICADO DA MÍDIA DENTRO DO PROJETO
+```
+
+Exemplo:
+
+```text
+arquivo:
+VID_4732.mp4
+
+fase:
+instalação do mobiliário
+
+ação:
+montagem de portas
+
+ambiente:
+cozinha
+
+prioridade narrativa:
+alta
+```
+
+Projete um **Project Knowledge Graph**, Project Manifest ou alternativa melhor.
+
+---
+
+# 14. EDITOR NARRATIVO
+
+Investigue a possibilidade de um módulo acima da timeline denominado conceitualmente:
+
+# STORY ENGINE
+
+Ele recebe:
+
+* objetivo;
+* plataforma;
+* duração;
+* público;
+* mídia disponível;
+* etapas do projeto;
+* estratégia;
+* identidade visual.
+
+E produz algo semelhante a:
+
+```text
+HOOK
+↓
+CONTEXTO
+↓
+PROBLEMA
+↓
+PROCESSO
+↓
+DETALHES TÉCNICOS
+↓
+TRANSFORMAÇÃO
+↓
+RESULTADO
+↓
+CTA
+```
+
+Mas não force essa fórmula em todos os vídeos.
+
+O Story Engine deve escolher a estrutura adequada.
+
+Exemplos:
+
+* transformação;
+* tutorial;
+* processo;
+* before/after;
+* showcase;
+* institucional;
+* técnico;
+* educativo;
+* comercial;
+* storytelling;
+* bastidores.
+
+---
+
+# 15. CARDS, BALÕES E GRAPHICS ENGINE
+
+Este deve ser um sistema profissional, não imagens estáticas jogadas sobre o vídeo.
+
+Projete um:
+
+# MOTION GRAPHICS / INFORMATION OVERLAY ENGINE
+
+Cards e balões devem poder ser:
+
+* parametrizados;
+* editáveis;
+* animados;
+* vinculados a dados;
+* responsivos;
+* reutilizáveis;
+* adaptáveis por proporção.
+
+Precisam considerar:
+
+* 9:16;
+* 16:9;
+* 1:1;
+* 4:5;
+* safe areas;
+* legendas;
+* rostos;
+* objeto principal;
+* composição;
+* movimento;
+* colisão visual.
+
+Analise:
+
+* auto placement;
+* anchor tracking;
+* face avoidance;
+* subject avoidance;
+* subtitle avoidance;
+* collision detection;
+* responsive layout;
+* animation presets;
+* templates;
+* design tokens;
+* Brand Packs.
+
+---
+
+# 16. TEXTO AUTOMÁTICO SEM ALUCINAÇÃO
+
+Se a IA gerar um card como:
+
+> “Tubulação PEX instalada”
+
+ela deve possuir evidência suficiente de que isso realmente ocorreu.
+
+Projete mecanismos de:
+
+* grounding;
+* confidence;
+* provenance;
+* revisão;
+* bloqueio de afirmações técnicas sem evidência.
+
+Exemplo:
+
+```text
+Card:
+"Aplicação de impermeabilização"
+
+Source:
+clip_018
+
+Evidence:
+frames 320-518
+
+Confidence:
+0.94
+```
+
+Isso é particularmente importante para informações técnicas.
+
+---
+
+# 17. LEGENDAS
+
+Projete um sistema profissional para:
+
+* speech-to-text;
+* word timestamps;
+* diarização quando necessária;
+* correção contextual;
+* pontuação;
+* remoção de vícios;
+* destaque de palavras;
+* karaoke;
+* estilos da marca;
+* quebra semântica de linhas;
+* limite de caracteres;
+* safe area;
+* geração multilíngue.
+
+---
+
+# 18. ÁUDIO
+
+Projete um pipeline para:
+
+* normalização;
+* loudness;
+* remoção de ruído;
+* speech enhancement;
+* ducking;
+* trilha;
+* efeitos;
+* detecção de beat;
+* edição sincronizada à música;
+* crossfades;
+* sound design.
+
+Determine o que deve ser:
+
+* automático;
+* configurável;
+* opcional.
+
+---
+
+# 19. REFRAMING INTELIGENTE
+
+Um vídeo horizontal poderá gerar automaticamente:
+
+```text
+16:9
+9:16
+4:5
+1:1
+```
+
+Mas o sistema deve tentar preservar:
+
+* pessoa;
+* ferramenta;
+* objeto;
+* ação;
+* bancada;
+* detalhe técnico;
+* elemento principal.
+
+Investigue:
+
+* tracking;
+* saliency;
+* object detection;
+* face detection;
+* dynamic crop;
+* keyframe crop.
+
+---
+
+# 20. SISTEMA ANTES/DEPOIS
+
+Crie um subsistema específico para transformação visual.
+
+Ele deverá ser capaz de sugerir pares de imagens ou vídeos com:
+
+* ambiente semelhante;
+* ângulo semelhante;
+* enquadramento compatível;
+* elementos reconhecíveis;
+* maior diferença visual;
+* maior impacto.
+
+Considere alinhamento aproximado de câmera e composição.
+
+---
+
+# 21. FOTOS
+
+A aplicação não pode tratar foto como vídeo congelado.
+
+Analise mecanismos próprios:
+
+* Ken Burns;
+* pan;
+* zoom;
+* depth/parallax;
+* smart crop;
+* saliency;
+* transições;
+* agrupamento semântico;
+* foto antes/depois.
+
+---
+
+# 22. TIMELINE PROFISSIONAL
+
+Determine qual nível de edição manual deve existir.
+
+Analise recursos como:
+
+* múltiplas tracks;
+* trim;
+* ripple edit;
+* slip;
+* split;
+* magnet timeline;
+* snapping;
+* markers;
+* layers;
+* overlays;
+* audio tracks;
+* keyframes;
+* undo/redo;
+* history;
+* preview;
+* proxy/original switching.
+
+Não copie Premiere ou DaVinci indiscriminadamente.
+
+Projete apenas o necessário para a missão da aplicação.
+
+---
+
+# 23. EDIÇÃO POR LINGUAGEM NATURAL
+
+Investigue profundamente este paradigma.
+
+Exemplos:
+
+> “remova os trechos parados”
+
+> “deixe apenas a montagem da ilha”
+
+> “crie um Reel de 45 segundos”
+
+> “mostre primeiro o antes e depois explique o processo”
+
+> “reduza essa parte para cinco segundos”
+
+> “troque este card por informação sobre a iluminação”
+
+A IA deverá transformar linguagem natural em operações estruturadas.
+
+Exemplo conceitual:
+
+```text
+USER
+↓
+LLM
+↓
+EDIT COMMAND
+↓
+VALIDATOR
+↓
+TIMELINE OPERATION
+```
+
+Nunca permita que o LLM altere arquivos diretamente sem uma camada estruturada de validação.
+
+---
+
+# 24. AGENTIC EDITING
+
+Investigue se faz sentido criar agentes especializados.
+
+Exemplo:
+
+```text
+Media Analyst
+Story Editor
+Technical Reviewer
+Social Strategist
+Graphics Director
+Audio Engineer
+Quality Reviewer
+```
+
+Mas evite “multiagentes” apenas por moda.
+
+Determine se:
+
+* agentes separados;
+* serviços;
+* pipelines determinísticos;
+* LLM único com ferramentas;
+
+seria a melhor solução.
+
+---
+
+# 25. ARQUITETURA DE IA
+
+Determine quais tarefas realmente precisam de IA.
+
+Não utilize um LLM onde:
+
+```text
+if duration > X
+```
+
+resolve melhor.
+
+Classifique todas as operações entre:
+
+```text
+DETERMINISTIC
+HEURISTIC
+CLASSICAL CV
+ML MODEL
+MULTIMODAL MODEL
+LLM
+HUMAN
+```
+
+Essa tabela é obrigatória.
+
+---
+
+# 26. IA LOCAL, CLOUD E HÍBRIDA
+
+Projete três capacidades.
+
+### Local
+
+Para privacidade e baixo custo.
+
+### Cloud
+
+Para modelos extremamente poderosos quando necessário.
+
+### Hybrid
+
+Local executa análise inicial e cloud apenas tarefas que justificam custo.
+
+O software não deve deixar de funcionar completamente quando uma API externa estiver indisponível.
+
+---
+
+# 27. HARDWARE ADAPTATIVO
+
+O sistema deverá detectar hardware.
+
+Exemplos:
+
+```text
+CPU only
+NVIDIA CUDA
+AMD
+Intel
+Apple Silicon
+```
+
+E alterar automaticamente:
+
+* modelo utilizado;
+* resolução de proxy;
+* batch size;
+* encoder;
+* análise;
+* render;
+* precisão.
+
+---
+
+# 28. PESQUISE O ECOSSISTEMA ATUAL
+
+Antes de recomendar tecnologias, faça pesquisa atual.
+
+Não se limite ao seu conhecimento interno.
+
+Quando possuir acesso à web/GitHub/documentação:
+
+**pesquise.**
+
+Investigue projetos e categorias relacionadas a:
+
+* FFmpeg;
+* libav;
+* PyAV;
+* GStreamer;
+* MLT;
+* OpenTimelineIO;
+* Remotion;
+* OpenCV;
+* PySceneDetect;
+* Whisper;
+* faster-whisper;
+* whisper.cpp;
+* ONNX Runtime;
+* modelos multimodais;
+* object detection;
+* tracking;
+* segmentation;
+* embeddings;
+* vector search;
+* audio analysis;
+* speech enhancement;
+* smart cropping;
+* video understanding;
+* captioning;
+* subtitle rendering;
+* motion graphics.
+
+Esses nomes são apenas sementes.
+
+**Não os adote automaticamente.**
+
+Encontre também alternativas melhores ou mais atuais.
+
+---
+
+# 29. PARA CADA TECNOLOGIA/REPOSITÓRIO
+
+Avalie:
+
+| Critério                  | Avaliação |
+| ------------------------- | --------- |
+| finalidade                |           |
+| maturidade                |           |
+| atividade do projeto      |           |
+| licença                   |           |
+| qualidade da documentação |           |
+| performance               |           |
+| GPU                       |           |
+| CPU                       |           |
+| cross-platform            |           |
+| Python                    |           |
+| JS/TS                     |           |
+| integração                |           |
+| complexidade              |           |
+| riscos                    |           |
+| manutenção futura         |           |
+| razão para usar           |           |
+| razão para não usar       |           |
+
+Não faça uma lista gigantesca de bibliotecas sem decisão.
+
+Escolha uma stack coerente.
+
+---
+
+# 30. STACK DA APLICAÇÃO
+
+Não assuma que a stack atual é correta.
+
+Compare seriamente abordagens como:
+
+```text
+Desktop native
+Desktop web-tech
+Browser
+Local web app
+Hybrid desktop
+Client/server local
+```
+
+E tecnologias possíveis.
+
+A decisão deve considerar:
+
+* Linux;
+* Windows;
+* eventualmente macOS;
+* acesso ao filesystem;
+* FFmpeg;
+* GPU;
+* processamento em background;
+* preview;
+* timeline;
+* estabilidade;
+* instalador;
+* atualização;
+* uso offline.
+
+---
+
+# 31. ARQUITETURA EM CAMADAS
+
+Avalie uma arquitetura semelhante a:
+
+```text
+UI
+↓
+APPLICATION CORE
+↓
+PROJECT ENGINE
+↓
+STORY ENGINE
+↓
+EDIT ENGINE
+↓
+MEDIA INTELLIGENCE
+↓
+AI SERVICES
+↓
+RENDER ENGINE
+↓
+SYSTEM SERVICES
+```
+
+Ou proponha solução superior.
+
+Não crie um monólito impossível de manter.
+
+---
+
+# 32. JOB SYSTEM
+
+Análises pesadas não devem congelar a aplicação.
+
+Projete:
+
+* task queue;
+* workers;
+* prioridades;
+* cancelamento;
+* pause/resume;
+* retry;
+* progress;
+* cache;
+* recovery.
+
+Exemplo:
+
+```text
+GenerateProxy
+Transcribe
+DetectScenes
+AnalyzeFrames
+CreateEmbeddings
+RenderPreview
+RenderFinal
+```
+
+---
+
+# 33. CACHE
+
+Uma mídia analisada não deve ser analisada novamente sem necessidade.
+
+Defina uma estratégia baseada em:
+
+* hash;
+* fingerprint;
+* parâmetros;
+* versão do modelo;
+* versão do pipeline.
+
+---
+
+# 34. OBSERVABILIDADE
+
+O software deve explicar:
+
+```text
+o que está fazendo
+por que está fazendo
+quanto concluiu
+qual etapa falhou
+como recuperar
+```
+
+Projete:
+
+* logs;
+* jobs;
+* events;
+* error reporting;
+* debug mode;
+* audit trail.
+
+---
+
+# 35. PROJECT FORMAT
+
+Projete um formato de projeto robusto.
+
+Algo conceitualmente parecido com:
+
+```text
+project.frproj
+```
+
+contendo ou referenciando:
+
+```text
+metadata
+sources
+analysis
+timeline
+graphics
+audio
+strategy
+exports
+history
+```
+
+Determine se deverá ser:
+
+* pasta;
+* JSON;
+* SQLite;
+* archive;
+* combinação.
+
+---
+
+# 36. REPRODUTIBILIDADE
+
+Dado:
+
+```text
+mesmo projeto
++
+mesmas mídias
++
+mesmas configurações
++
+mesma seed
+```
+
+o sistema deverá, quando desejado, conseguir reproduzir a mesma edição.
+
+IA não deve tornar tudo aleatoriamente irreproduzível.
+
+---
+
+# 37. VERSÕES E EXPERIMENTAÇÃO
+
+Projete:
+
+```text
+Version A
+Version B
+Version C
+```
+
+por exemplo:
+
+* técnico;
+* emocional;
+* comercial.
+
+O sistema deve reutilizar análises, não começar tudo novamente.
+
+---
+
+# 38. SOCIAL CONTENT ENGINE
+
+Não trate todas as plataformas igualmente.
+
+Projete presets estratégicos para:
+
+* Instagram Reels;
+* Instagram Feed;
+* Stories;
+* YouTube Shorts;
+* YouTube;
+* TikTok;
+* Facebook.
+
+Considere:
+
+* duração;
+* proporção;
+* ritmo;
+* texto;
+* hook;
+* CTA;
+* safe zones.
+
+Não invente “algoritmos secretos”.
+
+Baseie decisões em princípios verificáveis de comunicação e edição.
+
+---
+
+# 39. MULTI-OUTPUT
+
+Um projeto longo deverá poder produzir automaticamente:
+
+```text
+FILME PRINCIPAL
+
+├── Reel 15s
+├── Reel 30s
+├── Reel 60s
+├── Reel 90s
+├── Shorts
+├── Stories
+├── Teaser
+├── Before/After
+├── Technical Cut
+├── Clean Cut
+└── Thumbnail Candidates
+```
+
+Sem repetir toda a análise das mídias.
+
+---
+
+# 40. BRAND SYSTEM
+
+Separe:
+
+```text
+CONTENT
+```
+
+de:
+
+```text
+BRAND PRESENTATION
+```
+
+Um Brand Pack deverá poder controlar:
+
+* logo;
+* tipografia;
+* cores;
+* grids;
+* cards;
+* motion;
+* transições;
+* captions;
+* CTA;
+* lower thirds;
+* intro;
+* outro.
+
+---
+
+# 41. PLUGIN SYSTEM
+
+Avalie se a aplicação deve possuir arquitetura de plugins para:
+
+* IA;
+* modelos;
+* exportadores;
+* efeitos;
+* cards;
+* Brand Packs;
+* Domain Packs;
+* análise;
+* serviços externos.
+
+Proponha contratos claros.
+
+---
+
+# 42. SEGURANÇA
+
+Analise:
+
+* execução de FFmpeg;
+* paths;
+* shell injection;
+* APIs;
+* tokens;
+* downloads;
+* modelos;
+* plugins;
+* arquivos malformados;
+* permissões.
+
+---
+
+# 43. RECUPERAÇÃO DE FALHAS
+
+Se o programa fechar durante:
+
+```text
+42% da análise
+```
+
+não quero reiniciar tudo.
+
+Projete checkpoints e retomada.
+
+---
+
+# 44. PREVIEW VS FINAL
+
+Separe claramente:
+
+```text
+FAST PREVIEW
+```
+
+de:
+
+```text
+MASTER RENDER
+```
+
+O usuário não deve esperar um render 4K para avaliar um card.
+
+---
+
+# 45. TESTES
+
+Projete uma estratégia incluindo:
+
+* unit tests;
+* integration tests;
+* golden tests;
+* visual regression;
+* render tests;
+* fixture projects;
+* corrupted media tests;
+* benchmark tests;
+* deterministic pipeline tests.
+
+---
+
+# 46. GOLDEN PROJECTS
+
+Proponha manter projetos de referência como:
+
+```text
+golden/kitchen-renovation
+golden/before-after
+golden/manual-edit
+golden/ai-autopilot
+```
+
+Toda atualização relevante será comparada contra esses projetos.
+
+---
+
+# 47. BENCHMARKS
+
+Defina benchmarks mensuráveis.
+
+Exemplos:
+
+* tempo de ingestão;
+* geração de proxy;
+* velocidade de análise;
+* RAM;
+* VRAM;
+* render fps;
+* qualidade de transcrição;
+* precisão da detecção;
+* cache hit;
+* tempo de abertura.
+
+---
+
+# 48. UX
+
+A aplicação deve ser poderosa sem virar cockpit incompreensível.
+
+Pense em níveis.
+
+### SIMPLE
+
+```text
+Importar
+→
+Escolher objetivo
+→
+Gerar
+```
+
+### ASSISTED
+
+Permite revisar sugestões.
+
+### PRO
+
+Expõe:
+
+* timeline;
+* parâmetros;
+* modelos;
+* análise;
+* debugging.
+
+---
+
+# 49. COMMAND CENTER
+
+Avalie uma interface em que o usuário veja:
+
+```text
+PROJECT
+MEDIA
+STORY
+TIMELINE
+GRAPHICS
+AUDIO
+EXPORT
+AI
+```
+
+Não use isso obrigatoriamente.
+
+Projete a melhor IA de navegação.
+
+---
+
+# 50. NÃO CONFUNDA AUTOMAÇÃO COM FALTA DE CONTROLE
+
+Cada decisão automática importante deveria, quando aplicável, oferecer:
+
+```text
+resultado
+confiança
+motivo
+fonte
+editar
+aceitar
+rejeitar
+```
+
+---
+
+# 51. COMPARE COM A FR AUTOEDITE 4.0
+
+Somente depois de conceber a solução ideal, analise a versão existente.
+
+Crie uma matriz:
+
+| Área | 4.0 | Nova arquitetura | Preservar | Recriar | Remover |
+| ---- | --- | ---------------- | --------- | ------- | ------- |
+
+Não permita que a estrutura da versão 4.0 contamine prematuramente o novo desenho.
+
+---
+
+# 52. MIGRAÇÃO
+
+Depois disso, responda:
+
+> vale mais evoluir o código existente ou criar um novo core e migrar gradualmente?
+
+Não escolha por intuição.
+
+Considere:
+
+* dívida técnica;
+* cobertura de testes;
+* acoplamento;
+* capacidade de reaproveitamento;
+* custo;
+* risco;
+* migração dos projetos.
+
+---
+
+# 53. NÃO QUERO UM “BIG BANG REWRITE” IRRESPONSÁVEL
+
+Mesmo se recomendar reconstrução, elabore uma migração incremental.
+
+Exemplo conceitual:
+
+```text
+NOVO MEDIA CORE
+↓
+NOVO PROJECT MODEL
+↓
+NOVO ANALYZER
+↓
+NOVO STORY ENGINE
+↓
+NOVO TIMELINE ENGINE
+↓
+NOVO GRAPHICS ENGINE
+↓
+NOVO UI
+```
+
+Podendo coexistir temporariamente com partes antigas.
+
+---
+
+# 54. ARQUITETURA DE REFERÊNCIA
+
+No final, entregue um diagrama completo.
+
+Exemplo apenas conceitual:
+
+```text
+┌───────────────────────────────┐
+│              UI               │
+├───────────────────────────────┤
+│        Application Core       │
+├──────────────┬────────────────┤
+│ Story Engine │ Timeline Engine│
+├──────────────┴────────────────┤
+│     Media Intelligence        │
+├───────────┬───────────────────┤
+│ AI Layer  │ Media Engine      │
+├───────────┴───────────────────┤
+│          Job System           │
+├───────────────────────────────┤
+│ Storage / Cache / Database    │
+├───────────────────────────────┤
+│ FFmpeg / GPU / OS / Filesystem│
+└───────────────────────────────┘
+```
+
+Mas crie o seu próprio desenho depois da análise.
+
+---
+
+# 55. ENTREGÁVEIS OBRIGATÓRIOS
+
+Sua resposta deverá ser suficientemente detalhada para posteriormente ser convertida nos seguintes documentos:
+
+```text
+00_EXECUTIVE_SUMMARY.md
+01_PRODUCT_VISION.md
+02_REQUIREMENTS.md
+03_ARCHITECTURE.md
+04_MEDIA_PIPELINE.md
+05_AI_ARCHITECTURE.md
+06_STORY_ENGINE.md
+07_TIMELINE_ENGINE.md
+08_GRAPHICS_ENGINE.md
+09_AUDIO_ENGINE.md
+10_SOCIAL_ENGINE.md
+11_DATA_MODEL.md
+12_PLUGIN_SYSTEM.md
+13_UX_ARCHITECTURE.md
+14_TECHNOLOGY_RESEARCH.md
+15_SECURITY.md
+16_TEST_STRATEGY.md
+17_BENCHMARKS.md
+18_MIGRATION_PLAN.md
+19_CODEX_EXECUTION_PLAN.md
+20_ADR_INDEX.md
+```
+
+---
+
+# 56. CODEX EXECUTION PLAN
+
+Esta é uma das partes mais importantes.
+
+Depois da arquitetura, transforme o projeto em unidades de implementação que o Codex possa executar.
+
+Cada etapa deverá conter:
+
+```text
+OBJETIVO
+
+DEPENDÊNCIAS
+
+ARQUIVOS/MÓDULOS PROVÁVEIS
+
+IMPLEMENTAÇÃO
+
+TESTES
+
+CRITÉRIOS DE ACEITE
+
+RISCO
+
+ROLLBACK
+```
+
+---
+
+# 57. ORGANIZE EM EPICS
+
+Exemplo:
+
+```text
+EPIC 01 — Foundation
+EPIC 02 — Media Ingestion
+EPIC 03 — Project Database
+EPIC 04 — Proxy Engine
+EPIC 05 — Media Intelligence
+EPIC 06 — Speech Intelligence
+EPIC 07 — Visual Intelligence
+EPIC 08 — Timeline Core
+EPIC 09 — Story Engine
+EPIC 10 — Graphics Engine
+EPIC 11 — Audio Engine
+EPIC 12 — AI Assistant
+EPIC 13 — Social Outputs
+EPIC 14 — Render Engine
+EPIC 15 — Desktop UI
+EPIC 16 — Plugin Architecture
+EPIC 17 — Tests
+EPIC 18 — Migration
+```
+
+Mas altere esta lista se encontrar estrutura melhor.
+
+---
+
+# 58. QUEBRE EM PRs PEQUENOS
+
+Não diga:
+
+> “Codex: recrie toda aplicação”.
+
+Produza algo como:
+
+```text
+PR-001 Project skeleton
+PR-002 Media database
+PR-003 FFprobe ingestion
+PR-004 Proxy jobs
+PR-005 Scene detection
+PR-006 Audio transcription
+...
+```
+
+Cada PR deve ser testável e reversível.
+
+---
+
+# 59. DEPENDENCY GRAPH
+
+Informe quais implementações dependem de quais.
+
+Exemplo:
+
+```text
+PROJECT CORE
+ ├── MEDIA INGEST
+ │    ├── PROXY
+ │    ├── ANALYSIS
+ │    └── TRANSCRIPTION
+ │
+ ├── TIMELINE
+ │    ├── STORY ENGINE
+ │    └── GRAPHICS
+ │
+ └── RENDER
+```
+
+---
+
+# 60. MVP ≠ PRODUTO FINAL
+
+Divida claramente:
+
+### FOUNDATION
+
+infraestrutura fundamental.
+
+### MVP
+
+primeiro fluxo realmente utilizável.
+
+### V1
+
+produto estável.
+
+### V2 INTELLIGENCE
+
+IA avançada.
+
+### PRO
+
+recursos profissionais.
+
+Evite tentar construir tudo no primeiro commit.
+
+---
+
+# 61. PRIORIZAÇÃO
+
+Para cada funcionalidade relevante classifique:
+
+```text
+Impacto
+Complexidade
+Risco
+Dependências
+Prioridade
+```
+
+Não use somente MoSCoW de maneira superficial.
+
+---
+
+# 62. CRITÉRIOS PARA A ARQUITETURA FINAL
+
+A solução recomendada deverá maximizar:
+
+1. qualidade da edição;
+2. controle do usuário;
+3. automação;
+4. inteligência semântica;
+5. velocidade;
+6. estabilidade;
+7. capacidade offline;
+8. baixo retrabalho;
+9. extensibilidade;
+10. manutenibilidade;
+11. observabilidade;
+12. reprodutibilidade;
+13. evolução futura.
+
+---
+
+# 63. ANTI-PADRÕES
+
+Evite explicitamente:
+
+* script monolítico;
+* milhares de linhas em um arquivo;
+* chamadas FFmpeg espalhadas pela UI;
+* LLM alterando timeline diretamente;
+* regras de negócio dentro de componentes visuais;
+* JSON gigantesco usado como banco;
+* renderização bloqueando UI;
+* reanálise constante de mídia;
+* dependência obrigatória de internet;
+* templates hardcoded;
+* caminhos absolutos;
+* efeitos inseparáveis do render;
+* IA sem confidence;
+* IA sem provenance;
+* respostas genéricas;
+* tecnologia escolhida apenas por popularidade.
+
+---
+
+# 64. QUESTIONE MINHAS PREMISSAS
+
+Você possui autorização explícita para dizer:
+
+> essa abordagem não é ideal.
+
+Se encontrar alternativa melhor.
+
+Quero engenharia, não concordância.
+
+---
+
+# 65. NÃO PRODUZA UMA LISTA DE DESEJOS
+
+Cada funcionalidade proposta deve responder:
+
+```text
+Qual problema resolve?
+
+Por que ela deve existir?
+
+Como funcionaria?
+
+De que depende?
+
+Quanto custa em complexidade?
+
+Pertence ao core?
+
+É plugin?
+
+É IA?
+
+É determinística?
+
+É MVP?
+
+É futura?
+```
+
+---
+
+# 66. PESQUISA DE MERCADO TÉCNICA
+
+Analise conceitos utilizados em categorias de software como:
+
+* NLEs profissionais;
+* editores automáticos;
+* plataformas de clipping;
+* sistemas de transcript editing;
+* ferramentas de social video;
+* motion graphics;
+* media asset management;
+* DAM;
+* AI video editing.
+
+Não copie produtos.
+
+Extraia conceitos arquiteturais úteis.
+
+---
+
+# 67. DIFERENCIAL DA FR AUTOEDITE
+
+Procure descobrir qual poderia ser o verdadeiro diferencial.
+
+Não quero apenas:
+
+> “editor com IA”.
+
+Investigue conceitos como:
+
+```text
+PROJECT-AWARE EDITING
+DOMAIN-AWARE EDITING
+SEMANTIC MEDIA MEMORY
+EXPLAINABLE AUTOEDIT
+MULTI-OUTPUT STORY ENGINE
+BRAND-AWARE GRAPHICS
+```
+
+E diga quais deles possuem maior valor real para este produto.
+
+---
+
+# 68. RESULTADO ESPERADO
+
+Ao terminar sua análise, eu devo conseguir entregar sua resposta para outro engenheiro ou para o Codex e ele entender:
+
+* o que construir;
+* por que construir;
+* como estruturar;
+* tecnologias indicadas;
+* tecnologias rejeitadas;
+* quais módulos criar;
+* como eles conversam;
+* quais dados persistir;
+* como a IA funciona;
+* como a timeline funciona;
+* como a renderização funciona;
+* como testar;
+* como migrar;
+* em qual ordem implementar.
+
+---
+
+# 69. FORMATO OBRIGATÓRIO DA RESPOSTA
+
+Entregue na seguinte sequência:
+
+## PARTE A — Diagnóstico do problema
+
+## PARTE B — Visão da nova FR AutoEdite
+
+## PARTE C — Princípios arquiteturais
+
+## PARTE D — Arquitetura geral
+
+## PARTE E — Media Intelligence Engine
+
+## PARTE F — Story Engine
+
+## PARTE G — Timeline/Edit Engine
+
+## PARTE H — AI Architecture
+
+## PARTE I — Graphics/Card/Bubble Engine
+
+## PARTE J — Audio Engine
+
+## PARTE K — Social Content Engine
+
+## PARTE L — Data Architecture
+
+## PARTE M — UX
+
+## PARTE N — Tecnologias e repositórios pesquisados
+
+## PARTE O — Stack recomendada
+
+## PARTE P — Alternativas rejeitadas e justificativa
+
+## PARTE Q — Comparação com a FR AutoEdite 4.0
+
+## PARTE R — Estratégia de migração
+
+## PARTE S — Roadmap
+
+## PARTE T — Epics
+
+## PARTE U — Sequência de PRs para Codex
+
+## PARTE V — Testes e benchmarks
+
+## PARTE W — Riscos técnicos
+
+## PARTE X — Arquitetura final recomendada
+
+## PARTE Y — Estrutura de diretórios sugerida
+
+## PARTE Z — Prompt operacional final para o Codex
+
+---
+
+# 70. PROMPT DO CODEX
+
+A última seção é obrigatória.
+
+Depois de terminar toda a análise, transforme suas conclusões em um segundo prompt chamado:
+
+# PROMPT OPERACIONAL — CODEX — FR AUTOEDITE NEXT
+
+Esse segundo prompt deverá permitir que o Codex comece a implementação de forma segura e incremental.
+
+Ele deverá conter:
+
+* arquitetura escolhida;
+* stack;
+* regras;
+* estrutura;
+* primeira milestone;
+* arquivos iniciais;
+* testes;
+* critérios de aceite;
+* sequência de execução;
+* proibições;
+* checkpoints.
+
+Não mande o Codex reconstruir tudo de uma vez.
+
+Faça o Codex trabalhar fase a fase.
+
+---
+
+# 71. PROFUNDIDADE DO RACIOCÍNIO
+
+Antes de responder:
+
+1. decomponha o problema;
+2. identifique restrições;
+3. pesquise tecnologias atuais;
+4. compare alternativas;
+5. encontre conflitos arquiteturais;
+6. analise custo e complexidade;
+7. estabeleça requisitos;
+8. escolha uma arquitetura;
+9. tente encontrar falhas na própria arquitetura;
+10. refine;
+11. só então produza a recomendação final.
+
+Não mostre raciocínio interno privado.
+
+Mostre:
+
+* conclusões;
+* trade-offs;
+* evidências;
+* comparações;
+* justificativas técnicas.
+
+---
+
+# 72. REGRA FINAL
+
+Não pergunte:
+
+> “qual abordagem você prefere?”
+
+Sua função aqui é fazer a investigação técnica e chegar a **uma arquitetura principal coerente**.
+
+Você poderá mostrar alternativas quando houver trade-offs reais, mas deverá terminar com uma recomendação arquitetural concreta e internamente consistente.
+
+O resultado deve ser suficientemente detalhado para servir de **blueprint da próxima geração da FR AutoEdite** e posteriormente ser executado incrementalmente pelo Codex.
+

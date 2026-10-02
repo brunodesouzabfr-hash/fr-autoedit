@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 
 import ai_package_v2 as package_v2  # noqa: E402
+import ai_director_v3 as director_v3  # noqa: E402
 import fr_autoedite as fr  # noqa: E402
 import master_contract  # noqa: E402
 import project_scope  # noqa: E402
@@ -140,15 +141,17 @@ class AiPackageV2Test(unittest.TestCase):
                 probe=lambda _path: {"duration_sec": 2, "width": 10, "height": 10},
             )
 
-    def test_export_contains_only_v2_contract_and_all_proxies(self):
+    def test_export_defaults_to_v3_autonomous_contract_and_all_proxies(self):
         outputs = fr.create_chatgpt_package(self.project, self.answers)
         self.assertTrue(outputs)
+        self.assertFalse((self.project / "PACOTE_PARA_IA" / "V2" / "PACKAGE_DESCRIPTOR.json").exists())
         with zipfile.ZipFile(outputs[0]) as archive:
             names = set(archive.namelist())
-            for name in package_v2.DETERMINISTIC_FILES:
+            for name in director_v3.DETERMINISTIC_FILES:
                 self.assertIn(name, names)
             self.assertNotIn("EDIT_PLAN.json", names)
-            self.assertFalse(any("RESPOSTA" in name for name in names))
+            self.assertNotIn("CARD_STATE_V2.json", names)
+            self.assertFalse(any(name.startswith("assets/fonts/") for name in names))
             for index in range(1, 4):
                 self.assertIn(f"proxies/M{index:04d}_PROXY.png", names)
 

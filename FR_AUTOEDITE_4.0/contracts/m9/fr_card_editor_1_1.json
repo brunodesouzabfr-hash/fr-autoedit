@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "contract_id": "fr-card-editor/1.1",
+  "component": {
+    "id": "fr-card-editor",
+    "version": "1.1.0",
+    "entrypoint": "index.html",
+    "distribution": "local_only_pending_license",
+    "files": {
+      "index.html": {
+        "sha256": "810f6df20310ba6a1edae4ab2e3ab4d80e85d1ad2486c9a38f51e0cd82634143"
+      },
+      "assets/background-fr-hd.png": {
+        "sha256": "012a4eb3c0d76b823b3963292f0d1d8e8e8fbc69c1a4db8f75e78ea6249475bc",
+        "width": 2160,
+        "height": 3840,
+        "mode": "RGB"
+      },
+      "assets/background-fr-source.png": {
+        "sha256": "1203482771fbb70024555ab9cc06c666881494057d7b3d8ddd07000318410ace",
+        "width": 941,
+        "height": 1672,
+        "mode": "RGB"
+      },
+      "assets/background-fr.png": {
+        "sha256": "324a1a2287925a31ffca1f9db1b608a89559688c9d1ce763cab4415a4a4ad8f0",
+        "width": 941,
+        "height": 1672,
+        "mode": "RGB"
+      },
+      "assets/logo-fr.png": {
+        "sha256": "26ad729e8e0c8b32407769d06111e6a11c0bde491556c0d813ef0e17f0c0aaa6",
+        "width": 2048,
+        "height": 2048,
+        "mode": "RGBA"
+      }
+    },
+    "excluded": ["FR_CARD_EDITOR_STANDALONE.html"]
+  },
+  "canvas": {
+    "width": 941,
+    "height": 1672,
+    "ratio": "9:16",
+    "export_resolutions": [[941, 1672], [1080, 1920], [2160, 3840]]
+  },
+  "state": {
+    "top_level_fields": ["version", "canvas", "assets", "gridStyle", "layers", "fields", "lines"],
+    "version": "1.1.0",
+    "layers": ["background", "grid", "text", "logo"],
+    "asset_fields": [
+      "background",
+      "logo",
+      "visual",
+      "visualOpacity",
+      "visualShape",
+      "visualSize",
+      "visualZoom",
+      "visualFocalX",
+      "visualFocalY"
+    ],
+    "visual_shapes": ["circle", "square", "rounded", "full"],
+    "visual_ranges": {
+      "visualOpacity": [0, 1],
+      "visualSize": [120, 620],
+      "visualZoom": [1, 3],
+      "visualFocalX": [0, 100],
+      "visualFocalY": [0, 100]
+    },
+    "grid_style_fields": ["opacity"],
+    "grid_opacity_range": [0.05, 1]
+  },
+  "fields": {
+    "fixed_ids": [
+      "promise",
+      "brandSlash",
+      "brandHandle",
+      "pillars",
+      "quote1",
+      "quote2",
+      "services",
+      "region",
+      "whatsapp",
+      "site"
+    ],
+    "variable_ids": [
+      "title",
+      "subtitle",
+      "field1",
+      "field2",
+      "field3",
+      "field4",
+      "leftSupport",
+      "visualTitle",
+      "visualBody",
+      "summaryTitle",
+      "summaryBody"
+    ],
+    "properties": [
+      "id",
+      "role",
+      "text",
+      "x",
+      "y",
+      "w",
+      "h",
+      "font",
+      "size",
+      "weight",
+      "lineHeight",
+      "spacing",
+      "align",
+      "color",
+      "effect",
+      "visible",
+      "noWrap",
+      "shadowEnabled",
+      "shadowX",
+      "shadowY",
+      "shadowBlur",
+      "shadowOpacity"
+    ],
+    "fonts": ["Stardos Stencil", "Cormorant Garamond", "Rokkitt", "Share Tech Mono", "Georgia", "Arial"],
+    "weights": [400, 500, 600, 700],
+    "alignments": ["left", "center", "right"],
+    "effects": ["plain", "metallic"],
+    "dynamic_fields": true
+  },
+  "lines": {
+    "ids": [
+      "v-left",
+      "v-right",
+      "top-left",
+      "top-right",
+      "title-left",
+      "title-right",
+      "title-underline",
+      "info-1",
+      "info-2",
+      "info-3",
+      "visual-left",
+      "visual-right",
+      "visual-top-left",
+      "visual-top-right",
+      "visual-bottom",
+      "footer-left",
+      "footer-right",
+      "footer-top",
+      "footer-center",
+      "dash-left-1",
+      "dash-left-2",
+      "dash-right-1",
+      "dash-right-2",
+      "dash-right-3",
+      "dash-right-4",
+      "dash-promise",
+      "dash-pillars",
+      "dash-services",
+      "dash-summary"
+    ],
+    "properties": ["id", "x1", "y1", "x2", "y2", "width", "color", "visible", "opacity", "fade"],
+    "width_range": [0.2, 12],
+    "opacity_range": [0.02, 1],
+    "dynamic_lines": true
+  },
+  "javascript_api": ["getConfig", "applyConfig", "setField", "setLine", "exportPNG", "reset", "dimensions"],
+  "integrated_policy": {
+    "local_storage_source_of_truth": false,
+    "persistent_data_urls": false,
+    "html_as_project_state": false,
+    "png_as_project_state": false,
+    "backend_render_required": true,
+    "full_state_round_trip_required": true
+  },
+  "known_divergences": [
+    "screen_metallic_css_differs_from_canvas_gradient",
+    "screen_and_canvas_text_measurement_may_differ",
+    "original_applyConfig_is_not_a_production_validator",
+    "editor_contract_is_9_16_only"
+  ]
+}

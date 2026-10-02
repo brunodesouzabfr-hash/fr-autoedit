@@ -1,0 +1,2784 @@
+# PARTE II — FR AUTOEDITE NEXT
+
+## Stress Test Arquitetural, Inteligência Editorial FR, Provenance, Contratos e Preparação para Codex
+
+Esta Parte II complementa integralmente a Parte I.
+
+NÃO reinicie o projeto.
+
+NÃO repita todas as seções da Parte I.
+
+NÃO produza outra arquitetura independente.
+
+Considere que a Parte I já lhe obrigou a conceber a melhor arquitetura possível para a próxima geração da FR AutoEdite.
+
+Sua tarefa agora é:
+
+1. tentar quebrar essa arquitetura;
+2. encontrar premissas frágeis;
+3. especializá-la para o uso real da Franco Romeu;
+4. acrescentar requisitos operacionais ausentes;
+5. transformar decisões conceituais em contratos verificáveis;
+6. separar claramente hipótese, requisito, decisão e implementação;
+7. preparar a arquitetura para posterior execução incremental pelo Codex.
+
+---
+
+# 1. PRINCÍPIO CENTRAL DESTA PARTE
+
+A Parte I responde:
+
+> “Qual sistema deveríamos construir?”
+
+A Parte II deve responder:
+
+> “Essa arquitetura realmente sobreviverá ao mundo real, aos arquivos reais, ao uso real da Franco Romeu, às decisões probabilísticas de IA, a falhas, a projetos antigos e à evolução futura?”
+
+Sua função aqui é agir como:
+
+* Architecture Review Board;
+* Staff Engineer adversarial;
+* Technical Product Architect;
+* AI Safety/Validation Engineer;
+* Media Pipeline Engineer;
+* Director of Editing;
+* especialista em workflows audiovisuais reais;
+* especialista no domínio Franco Romeu.
+
+Não proteja suas decisões anteriores.
+
+Se uma arquitetura proposta na Parte I for frágil, corrija-a.
+
+---
+
+# 2. REGISTRO FORMAL DE PREMISSAS
+
+Antes de continuar, extraia da arquitetura da Parte I todas as premissas relevantes.
+
+Classifique cada uma como:
+
+* FACT;
+* REQUIREMENT;
+* ASSUMPTION;
+* HYPOTHESIS;
+* ARCHITECTURAL DECISION;
+* DEFERRED DECISION.
+
+Exemplo:
+
+```text
+ASSUMPTION
+A maioria dos projetos possui informação temporal utilizável.
+
+RISK
+Arquivos de WhatsApp e exports podem destruir metadados.
+
+MITIGATION
+Combinar EXIF, filename, filesystem timestamps,
+sidecars, análise visual e confirmação humana.
+```
+
+Não permita que uma suposição seja tratada como fato.
+
+Crie um:
+
+# ASSUMPTION REGISTER
+
+Ele deverá permanecer associado ao projeto técnico.
+
+---
+
+# 3. FR-FIRST, MAS NÃO FR-HARDCODED
+
+A aplicação deve ser concebida prioritariamente para a Franco Romeu.
+
+Entretanto, separe rigorosamente:
+
+```text
+UNIVERSAL MEDIA CORE
+        +
+DOMAIN PACK
+        +
+BRAND PACK
+        +
+CONTENT STRATEGY PACK
+```
+
+A Franco Romeu deverá ser a primeira implementação completa desses sistemas.
+
+## UNIVERSAL MEDIA CORE
+
+Não deve conhecer conceitos como:
+
+* pintura;
+* hidráulica;
+* móveis;
+* Franco Romeu;
+* quiet luxury.
+
+Deve conhecer:
+
+* mídia;
+* tempo;
+* cenas;
+* objetos;
+* ações;
+* metadados;
+* timeline;
+* render;
+* áudio;
+* texto;
+* análise;
+* jobs.
+
+## FR DOMAIN PACK
+
+Pode conhecer:
+
+* serviços;
+* processos;
+* materiais;
+* fases;
+* ambientes;
+* técnicas;
+* terminologia;
+* relações entre serviços.
+
+## FR BRAND PACK
+
+Pode conhecer:
+
+* identidade;
+* grids;
+* logo;
+* tipografia;
+* movimento;
+* cards;
+* cores;
+* linguagem visual.
+
+## FR CONTENT STRATEGY
+
+Pode conhecer:
+
+* formatos editoriais;
+* narrativa;
+* conteúdo técnico;
+* conteúdo comercial;
+* portfólio;
+* redes sociais.
+
+Nenhuma regra puramente Franco Romeu deverá ser acoplada ao Media Core sem necessidade técnica.
+
+---
+
+# 4. REALIDADE DA INGESTÃO
+
+Não imagine que os projetos chegam perfeitamente organizados.
+
+Projete explicitamente para:
+
+* diretórios locais;
+* ZIP;
+* Google Takeout;
+* exports de celular;
+* cartão SD;
+* fotos;
+* vídeos;
+* timelapses;
+* screen recordings;
+* renders;
+* vídeos longos;
+* arquivos parcialmente duplicados;
+* arquivos renomeados;
+* arquivos sem data confiável;
+* mídia editada misturada com originais;
+* sidecars;
+* EXIF;
+* XMP;
+* GPS quando disponível;
+* timestamps inconsistentes.
+
+A ingestão deve produzir:
+
+# MEDIA PROVENANCE
+
+Para cada asset determine, quando possível:
+
+```text
+source
+original_path
+import_batch
+hash
+perceptual_hash
+creation_time
+filesystem_time
+device
+codec
+resolution
+duration
+exif
+gps
+sidecars
+derived_from
+suspected_duplicate_of
+media_generation
+```
+
+---
+
+# 5. GERAÇÕES DE MÍDIA
+
+Um problema importante é impedir que versões exportadas sejam tratadas como matéria-prima original.
+
+Projete classificação semelhante a:
+
+```text
+G0 = original bruto
+G1 = proxy
+G2 = derivado técnico
+G3 = edição intermediária
+G4 = master/export
+G5 = social derivative
+```
+
+Não adote obrigatoriamente esses nomes.
+
+Mas resolva estruturalmente o problema.
+
+Exemplo:
+
+O sistema não deve selecionar automaticamente um Reel já exportado como se fosse gravação original da obra.
+
+---
+
+# 6. CLASSES SEMÂNTICAS QUE NÃO PODEM SER CONFUNDIDAS
+
+A arquitetura deverá distinguir explicitamente:
+
+* referência visual;
+* moodboard;
+* render 3D;
+* projeto 3D;
+* planta/desenho técnico;
+* estado anterior da obra;
+* processo real;
+* resultado executado;
+* produto/material isolado;
+* conteúdo externo;
+* conteúdo promocional previamente produzido.
+
+Isto é crítico.
+
+Um render 3D NÃO constitui evidência de que determinada solução foi executada.
+
+Uma referência do Pinterest NÃO constitui evidência de autoria.
+
+Uma imagem de projeto NÃO pode ser automaticamente rotulada como “resultado final”.
+
+Projete mecanismos para prevenir essas confusões.
+
+---
+
+# 7. PROVENANCE SEMÂNTICA
+
+Cada afirmação produzida pelo sistema deverá possuir origem rastreável.
+
+Exemplo conceitual:
+
+```text
+CLAIM
+"Instalação da iluminação LED"
+
+EVIDENCE
+asset_042
+segment_07
+00:13.400–00:21.800
+
+SOURCE TYPE
+real_process
+
+MODEL CONFIDENCE
+0.92
+
+DOMAIN CONFIDENCE
+0.86
+```
+
+Isso deve valer para:
+
+* cards;
+* balões;
+* legendas técnicas;
+* títulos;
+* descrições;
+* Story Engine;
+* classificação de etapas;
+* resumo do projeto.
+
+---
+
+# 8. PROIBIÇÃO DE AFIRMAÇÃO NÃO PROVADA
+
+Projete níveis de afirmação.
+
+Exemplo:
+
+## OBSERVED
+
+Diretamente visível ou audível.
+
+## INFERRED
+
+Inferência razoável da mídia.
+
+## PROVIDED
+
+Informação fornecida pelo usuário ou projeto.
+
+## EXTERNAL
+
+Informação oriunda de fonte externa.
+
+## UNKNOWN
+
+Não comprovada.
+
+O Graphics Engine e Story Engine devem conhecer essa distinção.
+
+Exemplo:
+
+Se a mídia mostra aplicação de revestimento, o sistema pode descrever o processo observado.
+
+Se não existe informação suficiente para determinar o material específico, não deve inventá-lo.
+
+---
+
+# 9. CONTRATO ENTRE IA E CORE
+
+Defina uma fronteira absoluta.
+
+A IA NÃO deverá:
+
+* manipular arquivos diretamente;
+* inventar IDs;
+* criar timestamps inexistentes;
+* chamar FFmpeg arbitrariamente;
+* alterar banco de dados livremente;
+* executar shell;
+* modificar timeline diretamente.
+
+A IA deverá produzir:
+
+# DECLARATIVE EDIT INTENT
+
+Esse contrato pode conter conceitos como:
+
+```text
+selected_segments
+segment_order
+editorial_role
+crop_intent
+overlay_intent
+caption_intent
+transition_intent
+audio_intent
+reason
+confidence
+evidence
+```
+
+O formato definitivo deverá ser definido tecnicamente na arquitetura.
+
+---
+
+# 10. VALIDATION GATE
+
+Todo plano criado por IA deverá passar por validação determinística antes de ser aplicado.
+
+O Validator deverá verificar pelo menos:
+
+* media_id existe;
+* segment_id existe;
+* timestamps pertencem ao arquivo;
+* início < fim;
+* duração válida;
+* asset não está corrompido;
+* claim possui evidência quando necessária;
+* style token existe;
+* template existe;
+* track suporta aquela operação;
+* formato é compatível;
+* recursos não colidem;
+* arquivo original não será modificado.
+
+Se qualquer condição falhar:
+
+```text
+PLAN != EXECUTABLE
+```
+
+O sistema retorna erro estruturado.
+
+---
+
+# 11. PLAN → VALIDATE → APPLY
+
+Todas as operações relevantes deverão seguir algo conceitualmente equivalente a:
+
+```text
+REQUEST
+   ↓
+INTENT
+   ↓
+PLAN
+   ↓
+VALIDATE
+   ↓
+DIFF
+   ↓
+SNAPSHOT
+   ↓
+APPLY
+   ↓
+AUDIT EVENT
+```
+
+O usuário deverá poder visualizar mudanças importantes antes de aplicá-las.
+
+---
+
+# 12. SNAPSHOTS TRANSACIONAIS
+
+Antes de qualquer alteração significativa:
+
+* registrar estado;
+* registrar operação;
+* registrar origem;
+* registrar usuário/agente;
+* registrar versão do modelo;
+* registrar parâmetros relevantes.
+
+Permitir:
+
+```text
+undo
+redo
+restore
+branch
+duplicate version
+regenerate
+```
+
+Investigue se event sourcing completo é justificável ou se snapshots + operation log são suficientes.
+
+Não introduza complexidade sem benefício real.
+
+---
+
+# 13. EDITABILIDADE APÓS IA
+
+Uma edição gerada por IA NÃO pode virar objeto opaco.
+
+Depois da geração automática, o usuário deverá poder:
+
+* cortar;
+* alongar;
+* trocar take;
+* mover card;
+* editar texto;
+* remover card;
+* trocar estilo;
+* substituir música;
+* alterar ordem;
+* modificar crop;
+* alterar duração.
+
+O projeto continua estruturalmente válido.
+
+---
+
+# 14. REPROCESSAMENTO RETROATIVO
+
+Projete pensando no seguinte cenário:
+
+Hoje existem 200 projetos.
+
+A Franco Romeu altera o sistema de cards.
+
+Não devemos reeditar manualmente 200 projetos.
+
+O sistema deverá distinguir:
+
+```text
+CONTENT DECISIONS
+STYLE DECISIONS
+RENDER DECISIONS
+```
+
+Assim poderá, quando tecnicamente possível:
+
+```text
+mesma edição
++
+novo Brand Pack
+=
+novo render
+```
+
+sem refazer a análise semântica inteira.
+
+---
+
+# 15. INVALIDAÇÃO DE CACHE
+
+Defina uma estratégia formal.
+
+Um artefato derivado precisa saber de quais inputs depende.
+
+Exemplo conceitual:
+
+```text
+preview_signature =
+timeline_version
++ brand_pack_version
++ template_version
++ asset_hash
++ render_parameters
+```
+
+Se somente o template mudar:
+
+* não reexecutar visão computacional;
+* não retranscrever áudio;
+* não recalcular embeddings;
+* invalidar apenas resultados dependentes.
+
+Projete um dependency graph de cache.
+
+---
+
+# 16. MEDIA INTELLIGENCE — VALOR EDITORIAL
+
+Não se limite à qualidade técnica.
+
+Para conteúdo Franco Romeu, investigue atributos editoriais como:
+
+* transformação;
+* ação;
+* materialidade;
+* detalhe técnico;
+* textura;
+* precisão;
+* uso de ferramenta;
+* revelação;
+* contraste antes/depois;
+* progressão;
+* dificuldade visível;
+* acabamento;
+* resultado;
+* composição;
+* novidade.
+
+Um trecho tecnicamente perfeito pode ser editorialmente inútil.
+
+Um trecho tecnicamente imperfeito pode documentar uma etapa essencial.
+
+Crie separação entre:
+
+```text
+TECHNICAL QUALITY
+EDITORIAL VALUE
+SEMANTIC VALUE
+NARRATIVE VALUE
+```
+
+---
+
+# 17. SCORE NÃO É VERDADE
+
+Se utilizar scoring, ele deverá ser explicável e modular.
+
+Evite:
+
+```text
+magic_score = 0.87
+```
+
+Prefira dimensões independentes.
+
+Exemplo:
+
+```text
+sharpness       0.91
+stability       0.75
+action          0.93
+novelty         0.88
+technical_value 0.95
+transformation  0.76
+```
+
+Diferentes Story Engines poderão aplicar pesos diferentes.
+
+---
+
+# 18. CONTEXTUAL SCORING
+
+O “melhor take” depende da finalidade.
+
+Um mesmo segmento pode receber:
+
+```text
+technical_tutorial = 0.94
+luxury_showcase    = 0.61
+before_after       = 0.72
+behind_the_scenes  = 0.89
+```
+
+Evite criar um ranking universal permanente.
+
+---
+
+# 19. ONTOLOGIA FR
+
+Projete um modelo formal do domínio Franco Romeu.
+
+Por exemplo:
+
+```text
+SERVICE
+PROCESS
+PHASE
+ACTION
+MATERIAL
+TOOL
+ENVIRONMENT
+COMPONENT
+RESULT
+DEFECT
+SOLUTION
+```
+
+Exemplos de relações:
+
+```text
+ACTION
+uses TOOL
+
+ACTION
+acts_on MATERIAL
+
+PROCESS
+contains ACTION
+
+SERVICE
+contains PROCESS
+
+PROJECT_PHASE
+contains PROCESS
+```
+
+Não transforme isso necessariamente em um knowledge graph complexo se um modelo relacional resolver.
+
+Escolha pela necessidade.
+
+---
+
+# 20. VOCABULÁRIO CONTROLADO + LINGUAGEM LIVRE
+
+A aplicação deverá combinar:
+
+## VOCABULÁRIO CONTROLADO
+
+Para classificação interna consistente.
+
+## NATURAL LANGUAGE
+
+Para descrição rica.
+
+Exemplo:
+
+Internamente:
+
+```text
+service = hydraulic
+action = fixture_installation
+component = kitchen_sink
+```
+
+Externamente:
+
+> “Instalação e ajuste da cuba na bancada.”
+
+Isso reduz inconsistência sem empobrecer a comunicação.
+
+---
+
+# 21. RENDER 3D × OBRA REAL
+
+Crie uma regra arquitetural explícita:
+
+```text
+DESIGN INTENT != EXECUTED RESULT
+```
+
+O Story Engine pode mostrar:
+
+```text
+Projeto 3D
+→
+Execução
+→
+Resultado
+```
+
+Mas jamais poderá fundi-los semanticamente.
+
+---
+
+# 22. BEFORE / PROCESS / AFTER COMO ENTIDADES
+
+Não trate before/after como simples tags.
+
+Projete relações como:
+
+```text
+same_space
+same_component
+same_project
+different_phase
+```
+
+Isso ajudará:
+
+* matching;
+* transformação;
+* carrossel;
+* comparação;
+* storytelling;
+* geração automática de pares.
+
+---
+
+# 23. RETENÇÃO × QUIET LUXURY
+
+A aplicação não deverá otimizar retenção simplesmente aumentando:
+
+* número de cortes;
+* zoom;
+* texto;
+* efeitos;
+* velocidade.
+
+Defina:
+
+# EDITORIAL PACING MODEL
+
+Ele deve considerar:
+
+* plataforma;
+* conteúdo;
+* informação;
+* movimento existente;
+* complexidade visual;
+* etapa narrativa;
+* posicionamento da marca.
+
+O objetivo é:
+
+```text
+MAXIMIZAR DENSIDADE DE VALOR
+≠
+MAXIMIZAR QUANTIDADE DE CORTES
+```
+
+---
+
+# 24. HOLD TIME
+
+Investigue hold time adaptativo.
+
+Por exemplo:
+
+Um macro de textura pode justificar mais permanência.
+
+Um deslocamento de câmera sem ação pode justificar corte rápido.
+
+Um detalhe técnico pode precisar de tempo suficiente para compreensão.
+
+Portanto:
+
+```text
+hold_time =
+function(
+  semantic_complexity,
+  motion,
+  narrative_role,
+  platform,
+  visual_density
+)
+```
+
+Não trate isso como fórmula fixa sem validação.
+
+---
+
+# 25. HOOKS VERIFICÁVEIS
+
+O Hook Engine não poderá inventar:
+
+* números;
+* preço;
+* prazo;
+* depoimento;
+* dificuldade;
+* economia;
+* urgência;
+* escassez;
+* resultado.
+
+Prefira hooks extraídos de informação verdadeira.
+
+Exemplos de estruturas:
+
+```text
+TRANSFORMATION
+DETAIL
+PROBLEM
+CONTRAST
+QUESTION
+REVEAL
+PROCESS
+```
+
+O hook deve possuir provenance.
+
+---
+
+# 26. BRAND FIDELITY COMO SISTEMA
+
+Não basta armazenar:
+
+```text
+orange = #...
+```
+
+O Brand Pack deve poder controlar:
+
+* typography;
+* logo;
+* spacing;
+* grid;
+* hierarchy;
+* corner treatment;
+* opacity;
+* motion timing;
+* transitions;
+* lower thirds;
+* card families;
+* safe areas;
+* caption style;
+* CTA;
+* intro/outro;
+* compositional rules.
+
+---
+
+# 27. FONT PIPELINE
+
+A fidelidade tipográfica deve ser validada.
+
+Considere:
+
+* disponibilidade da fonte;
+* versão;
+* licença;
+* fallback;
+* rasterização;
+* shaping;
+* kerning;
+* line breaking;
+* renderização no preview;
+* renderização no master.
+
+Preview e render final não devem produzir composições radicalmente diferentes.
+
+---
+
+# 28. STYLE PACK VERSIONING
+
+Cada Style Pack deverá possuir versão.
+
+Exemplo conceitual:
+
+```text
+FR_STYLE
+1.0
+1.1
+2.0
+```
+
+Um projeto antigo deverá saber qual versão utilizou.
+
+O usuário poderá optar por:
+
+```text
+KEEP ORIGINAL STYLE
+```
+
+ou:
+
+```text
+MIGRATE TO CURRENT STYLE
+```
+
+---
+
+# 29. DESIGN TOKENS
+
+Separe:
+
+```text
+DESIGN TOKENS
+```
+
+de:
+
+```text
+TEMPLATE GEOMETRY
+```
+
+e:
+
+```text
+MOTION PRESET
+```
+
+Isso permitirá alterar identidade sem reconstruir todo o sistema de composição.
+
+---
+
+# 30. GUIA DE COMPOSIÇÃO ADAPTATIVA
+
+Cards e balões devem reagir a:
+
+* proporção;
+* objeto principal;
+* rosto;
+* ferramentas;
+* mãos;
+* subtitle area;
+* safe area;
+* movimento;
+* outros overlays.
+
+Crie um:
+
+# OCCUPANCY MAP
+
+ou mecanismo equivalente.
+
+O Graphics Engine deverá saber quais regiões do frame estão “ocupadas semanticamente”.
+
+---
+
+# 31. PRIVACIDADE LOCAL-FIRST
+
+A arquitetura deverá funcionar fundamentalmente com mídia local.
+
+Nenhum fluxo básico deverá exigir upload de mídia pessoal.
+
+Quando um recurso cloud for habilitado:
+
+* indicar claramente o que será enviado;
+* para qual finalidade;
+* para qual serviço;
+* permitir cancelar;
+* permitir substituir por alternativa local quando existente.
+
+---
+
+# 32. LOCAL APPLICATION BOUNDARY
+
+Se utilizar servidor local:
+
+* bind local;
+* autenticação/controle quando necessário;
+* nunca expor automaticamente a LAN;
+* CORS restritivo;
+* paths validados;
+* tokens protegidos;
+* nenhuma credencial no repositório.
+
+Não assuma que `127.0.0.1` sozinho resolve toda segurança.
+
+Faça threat model.
+
+---
+
+# 33. ARQUIVOS PESSOAIS
+
+Defina políticas de:
+
+```text
+project/
+cache/
+proxies/
+renders/
+models/
+logs/
+secrets/
+```
+
+Mídia pessoal e projetos locais não devem entrar acidentalmente no Git.
+
+---
+
+# 34. JOB ENGINE — REALIDADE OPERACIONAL
+
+Teste sua arquitetura contra:
+
+* vídeo de 3 minutos;
+* vídeo de 90 minutos;
+* lote de 500 fotos;
+* projeto de 50 GB;
+* interrupção elétrica;
+* falta de espaço;
+* processo morto;
+* GPU indisponível;
+* modelo inexistente;
+* arquivo corrompido.
+
+Jobs deverão possuir:
+
+```text
+queued
+running
+paused
+completed
+failed
+cancelled
+recoverable
+```
+
+ou máquina de estados melhor.
+
+---
+
+# 35. RESOURCE SCHEDULER
+
+Não execute simultaneamente:
+
+* transcrição pesada;
+* análise visual pesada;
+* render 4K;
+
+se o hardware não suporta.
+
+Projete um scheduler considerando:
+
+* CPU;
+* GPU;
+* VRAM;
+* RAM;
+* storage throughput;
+* prioridade do usuário.
+
+---
+
+# 36. GRACEFUL DEGRADATION
+
+Se não houver GPU:
+
+não significa que o programa deixa de funcionar.
+
+Se um modelo multimodal estiver indisponível:
+
+não significa que a ingestão deixa de funcionar.
+
+Se a internet cair:
+
+não significa que a timeline deixa de abrir.
+
+Defina funcionalidades por níveis de capacidade.
+
+---
+
+# 37. CAPABILITY MATRIX
+
+Crie uma matriz semelhante a:
+
+```text
+CORE
+CPU
+GPU
+LOCAL_AI
+CLOUD_AI
+```
+
+E indique quais funcionalidades existem em cada nível.
+
+O usuário precisa saber:
+
+```text
+AVAILABLE
+LIMITED
+OPTIONAL
+UNAVAILABLE
+```
+
+---
+
+# 38. NÃO CONGELE TECNOLOGIAS PREMATURAMENTE
+
+Nomes como:
+
+* FFmpeg;
+* GStreamer;
+* OpenCV;
+* PySceneDetect;
+* PyAV;
+* MediaPipe;
+* Ollama;
+* Whisper;
+* faster-whisper;
+* whisper.cpp;
+* Remotion;
+* OpenTimelineIO;
+
+são candidatos.
+
+Não são mandamentos.
+
+Para cada categoria:
+
+1. identifique requisito;
+2. pesquise alternativas atuais;
+3. construa shortlist;
+4. compare;
+5. escolha.
+
+---
+
+# 39. TECHNOLOGY DECISION RECORD
+
+Cada escolha estrutural importante deverá gerar ADR.
+
+Exemplo:
+
+```text
+ADR-007
+Timeline representation
+
+Candidates:
+A
+B
+C
+
+Decision:
+B
+
+Why:
+...
+
+Rejected:
+A because...
+C because...
+
+Revisit if:
+...
+```
+
+Não use ADR para trivialidades.
+
+---
+
+# 40. REPOSITORY HEALTH
+
+Ao recomendar projeto open source, analise:
+
+* licença;
+* releases;
+* atividade;
+* issues;
+* manutenção;
+* documentação;
+* API stability;
+* comunidade;
+* dependências;
+* plataforma;
+* performance;
+* facilidade de substituição.
+
+Não selecione biblioteca somente porque possui muitas estrelas.
+
+---
+
+# 41. ABSTRACTION BOUNDARY
+
+Dependências importantes devem ser encapsuladas.
+
+Exemplo:
+
+```text
+TranscriptionProvider
+VisionProvider
+TimelineSerializer
+RenderBackend
+EmbeddingProvider
+```
+
+Isso permite trocar implementação sem reescrever o produto.
+
+Não abstraia tudo indiscriminadamente.
+
+Abstraia especialmente componentes com:
+
+* fornecedor externo;
+* modelo de IA;
+* backend de render;
+* alta volatilidade tecnológica.
+
+---
+
+# 42. SPEECH ENGINE
+
+Não imponha antecipadamente Whisper ou qualquer modelo específico.
+
+Defina primeiro uma interface capaz de fornecer:
+
+```text
+segments
+words
+timestamps
+confidence
+speaker optional
+language
+```
+
+Depois selecione backend.
+
+Na primeira milestone, speech intelligence poderá ser:
+
+* incluída;
+* reduzida;
+* postergada;
+
+de acordo com dependências reais do MVP.
+
+---
+
+# 43. VISUAL INTELLIGENCE EM CAMADAS
+
+Evite enviar todos os frames para um modelo multimodal caro.
+
+Considere pipeline:
+
+```text
+CHEAP SIGNALS
+↓
+CANDIDATE WINDOWS
+↓
+CLASSICAL CV
+↓
+SPECIALIZED MODEL
+↓
+MULTIMODAL REASONING
+```
+
+Use inteligência cara onde ela produz valor.
+
+---
+
+# 44. FRAME SAMPLING INTELIGENTE
+
+Não analise necessariamente 24 ou 60 frames por segundo semanticamente.
+
+Projete estratégias baseadas em:
+
+* scene boundaries;
+* motion;
+* entropy;
+* keyframes;
+* temporal sampling;
+* detected actions.
+
+Determine quais etapas precisam de frame-level precision.
+
+---
+
+# 45. HIERARQUIA DE ANÁLISE
+
+Considere níveis:
+
+```text
+ASSET
+SHOT
+SCENE
+SEGMENT
+FRAME
+REGION
+```
+
+Uma classificação deve informar a granularidade.
+
+Exemplo:
+
+```text
+asset = kitchen_project
+scene = island_installation
+segment = cutting_countertop
+region = hand/tool
+```
+
+---
+
+# 46. RESULTADOS DE IA PRECISAM DE VERSIONAMENTO
+
+Registre:
+
+* provider;
+* model;
+* model version;
+* prompt/template version;
+* parameters;
+* timestamp;
+* confidence;
+* source inputs.
+
+Se um modelo for trocado, o sistema deverá saber que análises antigas pertencem a outro pipeline.
+
+---
+
+# 47. REANÁLISE SELETIVA
+
+Ao instalar um detector melhor de cenas:
+
+não reexecute necessariamente toda inteligência semântica.
+
+Projete lineage entre analyses.
+
+---
+
+# 48. HUMAN REVIEW QUE REALMENTE AJUDA
+
+Não obrigue o usuário a revisar milhares de detecções.
+
+Crie interfaces de revisão para decisões de alto impacto.
+
+Exemplos:
+
+```text
+LOW CONFIDENCE
+CONFLICT
+NO EVIDENCE
+DUPLICATE
+AMBIGUOUS PHASE
+```
+
+O humano deve revisar exceções, não atuar como operador do algoritmo.
+
+---
+
+# 49. ACTIVE LEARNING LOCAL
+
+Avalie se correções humanas podem melhorar futuros projetos.
+
+Exemplo:
+
+Usuário corrige repetidamente:
+
+```text
+"isto é iluminação, não elétrica"
+```
+
+A aplicação pode:
+
+* aprender preferência;
+* criar regra;
+* atualizar vocabulário;
+* sugerir correção futura.
+
+Mas não crie treinamento complexo sem justificativa.
+
+Considere primeiro:
+
+* preference memory;
+* rules;
+* exemplars;
+* embeddings;
+* few-shot context.
+
+---
+
+# 50. COMPETITIVE DECOMPOSITION
+
+Compare conceitualmente a solução com categorias representadas por:
+
+* Premiere;
+* DaVinci Resolve;
+* CapCut;
+* Descript;
+* Opus Clip;
+* VEED;
+* Submagic;
+* Munch;
+* Auto-Editor;
+* ferramentas emergentes equivalentes.
+
+Não produza propaganda.
+
+Para cada uma, identifique:
+
+```text
+WHAT THEY OPTIMIZE FOR
+WHAT THEY DO WELL
+WHAT FR AUTOEDITE SHOULD NOT COPY
+WHAT CONCEPT IS WORTH ADOPTING
+```
+
+A comparação deverá utilizar informação atual quando pesquisa externa estiver disponível.
+
+---
+
+# 51. NÃO TENTE VENCER UM NLE EM TUDO
+
+A FR AutoEdite não precisa possuir:
+
+* color grading equivalente ao DaVinci;
+* compositor equivalente ao After Effects;
+* timeline equivalente ao Premiere;
+* editor gráfico equivalente ao Canva.
+
+Descubra seu produto específico.
+
+Uma hipótese central a ser validada é:
+
+> A FR AutoEdite deve dominar a transformação de acervos brutos de obras e projetos em narrativas sociais estruturadas, tecnicamente contextualizadas, visualmente consistentes e multi-output.
+
+Teste essa hipótese.
+
+---
+
+# 52. DIFERENCIAL DEFENSÁVEL
+
+Investigue especialmente:
+
+## PROJECT-AWARE EDITING
+
+A mídia pertence a um projeto e possui significado dentro dele.
+
+## DOMAIN-AWARE EDITING
+
+A aplicação entende serviços, ações e etapas.
+
+## EVIDENCE-AWARE GENERATION
+
+Texto e narrativa possuem provenance.
+
+## SEMANTIC MEDIA MEMORY
+
+O acervo se torna pesquisável.
+
+## EXPLAINABLE AUTOEDIT
+
+A IA informa por que tomou decisões relevantes.
+
+## BRAND-AWARE COMPOSITION
+
+Branding faz parte do motor de composição.
+
+## MULTI-OUTPUT STORY GRAPH
+
+Um entendimento editorial pode gerar diversas saídas sem reanalisar tudo.
+
+Determine quais realmente constituem vantagem arquitetural.
+
+---
+
+# 53. STORY GRAPH
+
+Investigue se uma única timeline master é suficiente.
+
+Talvez seja melhor representar primeiro uma estrutura narrativa abstrata.
+
+Exemplo:
+
+```text
+PROJECT STORY
+│
+├── BEFORE
+├── PROBLEM
+├── PROCESS
+│   ├── demolition
+│   ├── infrastructure
+│   ├── furniture
+│   └── lighting
+├── DETAILS
+└── RESULT
+```
+
+Dessa estrutura poderiam nascer:
+
+```text
+60s Reel
+30s Reel
+Technical Cut
+Before/After
+Stories
+Long Film
+```
+
+Compare:
+
+```text
+MASTER TIMELINE FIRST
+```
+
+versus:
+
+```text
+STORY GRAPH FIRST
+```
+
+Escolha conscientemente.
+
+---
+
+# 54. CONTENT ATOMS
+
+Avalie representar material editorial como átomos reutilizáveis:
+
+```text
+atom:
+service
+phase
+action
+media windows
+description
+evidence
+importance
+```
+
+Isso pode permitir novas edições sem reanalisar arquivos.
+
+Não adote se duplicar desnecessariamente outras estruturas.
+
+---
+
+# 55. MULTI-OUTPUT NÃO DEVE SER "AUTO-CROP"
+
+Gerar versão 30s a partir de 90s não deve significar simplesmente cortar duração.
+
+Cada output pode possuir narrativa diferente.
+
+Exemplo:
+
+```text
+90s
+process-focused
+
+30s
+transformation-focused
+
+15s
+result-focused
+```
+
+Compartilham conhecimento, não necessariamente a mesma montagem.
+
+---
+
+# 56. PUBLICAÇÃO NÃO É O CORE INICIAL
+
+Diferencie:
+
+```text
+CREATE CONTENT
+```
+
+de:
+
+```text
+PUBLISH CONTENT
+```
+
+Integrações com:
+
+* Drive;
+* cloud;
+* redes sociais;
+* storage externo;
+
+devem ser plugins/adapters quando possível.
+
+Não transforme APIs de terceiros em dependência estrutural do editor.
+
+---
+
+# 57. EXPORT MANIFEST
+
+Cada export deverá possuir registro.
+
+Exemplo:
+
+```text
+project
+version
+timeline/story
+brand pack
+output preset
+resolution
+fps
+codec
+audio
+render date
+source version
+```
+
+Isso permite reproduzir o conteúdo publicado.
+
+---
+
+# 58. CONTENT LINEAGE
+
+Deve ser possível responder:
+
+> De qual projeto este Reel veio?
+
+> Qual timeline o produziu?
+
+> Quais mídias foram usadas?
+
+> Qual Style Pack estava ativo?
+
+> Qual modelo sugeriu os cortes?
+
+> Houve alterações humanas?
+
+Projete essa rastreabilidade.
+
+---
+
+# 59. TESTE COM CASOS REAIS
+
+Não valide somente componentes.
+
+Crie cenários de produto.
+
+## CASE A — Projeto organizado
+
+20 vídeos claros.
+
+## CASE B — Takeout
+
+400 mídias misturadas.
+
+## CASE C — Vídeo longo
+
+90 minutos.
+
+## CASE D — Projeto incompleto
+
+Sem “before”.
+
+## CASE E — Mídia ambígua
+
+Render + obra real.
+
+## CASE F — CPU ONLY
+
+Sem GPU.
+
+## CASE G — Rebrand
+
+Projeto antigo recebe Style Pack novo.
+
+## CASE H — Recuperação
+
+Aplicação interrompida durante análise.
+
+A arquitetura deve explicar o comportamento esperado em todos.
+
+---
+
+# 60. FAILURE INJECTION
+
+Inclua testes deliberados:
+
+* apagar proxy;
+* mover original;
+* corromper arquivo;
+* matar worker;
+* lotar disco;
+* remover GPU;
+* invalidar API;
+* alterar versão de Style Pack;
+* interromper render.
+
+Verifique se o sistema falha de maneira controlada.
+
+---
+
+# 61. PERFORMANCE BUDGET
+
+Defina orçamento de performance para:
+
+* abertura de projeto;
+* scrubbing;
+* preview;
+* ingestão;
+* geração de proxy;
+* análise;
+* render;
+* busca semântica.
+
+Não precisa definir números arbitrários agora.
+
+Mas a arquitetura deve permitir medir.
+
+---
+
+# 62. STORAGE BUDGET
+
+Grandes projetos geram:
+
+* originals;
+* proxies;
+* thumbnails;
+* waveforms;
+* embeddings;
+* analysis;
+* previews;
+* masters.
+
+Projete:
+
+* limpeza;
+* cache eviction;
+* pinning;
+* armazenamento externo;
+* cálculo de espaço;
+* proteção de original.
+
+---
+
+# 63. RELOCATABLE PROJECTS
+
+Um projeto não deve quebrar completamente se:
+
+```text
+/home/user/videos
+```
+
+virar:
+
+```text
+/mnt/storage/videos
+```
+
+Projete:
+
+* relative paths;
+* asset IDs;
+* relink;
+* hash matching;
+* media search.
+
+---
+
+# 64. OFFLINE ARCHIVE
+
+Avalie capacidade de arquivar projeto preservando:
+
+* projeto;
+* decisões;
+* textos;
+* metadata;
+* manifests;
+* thumbnails;
+* eventualmente proxies;
+
+sem necessariamente duplicar todos os originais.
+
+---
+
+# 65. HUMAN-EDITABLE INTERCHANGE
+
+É útil possuir um artefato legível por humano/IA.
+
+Por exemplo:
+
+```text
+PROJECT_BRIEF.md
+EDIT_REVIEW.md
+AI_EDIT_REQUEST.md
+```
+
+com blocos estruturados.
+
+Entretanto:
+
+**não use Markdown como banco de dados principal apenas por conveniência.**
+
+O formato humano deve funcionar como:
+
+```text
+INTERCHANGE / REVIEW / AUDIT
+```
+
+e ser validado contra schemas internos.
+
+---
+
+# 66. SCHEMA VERSIONING
+
+Contratos deverão possuir versões.
+
+Exemplo:
+
+```text
+edit_plan.schema.v1
+edit_plan.schema.v2
+```
+
+Defina:
+
+* migration;
+* compatibility;
+* validation;
+* deprecation.
+
+---
+
+# 67. MIGRATION TESTS
+
+Não basta escrever migração.
+
+Mantenha fixtures de projetos antigos.
+
+Toda versão deverá provar que consegue:
+
+* abrir;
+* migrar;
+* preservar;
+* ou rejeitar explicitamente um formato antigo.
+
+---
+
+# 68. PLUGIN TRUST MODEL
+
+Se existir plugin system:
+
+não permita execução arbitrária sem pensar em segurança.
+
+Classifique plugins:
+
+* internal;
+* trusted;
+* external.
+
+Defina capabilities.
+
+Exemplo:
+
+```text
+read project
+read media
+write analysis
+register template
+register exporter
+network
+```
+
+---
+
+# 69. MODEL DOWNLOAD SECURITY
+
+Se modelos de IA forem baixados:
+
+* origem;
+* checksum;
+* versionamento;
+* cache;
+* licença;
+* tamanho;
+* integridade;
+
+devem ser conhecidos.
+
+---
+
+# 70. LICENSING REVIEW
+
+A escolha de tecnologias deverá considerar uso comercial.
+
+Não basta o código funcionar.
+
+Analise:
+
+* software license;
+* model license;
+* font license;
+* codec implications;
+* redistribuição.
+
+Qualquer incerteza deve ser explicitada.
+
+---
+
+# 71. DEPENDENCY MINIMIZATION COMO CONSEQUÊNCIA
+
+Não adote:
+
+> “menos dependências sempre é melhor”.
+
+Adote:
+
+> “cada dependência precisa justificar seu custo operacional”.
+
+Para cada dependência pesada responda:
+
+* qual problema resolve;
+* existe substituto;
+* pode ser opcional;
+* afeta instalador;
+* afeta atualização;
+* afeta segurança;
+* afeta performance;
+* afeta cross-platform.
+
+---
+
+# 72. DEBIAN/LINUX COMO PRIORIDADE DE ENTREGA
+
+Considere Linux/Debian-like como alvo prioritário inicial caso isso corresponda ao ambiente operacional estabelecido.
+
+Mas evite acoplar o domínio e o core de forma que Windows/macOS se tornem estruturalmente impossíveis.
+
+Separe:
+
+```text
+CORE PORTABILITY
+```
+
+de:
+
+```text
+FIRST SUPPORTED PLATFORM
+```
+
+---
+
+# 73. NO TERMINAL COMO UX PADRÃO
+
+Ferramentas de diagnóstico podem possuir CLI.
+
+Mas o fluxo normal deve existir no Studio.
+
+O usuário não deve precisar decorar comandos para:
+
+* importar;
+* analisar;
+* editar;
+* gerar;
+* recuperar;
+* atualizar packs;
+* exportar.
+
+---
+
+# 74. UX DE EXPLICAÇÃO
+
+O Studio deve diferenciar visualmente:
+
+```text
+SOURCE FACT
+AI INFERENCE
+AI SUGGESTION
+MANUAL DECISION
+SYSTEM ACTION
+WARNING
+ERROR
+```
+
+Isso é particularmente importante em um editor assistido por IA.
+
+---
+
+# 75. CONFIDENCE NÃO DEVE POLUIR A INTERFACE
+
+Não mostre centenas de números ao usuário comum.
+
+Use confidence internamente.
+
+Exponha-a quando:
+
+* decisão é ambígua;
+* confiança é baixa;
+* existe conflito;
+* usuário solicita detalhes;
+* afirmação possui implicação técnica.
+
+---
+
+# 76. REVIEW BY EXCEPTION
+
+A interface ideal deverá dizer algo semelhante:
+
+```text
+147 assets analisados
+12 decisões precisam de revisão
+```
+
+e não:
+
+```text
+revise 4.912 classificações
+```
+
+---
+
+# 77. SIMPLE MODE
+
+O usuário deveria conseguir:
+
+```text
+NOVO PROJETO
+→
+IMPORTAR
+→
+OBJETIVO
+→
+ANALISAR
+→
+REVISAR EXCEÇÕES
+→
+GERAR
+```
+
+---
+
+# 78. PRO MODE
+
+Usuários avançados poderão acessar:
+
+* timeline;
+* analysis;
+* weights;
+* metadata;
+* diagnostics;
+* jobs;
+* model providers;
+* cache;
+* render graph.
+
+Simple e Pro devem utilizar o mesmo core.
+
+---
+
+# 79. NÃO CRIE DOIS PRODUTOS
+
+Evite:
+
+```text
+simple app
++
+pro app
+```
+
+Mantenha progressividade de complexidade.
+
+---
+
+# 80. ARCHITECTURAL RED TEAM
+
+Depois de consolidar todas as decisões, ataque sua própria arquitetura.
+
+Procure:
+
+* single point of failure;
+* overengineering;
+* abstração excessiva;
+* dependência excessiva de IA;
+* dependência de um fornecedor;
+* gargalo de storage;
+* gargalo de GPU;
+* gargalo de banco;
+* UX excessivamente complexa;
+* contratos difíceis de migrar;
+* plugin system prematuro;
+* Story Engine impossível de testar;
+* pipeline caro demais.
+
+---
+
+# 81. TRÊS FALHAS MAIS PROVÁVEIS
+
+Identifique as três coisas com maior probabilidade de destruir o projeto.
+
+Não escolha problemas superficiais.
+
+Para cada uma:
+
+```text
+FAILURE MODE
+WHY IT IS DANGEROUS
+EARLY SIGNAL
+MITIGATION
+FALLBACK
+```
+
+---
+
+# 82. PRE-MORTEM
+
+Imagine:
+
+> É 18 meses no futuro e o FR AutoEdite Next fracassou.
+
+Explique as cinco causas técnicas ou de produto mais plausíveis.
+
+Depois adapte o desenho para reduzi-las.
+
+---
+
+# 83. COMPLEXITY BUDGET
+
+Cada grande sistema deverá justificar existir.
+
+Classifique:
+
+```text
+ESSENTIAL NOW
+ESSENTIAL FOUNDATION
+LATER
+EXPERIMENTAL
+REJECT
+```
+
+Especialmente para:
+
+* knowledge graph;
+* vector database;
+* agents;
+* plugin marketplace;
+* event sourcing;
+* cloud;
+* multi-user;
+* generative video;
+* model training.
+
+---
+
+# 84. BUILD VS BUY VS INTEGRATE
+
+Para cada capacidade complexa, determine:
+
+```text
+BUILD
+ADAPT
+INTEGRATE
+OUTSOURCE
+```
+
+Exemplos:
+
+* timeline;
+* transcription;
+* scene detection;
+* rendering;
+* motion graphics;
+* embeddings;
+* object tracking.
+
+---
+
+# 85. ARCHITECTURE FREEZE
+
+Depois da pesquisa e do Red Team, produza:
+
+# ARCHITECTURE FREEZE v1
+
+Não significa que nunca mudará.
+
+Significa que o Codex não deve começar a implementar enquanto questões estruturais fundamentais continuam abertas.
+
+---
+
+# 86. DECISIONS THAT MUST BE FROZEN
+
+Antes da implementação determine pelo menos:
+
+* linguagem/core;
+* runtime;
+* UI architecture;
+* project format;
+* database;
+* timeline representation;
+* render backend;
+* job model;
+* media identity;
+* analysis storage;
+* AI provider boundary;
+* plugin boundary;
+* Brand Pack contract;
+* schema strategy.
+
+---
+
+# 87. DECISIONS THAT MAY REMAIN PLUGGABLE
+
+Exemplos:
+
+* transcription model;
+* multimodal provider;
+* embedding model;
+* detector;
+* music source;
+* cloud integrations.
+
+Não confunda arquitetura estável com tecnologias imutáveis.
+
+---
+
+# 88. CODEX IMPLEMENTATION CONTRACT
+
+Depois do Architecture Freeze, gere regras para o Codex.
+
+O Codex deverá receber:
+
+```text
+ARCHITECTURE
+ADR
+SCHEMAS
+DEPENDENCY RULES
+TESTS
+ACCEPTANCE CRITERIA
+MILESTONE
+```
+
+E não apenas uma descrição em linguagem natural.
+
+---
+
+# 89. CODEX NÃO DEVE REDESENHAR A ARQUITETURA DURANTE CADA PR
+
+O Codex poderá identificar problemas.
+
+Mas mudanças estruturais deverão produzir:
+
+```text
+ARCHITECTURE CHANGE REQUEST
+```
+
+antes de serem aplicadas.
+
+Isso evita deriva arquitetural entre dezenas de PRs.
+
+---
+
+# 90. VERTICAL SLICE PRIMEIRO
+
+Antes de implementar todos os subsistemas, construa um vertical slice mínimo que prove a arquitetura.
+
+Exemplo conceitual:
+
+```text
+IMPORT 1 VIDEO
+↓
+IDENTIFY
+↓
+GENERATE PROXY
+↓
+DETECT SCENES
+↓
+CREATE PROJECT
+↓
+CREATE SIMPLE TIMELINE
+↓
+ADD 1 GRAPHIC
+↓
+PREVIEW
+↓
+RENDER
+↓
+REOPEN PROJECT
+```
+
+Sem IA avançada inicialmente.
+
+Esse slice deve provar:
+
+* project model;
+* jobs;
+* timeline;
+* render;
+* persistence;
+* recovery.
+
+---
+
+# 91. INTELLIGENCE SECOND SLICE
+
+Depois:
+
+```text
+ANALYZE
+↓
+SUGGEST SEGMENTS
+↓
+PLAN
+↓
+VALIDATE
+↓
+USER REVIEW
+↓
+APPLY
+```
+
+Isso prova a fronteira IA/core.
+
+---
+
+# 92. FR DOMAIN SLICE
+
+Depois:
+
+```text
+PROJECT CONTEXT
+↓
+FR CLASSIFICATION
+↓
+STORY STRUCTURE
+↓
+FR GRAPHICS
+↓
+SOCIAL OUTPUT
+```
+
+Isso prova a especialização de domínio sem contaminar o core.
+
+---
+
+# 93. NÃO FAÇA UI COMPLETA ANTES DO CORE FUNCIONAR
+
+Evite construir dezenas de telas sobre contratos ainda instáveis.
+
+Use inicialmente interfaces mínimas suficientes para testar workflows.
+
+Depois refine UX.
+
+---
+
+# 94. NÃO FAÇA IA AVANÇADA ANTES DA LINHA DE BASE
+
+Primeiro crie baseline determinístico mensurável.
+
+Depois meça quanto a IA melhora:
+
+* seleção;
+* classificação;
+* tempo manual;
+* qualidade percebida.
+
+Sem baseline, “IA melhor” vira opinião.
+
+---
+
+# 95. MÉTRICAS DO PRODUTO
+
+Além de performance técnica, considere:
+
+```text
+TIME TO FIRST USABLE CUT
+MANUAL INTERVENTIONS
+REJECTED AI SUGGESTIONS
+PROJECT RECOVERY SUCCESS
+CACHE REUSE
+RENDER FAILURE RATE
+CLAIM VALIDATION FAILURE
+```
+
+Não trate essas métricas como metas arbitrárias inicialmente.
+
+Use-as para comparação.
+
+---
+
+# 96. HUMAN EFFORT AS PRIMARY KPI
+
+Uma das métricas centrais deverá ser:
+
+> Quanto trabalho humano é necessário para transformar mídia bruta em conteúdo publicável sem sacrificar qualidade?
+
+Meça tarefas humanas evitadas.
+
+---
+
+# 97. QUALITY NÃO PODE SER UM ÚNICO NÚMERO
+
+Avalie separadamente:
+
+* technical;
+* editorial;
+* factual;
+* brand;
+* narrative;
+* render.
+
+---
+
+# 98. BENCHMARK DATASET
+
+Construa futuramente um conjunto interno de projetos anonimizados ou autorizados para avaliação.
+
+Deve possuir exemplos de:
+
+* boa seleção;
+* má seleção;
+* before/after;
+* render/real;
+* serviços;
+* áreas mortas;
+* duplicatas;
+* baixa qualidade;
+* bons detalhes técnicos.
+
+Isso será essencial para medir evolução da inteligência.
+
+---
+
+# 99. GOLDEN EDITS
+
+Além de Golden Projects, mantenha edições aprovadas como referência.
+
+O objetivo não é treinar automaticamente.
+
+É permitir regressão:
+
+```text
+nova versão
+vs
+edição de referência
+```
+
+---
+
+# 100. ENTREGÁVEIS ADICIONAIS DA PARTE II
+
+Além dos entregáveis da Parte I, produza:
+
+## A. ASSUMPTION_REGISTER.md
+
+Premissas e riscos.
+
+## B. SYSTEM_INVARIANTS.md
+
+Regras que nunca podem ser violadas.
+
+Exemplos:
+
+```text
+Original media is immutable.
+AI cannot reference nonexistent media.
+Technical claims require provenance.
+```
+
+## C. MEDIA_PROVENANCE_SPEC.md
+
+Identidade, geração e lineage dos assets.
+
+## D. AI_CORE_CONTRACT.md
+
+Fronteira entre modelos e execução determinística.
+
+## E. FR_DOMAIN_MODEL.md
+
+Ontologia/vocabulário operacional.
+
+## F. BRAND_PACK_SPEC.md
+
+Contrato de identidade e motion.
+
+## G. CACHE_DEPENDENCY_GRAPH.md
+
+Reprocessamento seletivo.
+
+## H. CAPABILITY_MATRIX.md
+
+CPU/GPU/local/cloud.
+
+## I. FAILURE_MODEL.md
+
+Falhas e recuperação.
+
+## J. ARCHITECTURE_RED_TEAM.md
+
+Auto-crítica e pre-mortem.
+
+## K. ARCHITECTURE_FREEZE_V1.md
+
+Decisões congeladas antes do Codex.
+
+## L. VERTICAL_SLICE_PLAN.md
+
+Primeiro fluxo ponta a ponta.
+
+---
+
+# 101. SYSTEM INVARIANTS OBRIGATÓRIOS
+
+Analise e refine pelo menos estes invariantes:
+
+### INVARIANT 01
+
+Original nunca é modificado.
+
+### INVARIANT 02
+
+Nenhuma operação de IA é aplicada sem validação estrutural.
+
+### INVARIANT 03
+
+IA não pode referenciar mídia ou intervalo inexistente.
+
+### INVARIANT 04
+
+Afirmação factual/técnica precisa possuir origem.
+
+### INVARIANT 05
+
+Render 3D não equivale a obra executada.
+
+### INVARIANT 06
+
+Projeto precisa ser recuperável após interrupção.
+
+### INVARIANT 07
+
+Reprocessamento deve reutilizar trabalho anterior sempre que inputs dependentes não mudaram.
+
+### INVARIANT 08
+
+Core deve funcionar sem cloud obrigatória.
+
+### INVARIANT 09
+
+Decisões automáticas relevantes devem ser reversíveis.
+
+### INVARIANT 10
+
+Branding não deve estar hardcoded no motor universal.
+
+---
+
+# 102. DECISION MATRIX FINAL
+
+Antes do Prompt Operacional do Codex, produza uma matriz final contendo:
+
+| Decisão        | Escolha | Evidência | Trade-off | Status    |
+| -------------- | ------- | --------- | --------- | --------- |
+| Core language  | ...     | ...       | ...       | FROZEN    |
+| Timeline       | ...     | ...       | ...       | FROZEN    |
+| STT backend    | ...     | ...       | ...       | PLUGGABLE |
+| Vision backend | ...     | ...       | ...       | PLUGGABLE |
+
+Use estados como:
+
+```text
+FROZEN
+PLUGGABLE
+DEFERRED
+EXPERIMENTAL
+```
+
+---
+
+# 103. RESEARCH BACKLOG
+
+Nem todas as decisões precisam ser fingidamente resolvidas.
+
+Quando evidência for insuficiente:
+
+```text
+RESEARCH ITEM
+QUESTION
+CANDIDATES
+TEST
+DECISION CRITERIA
+```
+
+Não transforme dúvida real em falsa certeza.
+
+---
+
+# 104. PROTOTYPE BEFORE COMMITMENT
+
+Quando duas tecnologias permanecerem equivalentes, proponha spike técnico.
+
+Exemplo:
+
+```text
+SPIKE-003
+Compare timeline backend A vs B.
+
+Dataset:
+3 reference projects.
+
+Measure:
+serialization
+seek
+edit operations
+render integration
+complexity
+```
+
+Depois decidir.
+
+---
+
+# 105. SAÍDA FINAL DA PARTE II
+
+Sua resposta a esta Parte II deverá terminar com cinco blocos claramente separados:
+
+## 1. CORREÇÕES À ARQUITETURA DA PARTE I
+
+Tudo que você alteraria após este stress test.
+
+## 2. ARQUITETURA CONSOLIDADA
+
+Somente diferenças e decisões finais; não repita toda a Parte I inutilmente.
+
+## 3. ARCHITECTURE FREEZE v1
+
+Decisões necessárias para iniciar implementação.
+
+## 4. RESEARCH/SPIKES PENDENTES
+
+Somente questões cuja resolução depende de teste ou pesquisa adicional.
+
+## 5. DELTA PARA O PROMPT OPERACIONAL DO CODEX
+
+Liste exatamente o que precisa ser acrescentado ao Prompt Operacional produzido na Parte I.
+
+---
+
+# 106. REGRA DE NÃO REDUNDÂNCIA
+
+Antes de escrever qualquer seção, pergunte internamente:
+
+> Isto já foi completamente especificado na Parte I?
+
+Se SIM:
+
+não repita.
+
+Apenas:
+
+* refine;
+* corrija;
+* torne verificável;
+* acrescente requisito ausente;
+* registre conflito.
+
+A Parte II existe para aumentar a qualidade da Parte I, não para duplicá-la.
+
+---
+
+# 107. REGRA DE CONFLITO
+
+Se esta Parte II contradizer uma decisão da Parte I:
+
+não escolha silenciosamente.
+
+Produza:
+
+```text
+CONFLICT
+
+PART I
+...
+
+PART II REQUIREMENT
+...
+
+ANALYSIS
+...
+
+FINAL DECISION
+...
+
+WHY
+...
+```
+
+---
+
+# 108. REGRA DE TECNOLOGIA
+
+Não mantenha uma tecnologia simplesmente porque foi citada neste prompt.
+
+Toda tecnologia mencionada é:
+
+```text
+CANDIDATE
+```
+
+até ser tecnicamente selecionada.
+
+---
+
+# 109. REGRA DE CONTEXTO
+
+Use todo contexto confiável disponível sobre a Franco Romeu para compreender:
+
+* serviços;
+* estética;
+* produção de mídia;
+* operação;
+* conteúdo;
+* objetivos.
+
+Entretanto:
+
+não invente informação ausente.
+
+Quando o projeto depender de uma informação não comprovada:
+
+```text
+ASSUMPTION
+```
+
+ou:
+
+```text
+RESEARCH REQUIRED
+```
+
+---
+
+# 110. REGRA FINAL
+
+Ao terminar Parte I + Parte II, o sistema proposto não deverá parecer:
+
+> “um editor de vídeo com alguns recursos de IA”.
+
+Ele deverá possuir uma tese arquitetural clara.
+
+Uma hipótese que merece forte consideração é:
+
+> FR AutoEdite Next é um sistema local-first de inteligência de mídia e edição não destrutiva, orientado a projeto e domínio, que transforma acervos brutos em narrativas verificáveis, editáveis, reutilizáveis e multi-output, mantendo a IA separada da execução determinística.
+
+Você não é obrigado a aceitar essa definição.
+
+Teste-a.
+
+Melhore-a.
+
+Rejeite-a se encontrar formulação arquitetural superior.
+
+O objetivo final não é preservar minhas ideias.
+
+É encontrar a melhor arquitetura tecnicamente defensável para que o Codex consiga construir a aplicação incrementalmente, sem dívida estrutural deliberada e sem transformar decisões probabilísticas de IA em comportamento não auditável.
+

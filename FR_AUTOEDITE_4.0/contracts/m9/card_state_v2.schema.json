@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FR AutoEdite Card State v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assets", "layers", "gridStyle", "fields", "lines"],
+  "properties": {
+    "assets": {"$ref": "#/$defs/assets"},
+    "layers": {"$ref": "#/$defs/layers"},
+    "gridStyle": {"$ref": "#/$defs/gridStyle"},
+    "fields": {
+      "type": "array",
+      "minItems": 21,
+      "maxItems": 21,
+      "items": {"$ref": "#/$defs/field"}
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 29,
+      "maxItems": 29,
+      "items": {"$ref": "#/$defs/line"}
+    }
+  },
+  "$defs": {
+    "assetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "asset_id", "sha256"],
+      "properties": {
+        "scope": {
+          "enum": ["component", "service_catalog", "project_media", "project_asset"]
+        },
+        "asset_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "frame_time_sec": {"type": "number", "minimum": 0}
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "background",
+        "logo",
+        "visual",
+        "visualOpacity",
+        "visualShape",
+        "visualSize",
+        "visualZoom",
+        "visualFocalX",
+        "visualFocalY"
+      ],
+      "properties": {
+        "background": {"$ref": "#/$defs/assetRef"},
+        "logo": {"$ref": "#/$defs/assetRef"},
+        "visual": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/assetRef"}
+          ]
+        },
+        "visualOpacity": {"type": "number", "minimum": 0, "maximum": 1},
+        "visualShape": {"enum": ["circle", "square", "rounded", "full"]},
+        "visualSize": {"type": "number", "minimum": 120, "maximum": 620},
+        "visualZoom": {"type": "number", "minimum": 1, "maximum": 3},
+        "visualFocalX": {"type": "number", "minimum": 0, "maximum": 100},
+        "visualFocalY": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "grid", "text", "logo"],
+      "properties": {
+        "background": {"type": "boolean"},
+        "grid": {"type": "boolean"},
+        "text": {"type": "boolean"},
+        "logo": {"type": "boolean"}
+      }
+    },
+    "gridStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opacity"],
+      "properties": {
+        "opacity": {"type": "number", "minimum": 0.05, "maximum": 1}
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "text",
+        "x",
+        "y",
+        "w",
+        "h",
+        "font",
+        "size",
+        "weight",
+        "lineHeight",
+        "spacing",
+        "align",
+        "color",
+        "effect"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "promise",
+            "brandSlash",
+            "brandHandle",
+            "pillars",
+            "quote1",
+            "quote2",
+            "services",
+            "region",
+            "whatsapp",
+            "site",
+            "title",
+            "subtitle",
+            "field1",
+            "field2",
+            "field3",
+            "field4",
+            "leftSupport",
+            "visualTitle",
+            "visualBody",
+            "summaryTitle",
+            "summaryBody"
+          ]
+        },
+        "role": {"enum": ["fixed", "variable"]},
+        "text": {"type": "string"},
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+        "w": {"type": "number", "exclusiveMinimum": 0},
+        "h": {"type": "number", "exclusiveMinimum": 0},
+        "font": {
+          "enum": [
+            "Stardos Stencil",
+            "Cormorant Garamond",
+            "Rokkitt",
+            "Share Tech Mono",
+            "Georgia",
+            "Arial"
+          ]
+        },
+        "size": {"type": "number", "exclusiveMinimum": 0},
+        "weight": {"enum": [400, 500, 600, 700]},
+        "lineHeight": {"type": "number", "exclusiveMinimum": 0},
+        "spacing": {"type": "number"},
+        "align": {"enum": ["left", "center", "right"]},
+        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "effect": {"enum": ["plain", "metallic"]},
+        "visible": {"type": "boolean"},
+        "noWrap": {"type": "boolean"},
+        "shadowEnabled": {"type": "boolean"},
+        "shadowX": {"type": "number"},
+        "shadowY": {"type": "number"},
+        "shadowBlur": {"type": "number", "minimum": 0},
+        "shadowOpacity": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "x1", "y1", "x2", "y2", "width", "color", "visible"],
+      "properties": {
+        "id": {
+          "enum": [
+            "v-left",
+            "v-right",
+            "top-left",
+            "top-right",
+            "title-left",
+            "title-right",
+            "title-underline",
+            "info-1",
+            "info-2",
+            "info-3",
+            "visual-left",
+            "visual-right",
+            "visual-top-left",
+            "visual-top-right",
+            "visual-bottom",
+            "footer-left",
+            "footer-right",
+            "footer-top",
+            "footer-center",
+            "dash-left-1",
+            "dash-left-2",
+            "dash-right-1",
+            "dash-right-2",
+            "dash-right-3",
+            "dash-right-4",
+            "dash-promise",
+            "dash-pillars",
+            "dash-services",
+            "dash-summary"
+          ]
+        },
+        "x1": {"type": "number"},
+        "y1": {"type": "number"},
+        "x2": {"type": "number"},
+        "y2": {"type": "number"},
+        "width": {"type": "number", "minimum": 0.2, "maximum": 12},
+        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "visible": {"type": "boolean"},
+        "opacity": {"type": "number", "minimum": 0.02, "maximum": 1},
+        "fade": {"type": "boolean"}
+      }
+    }
+  }
+}

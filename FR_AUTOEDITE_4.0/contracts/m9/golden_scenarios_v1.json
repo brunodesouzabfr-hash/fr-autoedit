@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "suite_id": "fr-card-editor-1.1-m9.0",
+  "reference_renderer": "fr_card_editor_1_1_canvas_export_algorithm",
+  "distribution": "local_only_non_redistributable",
+  "repeat_each_render": 2,
+  "scenarios": [
+    {
+      "id": "baseline",
+      "description": "Estado DEFAULT integral: 21 campos, 29 linhas, fundo, logo, grid e ícones.",
+      "resolutions": [[941, 1672], [1080, 1920], [2160, 3840]],
+      "operations": []
+    },
+    {
+      "id": "typography_geometry",
+      "description": "Exercita geometria, pesos, tracking, alinhamento, metálico, sombra, visibilidade e grid.",
+      "resolutions": [[941, 1672]],
+      "operations": [
+        {
+          "op": "set_field",
+          "id": "title",
+          "values": {
+            "text": "GOLDEN M9 · GEOMETRIA",
+            "x": 104,
+            "y": 205,
+            "w": 733,
+            "h": 82,
+            "font": "Stardos Stencil",
+            "size": 58,
+            "weight": 700,
+            "lineHeight": 1,
+            "spacing": 0.02,
+            "align": "center",
+            "color": "#f6a700",
+            "effect": "metallic",
+            "noWrap": true,
+            "visible": true,
+            "shadowEnabled": true,
+            "shadowX": 2,
+            "shadowY": 3,
+            "shadowBlur": 2.5,
+            "shadowOpacity": 0.34
+          }
+        },
+        {
+          "op": "set_field",
+          "id": "subtitle",
+          "values": {
+            "text": "Texto sintético para medir auto-fit, entrelinha e alinhamento.",
+            "font": "Cormorant Garamond",
+            "size": 31,
+            "weight": 600,
+            "lineHeight": 1.08,
+            "spacing": 0.01,
+            "align": "right",
+            "color": "#e6d6b5",
+            "effect": "plain"
+          }
+        },
+        {
+          "op": "set_field",
+          "id": "field1",
+          "values": {
+            "font": "Rokkitt",
+            "size": 21,
+            "weight": 500,
+            "visible": false
+          }
+        },
+        {
+          "op": "set_field",
+          "id": "summaryBody",
+          "values": {
+            "font": "Share Tech Mono",
+            "size": 16,
+            "weight": 400,
+            "spacing": 0.04,
+            "align": "left"
+          }
+        },
+        {
+          "op": "set_line",
+          "id": "title-underline",
+          "values": {
+            "x1": 300,
+            "y1": 334,
+            "x2": 641,
+            "y2": 334,
+            "width": 2.4,
+            "color": "#f6a700",
+            "visible": true,
+            "opacity": 0.72,
+            "fade": false
+          }
+        },
+        {
+          "op": "set_grid_style",
+          "values": {"opacity": 0.55}
+        },
+        {
+          "op": "set_layers",
+          "values": {"background": true, "grid": true, "text": true, "logo": true}
+        }
+      ]
+    },
+    {
+      "id": "visual_circle",
+      "description": "Crop circular com zoom e focal point sintéticos.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "synthetic_test_pattern", "shape": "circle", "size": 389, "zoom": 1.73, "focal_x": 23, "focal_y": 77, "opacity": 0.86},
+      "operations": []
+    },
+    {
+      "id": "visual_square",
+      "description": "Crop quadrado com zoom e focal point sintéticos.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "synthetic_test_pattern", "shape": "square", "size": 420, "zoom": 2.1, "focal_x": 81, "focal_y": 19, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "visual_rounded",
+      "description": "Crop quadrado arredondado sintético.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "synthetic_test_pattern", "shape": "rounded", "size": 356, "zoom": 1.35, "focal_x": 50, "focal_y": 50, "opacity": 0.74},
+      "operations": []
+    },
+    {
+      "id": "visual_full",
+      "description": "Área visual completa 623 por 863.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "synthetic_test_pattern", "shape": "full", "size": 389, "zoom": 1.18, "focal_x": 34, "focal_y": 62, "opacity": 0.91},
+      "operations": []
+    },
+    {
+      "id": "service_alvenaria",
+      "description": "Binding SERVICE alvenaria.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "alvenaria", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_criacoes",
+      "description": "Binding SERVICE criacoes.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "criacoes", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_eletrica",
+      "description": "Binding SERVICE eletrica.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "eletrica", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_hidraulica",
+      "description": "Binding SERVICE hidraulica.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "hidraulica", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_iluminacao",
+      "description": "Binding SERVICE iluminacao.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "iluminacao", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_instalacao",
+      "description": "Binding SERVICE instalacao.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "instalacao", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_manutencao",
+      "description": "Binding SERVICE manutencao.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "manutencao", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_moveis",
+      "description": "Binding SERVICE moveis.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "moveis", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_pintura",
+      "description": "Binding SERVICE pintura.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "pintura", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_producoes",
+      "description": "Binding SERVICE producoes.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "producoes", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_projetos_3d",
+      "description": "Binding SERVICE projetos_3d.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "projetos_3d", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_revestimentos",
+      "description": "Binding SERVICE revestimentos.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "revestimentos", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    },
+    {
+      "id": "service_textura",
+      "description": "Binding SERVICE textura.",
+      "resolutions": [[941, 1672]],
+      "visual": {"kind": "service_catalog", "service_key": "textura", "shape": "circle", "size": 389, "zoom": 1, "focal_x": 50, "focal_y": 50, "opacity": 1},
+      "operations": []
+    }
+  ]
+}

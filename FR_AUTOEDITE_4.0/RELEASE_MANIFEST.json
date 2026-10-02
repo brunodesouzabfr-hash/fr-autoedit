@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "version": "4.0.0-candidate",
+  "version": "4.6.1-candidate",
   "source_base": "3.4.0",
   "generated_at": null,
   "files": [
     {
       "path": "ATUALIZAR_CORRECAO_CARDS.sh",
-      "sha256": "0929ab59ace27c29c18ad5617a386e8e6bdf297cfe45dedb946ec7707fce2a13",
-      "bytes": 2567
+      "sha256": "3dca9c519b8971f0b4d070bb9c48871bdb1ade3610d8812f845f473929b86d09",
+      "bytes": 2877
     },
     {
       "path": "ATUALIZAR_FR_AUTOEDITE_3.3.1.sh",
-      "sha256": "39b2aa98481d6f5bfa6bd84dd36fe42bbf75cd0c1d1339fd451e4aee4300a0d8",
-      "bytes": 3698
+      "sha256": "f5bc0af4c75d91cf35959d4acd4dc9275ec9a412eaaf2cecd2d57724e35258d1",
+      "bytes": 3993
     },
     {
       "path": "ATUALIZAR_FR_AUTOEDITE_3.4.0.sh",
@@ -26,8 +26,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f47bfb049112437bca9c561923b57a57271e433cba0d3bcb8ea3ac61e5ed1cdf",
-      "bytes": 15267
+      "sha256": "24a327da68cb4afc02e9f5870857b779e24aafed118c482f01feea5d98863b3b",
+      "bytes": 20069
     },
     {
       "path": "CONTEXTO_PARA_IA_AUDITORIA_E_AUTOMACAO.md",
@@ -51,8 +51,8 @@
     },
     {
       "path": "INSTALAR_EM_OUTRO_COMPUTADOR.sh",
-      "sha256": "1fa0e3de3c854a6f1438903ebed9b1300c2efca18c6dcbef26444a8f352cbf94",
-      "bytes": 4557
+      "sha256": "b74e21432ea1bf3561623ff704345301d085e7e70cf1c5bec79dce798ff396de",
+      "bytes": 4835
     },
     {
       "path": "INSTALAR_FR_AUTOEDITE_4.sh",
@@ -66,8 +66,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "6a65f2e3c8a58f83f1164aaef6e3cb4e2edc059bb663fe4ab22ef56b07aff093",
-      "bytes": 9374
+      "sha256": "e1532225d080d60697760e45317941c897cbb038e85be4ee4956fa4468a9af39",
+      "bytes": 11894
     },
     {
       "path": "RELATORIO_DE_VALIDACAO_3_3.md",
@@ -86,7 +86,7 @@
     },
     {
       "path": "VERSION",
-      "sha256": "be743c789d65e04dcfa24466db55a548ab94cd4d8c65905e5603c509eac95424",
+      "sha256": "ec9bb82ce65c16247268a46e6bb89175912066117a37efc5db57f5045e834c17",
       "bytes": 16
     },
     {
@@ -96,8 +96,8 @@
     },
     {
       "path": "app/fr_autoedite.py",
-      "sha256": "46819cb6f5203a375e1357a306bc0b769cd35f3293faabd5ab369a151aa8659b",
-      "bytes": 333472
+      "sha256": "5a525a19eddd11caf4bacf06df1869f821ba2a8775238210928f87a439e47e95",
+      "bytes": 375912
     },
     {
       "path": "app/fr_v4/__init__.py",
@@ -121,8 +121,8 @@
     },
     {
       "path": "app/fr_v4/bridge.py",
-      "sha256": "6a36157c863fc54aeaafe20c7d3d9d8954ec221694200b18127ae76890376416",
-      "bytes": 4533
+      "sha256": "38869cbd714b677a10e893603e83e39e45b9132d3e986d2e2a799f78255bc3ee",
+      "bytes": 4947
     },
     {
       "path": "app/fr_v4/contracts/__init__.py",
@@ -136,8 +136,8 @@
     },
     {
       "path": "app/fr_v4/contracts/generator.py",
-      "sha256": "9d54d66276ecd5be0bfc66ea09b0dfe3a58dd65a750cdab843639da403f4ea5e",
-      "bytes": 4450
+      "sha256": "20552cf2d86131352ff1bd3966660ea143579389a7cf960940165a55481fe2d4",
+      "bytes": 4460
     },
     {
       "path": "app/fr_v4/contracts/markdown.py",
@@ -146,8 +146,8 @@
     },
     {
       "path": "app/fr_v4/contracts/migration.py",
-      "sha256": "8d12c834525bda57ea2cf6b4b846f366e5f67a6e1fe99488686d777afbd2b4e8",
-      "bytes": 5518
+      "sha256": "4479df796a3c50ea8ab0d00bb1425b3aff86300302dc2c47d8a410ec02e6e7c2",
+      "bytes": 5529
     },
     {
       "path": "app/fr_v4/contracts/service.py",
@@ -306,8 +306,8 @@
     },
     {
       "path": "app/fr_v4/overlays.py",
-      "sha256": "56b64565435aea933a47a1834799e3a0553cacf909e22cb054527f5ddc63be48",
-      "bytes": 3233
+      "sha256": "fff51e1324818b739d1726464def6ec19e268b508128b11104536d7b738af4d4",
+      "bytes": 5977
     },
     {
       "path": "app/fr_v4/quiet_luxury/__init__.py",
@@ -331,13 +331,13 @@
     },
     {
       "path": "app/local_analysis.py",
-      "sha256": "35b7fbcd5f231fbc8a49456d6703718d3e494404e7b313600793e30f3bf01107",
-      "bytes": 15041
+      "sha256": "8b3a955874463f9e7cc7cd0dbbe843bf76a291ee09e0197470b9a019d0eaed5e",
+      "bytes": 17189
     },
     {
       "path": "app/master_contract.py",
-      "sha256": "a39c799d2f269920056c6b8a545fe757d28c7fb4988b878d8e4eba73c4b679ec",
-      "bytes": 77134
+      "sha256": "837f13ec3060667b72208686c93e906db5f46f831aafbcab9b2b977367049e82",
+      "bytes": 82478
     },
     {
       "path": "app/media_frames.py",
@@ -346,13 +346,18 @@
     },
     {
       "path": "app/project_scope.py",
-      "sha256": "8a6b471a12263eb22ad3902de7cffafcfa5da1569ed495366a573e65ae4b29a9",
-      "bytes": 18039
+      "sha256": "5557dcafd93e3cbf8b5a6b9388662e4be04406c4e46bf17e51e495dd85183cb3",
+      "bytes": 18530
+    },
+    {
+      "path": "app/proxy_integrity.py",
+      "sha256": "3c279f40558bf481d2a0b3e70c8e385c5f6e43f46e5633aff97f843b52452bd0",
+      "bytes": 17511
     },
     {
       "path": "app/ready_video.py",
-      "sha256": "55a37aa80e7134c81d5cca14cc7d7ab1c2b91375efcaf06df091b33e7c9c709e",
-      "bytes": 31519
+      "sha256": "89116bd787814d9a68365804d80bd01188b9cea3c4a06025b7379e65e6caac82",
+      "bytes": 36286
     },
     {
       "path": "app/render_joins.py",
@@ -360,9 +365,14 @@
       "bytes": 5420
     },
     {
+      "path": "app/runtime_control.py",
+      "sha256": "195425d5345911808b98d4b226bcc617ebc38d5d739f332d7ad1114d821aff6d",
+      "bytes": 3087
+    },
+    {
       "path": "app/service_cards.py",
-      "sha256": "56bc7d6999c1206e99da69fcad63c589628638527ac87ea6d171d389ca566fbb",
-      "bytes": 15021
+      "sha256": "ca0672b17d06dd61635fe7eb975f8cfde96ebd6287a5f21084a644503ab5b90c",
+      "bytes": 16395
     },
     {
       "path": "app/social_contract.py",
@@ -371,8 +381,8 @@
     },
     {
       "path": "app/studio.py",
-      "sha256": "a6ce4f0d743d513fe644f723e5b2fdf64e2fd0fbc5ef4ad7a1f2a5500af7cc6b",
-      "bytes": 94535
+      "sha256": "efe2669abcc271e55920d1e410f2f629a2cfe702ca9de3889d47e8da7d07c30f",
+      "bytes": 130047
     },
     {
       "path": "app/style_engine.py",
@@ -641,8 +651,8 @@
     },
     {
       "path": "assets/studio/index.html",
-      "sha256": "ec7eaa8ccbb3519373f644a0b2b39cb5d15ff300852658ade74177709d3fc6a5",
-      "bytes": 132495
+      "sha256": "f2c83d1295c64e9806c63fa2ca15105b2c98bbf6539d217de3af71aa6b7fbe5b",
+      "bytes": 159878
     },
     {
       "path": "assets/style_packs/fr_chiaroscuro_vintage_v1/ASSET_REQUIREMENTS.md",
@@ -715,9 +725,14 @@
       "bytes": 3161
     },
     {
+      "path": "docs/FR_AUTOEDITE_4_6_1_RESILIENCE.md",
+      "sha256": "edf9f1eb576515931978ad05ecc306c2de3edafb54c45591ec94752859c092f3",
+      "bytes": 2167
+    },
+    {
       "path": "docs/GUIA_INSTALACAO_ATUALIZACAO_4_0.md",
-      "sha256": "c9799b9e2a950b538d4b2e4d741bc7ce06ca8aabe0277d99915e70e0fb944e0b",
-      "bytes": 2089
+      "sha256": "9e595fd0977722f17b02fa2a1d432c6b82712189ce8ad6fd9485cea3bedfeeea",
+      "bytes": 4189
     },
     {
       "path": "docs/LEIA_PRIMEIRO_FUNDACAO.md",
@@ -746,8 +761,8 @@
     },
     {
       "path": "docs/RELATORIO_VALIDACAO_4_0.md",
-      "sha256": "f7e1982dd15dd5d72cd3df34c4793dfb98749c7411fb7b7ce0c802d3c0a86317",
-      "bytes": 3623
+      "sha256": "076ea0221353d05a2671cf7df0232fa82863d2fbbd9992b4d0258b1bc079f5a0",
+      "bytes": 7568
     },
     {
       "path": "examples/cozinha_carreira.questionario.json",
@@ -761,8 +776,8 @@
     },
     {
       "path": "install.sh",
-      "sha256": "02834ab0571e64de168be6755b7dc5d1196ed04d04685622fa4c391a933ec25d",
-      "bytes": 2412
+      "sha256": "86556dd1cb58620900e80c9fd28f4fdad70a17819a5b0d5fdc472a3cf417cbee",
+      "bytes": 3497
     },
     {
       "path": "knowledge/FRANCO_ROMEU_MENTE_ESTRATEGICA_LLM_MASTER_v1.1.md",
@@ -771,8 +786,8 @@
     },
     {
       "path": "requirements-dev.txt",
-      "sha256": "9db10e06e59f5c4aa47b067bff5563aae75f66967b41a3811337bc181d6564a6",
-      "bytes": 13
+      "sha256": "48a8cd6fa04afb36807706be95f0d0d7cd901859649a9fd700becb1b6bf426dc",
+      "bytes": 28
     },
     {
       "path": "schemas/roteiro_mestre_v4.schema.json",
@@ -801,8 +816,8 @@
     },
     {
       "path": "scripts/empacotar_release_v4.py",
-      "sha256": "4dfb5a5047ed346b3a31eadb7ff9973b2d9304339c01e290b7ddf51d57c1defb",
-      "bytes": 4041
+      "sha256": "4b7c0497b00074f05799410729fb30d2e5b70d12242186f64c1152f1a5310969",
+      "bytes": 8432
     },
     {
       "path": "scripts/exportar_cards_individuais.py",
@@ -896,13 +911,13 @@
     },
     {
       "path": "tests/make_fixture.py",
-      "sha256": "0f60a514007a8c2fc37c18336cd205e269737dde1c8fd6b48acca2a66a6bb3b0",
-      "bytes": 5591
+      "sha256": "5f8273df3c748ff1d867cb7d203e4604dccc4bf7e361eb00f4e49b3cbc5a1218",
+      "bytes": 5874
     },
     {
       "path": "tests/master_contract_test.py",
-      "sha256": "eff11a817e7aa5315247ae6d60a8b28a127925822f94298261511400d3c2313c",
-      "bytes": 19813
+      "sha256": "9eb557d917bb514865175cfcec99c27f559722fe4d2de53e9971f60fc9a7ebd3",
+      "bytes": 19923
     },
     {
       "path": "tests/phase2_ai_package_test.py",
@@ -916,13 +931,18 @@
     },
     {
       "path": "tests/ready_video_test.py",
-      "sha256": "5f2ad727a4c34e3812347cb7036c0f1d14d59faa6814e31d2e2ec51fc308a813",
-      "bytes": 16566
+      "sha256": "ed1e2dc5adf5d3afd74cce559323696753a57f25054c257f049bee895164c336",
+      "bytes": 23127
+    },
+    {
+      "path": "tests/resilience_461_test.py",
+      "sha256": "2a57bebb69046819007a133aa57c23183953f457a810a57584e081ca5d2400a9",
+      "bytes": 5848
     },
     {
       "path": "tests/smoke_test.sh",
-      "sha256": "192bdacf390aad47c96d8a5fd1a43668e9dbff1881aa9000e1bd2cbc838c3e48",
-      "bytes": 9373
+      "sha256": "94720ff614ea6e7bcc2cda30101e276744277a4b10207217e698ee6d4fa6a81c",
+      "bytes": 9517
     },
     {
       "path": "tests/smoke_v4_foundation.sh",
@@ -936,8 +956,8 @@
     },
     {
       "path": "tests/studio_http_test.py",
-      "sha256": "947887862db4ca7e29e70096421e32969201d0e99a5d671a7eef3ed71e1ba792",
-      "bytes": 15342
+      "sha256": "998610cd7808058d0c60c7b3bf46648049c27289de15da8e7ef995aac0f4e301",
+      "bytes": 25595
     },
     {
       "path": "tests/studio_job_recovery_test.py",
@@ -965,5 +985,14 @@
       "bytes": 1685
     }
   ],
-  "count": 192
+  "count": 196,
+  "card_editor_migration": "9.9.1",
+  "card_editor_definition_version": 2,
+  "notes": "AI Director V3: state-zero editorial snapshot, closed-world capabilities, exact eligible-media decisions, no legacy V2 snapshot in the default package, and automatic universal-card activation after V3 apply.",
+  "ai_director_contract": 3,
+  "default_ai_mode": "autonomous_new_edit",
+  "editorial_snapshot": "virgin",
+  "human_media_exclusion": "excluded_from_auto_edit_preserved",
+  "ai_response": "AI_DIRECTOR_RESPONSE_V3.json",
+  "distribution": "FR AutoEdite 4.6.1 candidate"
 }

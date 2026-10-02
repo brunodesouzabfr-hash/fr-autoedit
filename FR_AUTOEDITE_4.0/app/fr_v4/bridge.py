@@ -5,7 +5,6 @@ card já validado para ``CardSpec``. O fallback legado é decisão da fachada.
 """
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -77,20 +76,15 @@ def spec_from_legacy(segment: dict[str, Any], brand: dict[str, Any]) -> CardSpec
     )
 
 
-def render_legacy_card(
-    path: Path, segment: dict[str, Any], plan: dict[str, Any],
-    brand: dict[str, Any], style: dict[str, Any], app_root: Path,
-    *, project_dir: Path | None = None, env: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Renderiza atomicamente e retorna metadados editoriais verificáveis.
-
-    Cards F3 com central_media continuam no renderer visual v2. A mídia é
-    resolvida pelo manifesto do projeto e transformada em input somente de
-    leitura do compositor. Se ela desaparecer após a validação, o próprio v2
-    usa o medalhão oficial do serviço e registra aviso; não há fallback
-    silencioso para o renderer legado.
-    """
+def render_legacy_card(path: Path, segment: dict[str, Any], plan: dict[str, Any],
+                       brand: dict[str, Any], style: dict[str, Any], app_root: Path) -> dict[str, Any]:
+    """Renderiza atomicamente e retorna metadados editoriais verificáveis."""
     central_media = segment.get("card_instance", {}).get("central_media")
+    if isinstance(central_media, dict):
+        # A mídia de projeto precisa ser resolvida no escopo do projeto. O
+        # compositor SERVICE abaixo usa a mesma fachada de preview/master e
+        # mantém o renderer F1–F6 intacto para todas as demais instâncias.
+        return {"handled": False, "reason": "service_central_media"}
     if not enabled(style):
         return {"handled": False}
     output = plan.get("output", {})
@@ -103,40 +97,7 @@ def render_legacy_card(
     if not manifest.is_file():
         index_assets(app_root)
     spec = spec_from_legacy(segment, brand)
-    bridge_warnings: list[str] = []
-    if isinstance(central_media, dict):
-        if spec.family != "F3":
-            return {"handled": False, "reason": "central_media_non_service"}
-        if project_dir is None or env is None:
-            bridge_warnings.append(
-                "central_media: contexto do projeto indisponível; usando medalhão v2 do serviço."
-            )
-        else:
-            try:
-                from media_frames import extract_reference
-                source = extract_reference(
-                    env, Path(project_dir),
-                    {
-                        "media_id": central_media["central_asset_id"],
-                        "time_sec": central_media.get("frame_time_sec", 0.0),
-                        "time_basis": "absolute_parent_media",
-                    },
-                    plan.get("output", {}).get("render_source") == "proxies",
-                )
-                spec = replace(
-                    spec,
-                    central_image=Path(source),
-                    central_zoom=float(central_media.get("zoom", 1.0)),
-                    central_focal_x=float(central_media.get("focal_x", 0.5)),
-                    central_focal_y=float(central_media.get("focal_y", 0.5)),
-                )
-            except Exception as exc:
-                bridge_warnings.append(
-                    "central_media: mídia indisponível; usando medalhão v2 do serviço: " + str(exc)
-                )
     composition = compose(spec, size, app_root)
-    if bridge_warnings:
-        composition.warnings[:0] = bridge_warnings
     image = composition.flatten()
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -13,12 +13,15 @@ python3 -m py_compile \
   "$fr_app_dir/app/fr_autoedite.py" \
   "$fr_app_dir/app/local_analysis.py" \
   "$fr_app_dir/app/master_contract.py" \
+  "$fr_app_dir/app/card_migration_v99.py" \
+  "$fr_app_dir/app/card_persistence_v2.py" \
   "$fr_app_dir/app/project_scope.py" \
   "$fr_app_dir/app/ready_video.py" \
   "$fr_app_dir/app/service_cards.py" \
   "$fr_app_dir/app/style_engine.py" \
   "$fr_app_dir/app/copilot.py" \
   "$fr_app_dir/app/studio.py"
+python3 "$fr_app_dir/tests/card_migration_v99_test.py"
 python3 "$fr_app_dir/tests/ready_video_test.py"
 python3 "$fr_app_dir/tests/studio_http_test.py"
 python3 "$fr_app_dir/tests/card_circle_test.py"

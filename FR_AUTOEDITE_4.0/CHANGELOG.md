@@ -1,5 +1,41 @@
 # Alterações
 
+## FR AutoEdite 4.0 beta-next — M9.9 — 2026-09-27
+
+- migra automaticamente todos os cards raw/ready existentes para
+  CardDefinition/CardInstance v2 no primeiro carregamento do projeto;
+- torna `fr-universal-card` a rota padrão de preview e master e exige registro
+  nominal com motivo para qualquer fallback F1–F6;
+- adiciona migração idempotente, snapshot/rollback, relatório por card e
+  invalidação/regeneração de previews sem alterar plano ou mídia;
+- permite persistir e reabrir texto, fundo, logo, mídia central, crop/shape,
+  zoom, focal point, geometria e estilo no editor universal.
+
+## FR AutoEdite 4.0 beta-next — M9.0–M9.8 — 2026-09-27
+
+- M9.0 `589e910`: congela a arquitetura executável, os contratos e os 21
+  golden masters locais do Card Editor Universal;
+- M9.1 `32b0259`: adiciona schemas e validators estritos de
+  CardDefinition/CardInstance v2;
+- M9.2 `fc70a45`: adiciona o adapter bidirecional `fr-autoedite-card/2`;
+- M9.3 `40bdc7a`: adiciona o renderer universal determinístico em
+  Python/Pillow sem alterar F1–F6;
+- M9.4 `a53cb6d`: resolve os 13 serviços somente pelo catálogo produtivo e por
+  assets com origem/hash conferidos;
+- M9.5 `e22c485`: adiciona persistência transacional, snapshot, rollback e
+  round-trip raw/ready;
+- M9.6 `3d21b8c`: adiciona `CARD_EDIT_INTENT` v2 declarativo, validado,
+  confirmado e reversível;
+- M9.7 `9e9e631`: integra estado universal, preview e render ao Studio e à
+  timeline;
+- M9.8: amplia regressão, documentação e hardening do pacote, incluindo
+  bloqueio por caminho e SHA-256 dos assets externos com licença pendente.
+
+O renderer é determinístico e todas as diferenças contra os goldens são
+medidas, não ocultadas. A comparação atual ainda diverge nos 21 artefatos;
+revisão visual humana e confirmação de licença/procedência continuam gates
+obrigatórios antes de publicação ou redistribuição.
+
 ## FR AutoEdite 4.0 beta-next — M1–M8 — 2026-09-26
 
 O nome da distribuição de homologação é **FR AutoEdite 4.0 beta-next**. O

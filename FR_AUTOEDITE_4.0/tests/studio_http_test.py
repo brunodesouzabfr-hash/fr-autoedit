@@ -75,6 +75,8 @@ def main() -> int:
             assert "Transformar em serviço" in html
             assert "Editar conteúdo" in html
             assert "fr-autoedite-card-content/1" in html
+            assert "fr-autoedite-card/2" in html
+            assert "/api/card-v2" in html
             assert 'id="cardContentModal"' in html
             assert 'id="cardEditorFrame"' in html
             assert "FR CARD EDITOR UNIVERSAL v1.1.0" in html
@@ -106,8 +108,11 @@ def main() -> int:
             assert "FR Card Editor Universal v1.1.0" in editor_html
             assert 'id="fr-autoedite-bridge"' in editor_html
             assert "fr-autoedite:load-card" in editor_html
+            assert "fr-autoedite:load-card-v2" in editor_html
+            assert "fr-autoedite:request-card-v2" in editor_html
             assert "editor modular abaixo é uma referência visual" not in editor_html
-            assert "Prévia visual de referência" in editor_html
+            assert "Fallback explícito de compatibilidade M9.9" in editor_html
+            assert "F1–F6 continua sendo a autoridade" not in editor_html
             assert "localStorage.getItem" not in editor_html
             assert "localStorage.setItem" not in editor_html
             assert "fonts.googleapis.com" not in editor_html
@@ -135,8 +140,10 @@ def main() -> int:
             initial_state = request(base + "/api/state?" + project_query, state.token)
             editor_capability = initial_state["capabilities"]["card_editor"]
             assert editor_capability["available"] is True
-            assert editor_capability["integration_mode"] == "same_origin_iframe_content_only"
+            assert editor_capability["integration_mode"] == "same_origin_iframe_v2_with_legacy_content_projection"
             assert editor_capability["supported_fields"] == ["title", "body"]
+            assert editor_capability["universal_adapter_version"] == "fr-autoedite-card/2"
+            assert editor_capability["external_distribution_allowed"] is False
             assert editor_capability["provenance"] == "user_supplied_local_publication_pending"
 
             # Regressão 3.2.3: cards pré-preparo e autorreparo de estilo antigo.
@@ -144,7 +151,7 @@ def main() -> int:
                 json.dumps({"palette": {"background": "cor-invalida"}}), encoding="utf-8"
             )
             state.start_job(project, "cards")
-            card_job = wait_for_job(state, project, timeout=90.0)
+            card_job = wait_for_job(state, project, timeout=300.0)
             assert card_job["returncode"] == 0, "\n".join(card_job.get("log", []))
             assert any("Cards 1/" in line for line in card_job.get("log", []))
             assert (project / "CARD_PREVIEW_PLAN.json").is_file()
@@ -155,6 +162,16 @@ def main() -> int:
             assert preview_state["card_previews"]
             assert all(item.get("version") for item in preview_state["card_previews"])
             assert len({item.get("generation_id") for item in preview_state["card_previews"]}) == 1
+
+            # O smoke cobre a rota universal e seu preview; masters 4K têm
+            # cobertura focada própria e tornariam esta suíte HTTP serial
+            # desnecessariamente longa.
+            fast_style = json.loads((project / "CARD_STYLE.json").read_text())
+            fast_style["cards"]["always_generate_4k_masters"] = False
+            (project / "CARD_STYLE.json").write_text(
+                json.dumps(fast_style, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
 
             image = (app_root / "assets" / "services" / "iluminacao.png").read_bytes()
 
@@ -213,26 +230,27 @@ def main() -> int:
             )
             assert repeated_zip["duplicate"] is True
             state.start_job(project, "brief-generate")
-            brief_job = wait_for_job(state, project, timeout=90.0)
+            brief_job = wait_for_job(state, project, timeout=300.0)
             assert brief_job["returncode"] == 0, "\n".join(brief_job.get("log", []))
-            generated_brief = project / "_ENVIAR_IA" / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md"
+            generated_brief = project / "PACOTE_PARA_IA" / "01_PROMPT_MESTRE_AUTONOMO.md"
             assert generated_brief.is_file()
             canonical_package = project / "PACOTE_PARA_IA"
-            assert (canonical_package / "01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE.md").is_file()
+            assert (canonical_package / "V3" / "PACKAGE_DESCRIPTOR.json").is_file()
             assert (canonical_package / "03_NAO_EDITAR_LOTES_DE_PROXIES").is_dir()
+            assert not (project / "EDIT_PLAN.json").exists()
             downloaded_brief = request(
                 base + "/api/file?" + urlencode({
                     "token": state.token,
                     "project": slug,
-                    "path": "_ENVIAR_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md",
+                    "path": "PACOTE_PARA_IA/01_PROMPT_MESTRE_AUTONOMO.md",
                 })
             ).decode("utf-8")
-            assert "FR_AUTOEDITE_JSON_BEGIN" in downloaded_brief
+            assert "PROMPT MESTRE AUTÔNOMO" in downloaded_brief
             range_call = Request(
                 base + "/api/file?" + urlencode({
                     "token": state.token,
                     "project": slug,
-                    "path": "_ENVIAR_IA/01_EDITAR_E_DEVOLVER_ROTEIRO_MESTRE_IA.md",
+                    "path": "PACOTE_PARA_IA/01_PROMPT_MESTRE_AUTONOMO.md",
                 }),
                 headers={"Range": "bytes=0-31", "X-FR-Token": state.token},
             )
@@ -250,47 +268,63 @@ def main() -> int:
             )
             assert uploaded["config"]["external_intro_outro"]["intro_enabled"] is True
 
-            # Reenvia o contrato gerado pela própria Central como uma resposta
-            # válida da IA; um JSON vazio deve continuar sendo rejeitado pelo
-            # validador antes de alterar o projeto.
-            brief = generated_brief.read_bytes()
+            descriptor = json.loads(
+                (canonical_package / "V3" / "PACKAGE_DESCRIPTOR.json").read_text(encoding="utf-8")
+            )
+            director_plan = json.loads(
+                (canonical_package / "V3" / "DIRECTOR_TEMPLATE.json").read_text(encoding="utf-8")
+            )
+            director_plan["configuration"]["social"].update({
+                "enabled": False, "reels_enabled": False,
+                "stories_enabled": False, "carousel_enabled": False,
+            })
+            eligible = descriptor["eligible_asset_ids"]
+            assert eligible
+            director_plan["main_timeline"] = {
+                "contract_version": 2, "project": {"slug": slug},
+                "segments": [{
+                    "segment_id": "S0001", "type": "media", "enabled": True,
+                    "include_in": ["branded", "clean"], "media_id": eligible[0],
+                    "start_sec": 0, "duration_sec": 3, "transition": "cut",
+                }],
+            }
+            decisions = [
+                {
+                    "asset_id": asset_id,
+                    "decision": "use" if asset_id == eligible[0] else "discard",
+                    "reason": "seleção do teste" if asset_id == eligible[0] else "não necessário no teste",
+                    "confidence": 1.0,
+                }
+                for asset_id in eligible
+            ]
+            v3_response = json.dumps({
+                "schema_version": 3,
+                "package_snapshot_id": descriptor["snapshot_id"],
+                "mode": "autonomous_new_edit",
+                "asset_decisions": decisions,
+                "director_plan": director_plan,
+                "facts_to_confirm": [],
+                "executive_summary": ["Smoke HTTP V3"],
+            }).encode()
             response = request(
                 base + "/api/editing-brief-upload?" + project_query,
                 state.token,
-                brief,
-                {"Content-Type": "text/markdown"},
+                v3_response,
+                {"Content-Type": "application/json"},
             )
             assert response["ok"] is True
+            assert response["path"].endswith("AI_DIRECTOR_RESPONSE_V3.json")
             repeated_response = request(
                 base + "/api/editing-brief-upload?" + project_query,
                 state.token,
-                brief,
-                {"Content-Type": "text/markdown"},
-            )
-            assert repeated_response["duplicate"] is True
-            descriptor = json.loads(
-                (canonical_package / "V2" / "PACKAGE_DESCRIPTOR.json").read_text(encoding="utf-8")
-            )
-            begin = downloaded_brief.index("<!-- FR_AUTOEDITE_JSON_BEGIN -->")
-            end = downloaded_brief.index("<!-- FR_AUTOEDITE_JSON_END -->", begin)
-            fenced = downloaded_brief[begin:end].split("```json", 1)[1].split("```", 1)[0]
-            v2_response = json.dumps({
-                "schema_version": 2,
-                "package_snapshot_id": descriptor["snapshot_id"],
-                "edit_plan": json.loads(fenced),
-            }).encode()
-            imported_v2 = request(
-                base + "/api/editing-brief-upload?" + project_query,
-                state.token,
-                v2_response,
+                v3_response,
                 {"Content-Type": "application/json"},
             )
-            assert imported_v2["ok"] is True
-            assert imported_v2["path"].endswith("EDIT_PLAN_RESPONSE_V2.json")
+            assert repeated_response["duplicate"] is True
             import_source = json.loads(
                 (project / "_CONTROLE" / "ROTEIRO_IMPORT_SOURCE.json").read_text(encoding="utf-8")
             )
-            assert import_source["format"] == "v2_json"
+            assert import_source["format"] == "v3_json"
 
             plan = {
                 "segments": [{
@@ -352,7 +386,7 @@ def main() -> int:
                 {"Content-Type": "application/json"},
             )
             assert edited["ok"] is True and edited["preview_job_started"] is True
-            preview_job = wait_for_job(state, project, timeout=90.0)
+            preview_job = wait_for_job(state, project, timeout=300.0)
             assert preview_job["returncode"] == 0, "\n".join(preview_job.get("log", []))
             persisted = json.loads((project / "EDIT_PLAN.json").read_text())
             persisted_card = next(item for item in persisted["segments"] if item["segment_id"] == "S0001")

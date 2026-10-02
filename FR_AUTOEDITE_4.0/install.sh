@@ -48,9 +48,14 @@ if [[ -n "$fr_card_editor_source" ]]; then
   python3 "$fr_source_dir/scripts/install_card_editor_local.py" \
     --source "$fr_card_editor_source" \
     --destination "$fr_install_dir/local_components/fr-card-editor/1.1.0"
+  python3 "$fr_source_dir/scripts/install_card_editor_fonts.py" \
+    --contract "$fr_install_dir/contracts/m9/font_sources_v1.json" \
+    --destination "$fr_install_dir/local_components/fr-card-editor/1.1.0/font-cache"
+  echo "Renderer fr-universal-card: componente e font-cache verificados."
 else
-  echo "Card Editor modular não instalado: fonte local não informada."
-  echo "Use: FR_CARD_EDITOR_SOURCE=/caminho/FR_CARD_EDITOR_UNIVERSAL_v1.1.0 ./install.sh"
+  echo "ERRO: FR Card Editor Universal v1.1.0 é obrigatório na versão 4.5." >&2
+  echo "Use: FR_CARD_EDITOR_SOURCE=/caminho/FR_CARD_EDITOR_UNIVERSAL_v1.1.0 ./install.sh" >&2
+  exit 2
 fi
 chmod +x "$fr_install_dir/fr-autoedite" "$fr_install_dir/install.sh" \
   "$fr_install_dir/ATUALIZAR_FR_AUTOEDITE_3.4.0.sh" \
@@ -64,7 +69,7 @@ fr_desktop_file="$fr_applications_dir/fr-autoedite-studio.desktop"
 {
   echo '[Desktop Entry]'
   echo 'Type=Application'
-  echo 'Name=FR AutoEdite Studio 4.0'
+  echo 'Name=FR AutoEdite Studio 4.6.1'
   echo 'Comment=Central local de preparação e edição Franco Romeu'
   echo "Exec=$fr_bin_path studio"
   echo 'Terminal=true'
@@ -80,5 +85,5 @@ if [[ ":$PATH:" != *":$fr_bin_dir:"* ]]; then
 fi
 echo "Teste agora: fr-autoedite --version (ou --versao)"
 echo "Abra a central visual: fr-autoedite studio"
-echo "Atalho de aplicativos: FR AutoEdite Studio 4.0"
+echo "Atalho de aplicativos: FR AutoEdite Studio 4.6.1"
 echo "Opcionais: sudo apt install -y qrencode espeak-ng libsecret-tools rclone libimage-exiftool-perl"

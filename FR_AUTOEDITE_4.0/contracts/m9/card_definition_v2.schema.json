@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FR AutoEdite CardDefinition v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "definition_id",
+    "definition_version",
+    "editor_schema",
+    "renderer_id",
+    "renderer_version",
+    "canvas",
+    "component",
+    "default_state",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "definition_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+    },
+    "definition_version": {"type": "integer", "minimum": 1},
+    "editor_schema": {"const": "fr-card-editor/1.1"},
+    "renderer_id": {"const": "fr-universal-card"},
+    "renderer_version": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$"
+    },
+    "canvas": {
+      "const": {
+        "width": 941,
+        "height": 1672,
+        "ratio": "9:16",
+        "export_resolutions": [[941, 1672], [1080, 1920], [2160, 3840]]
+      }
+    },
+    "component": {
+      "const": {
+        "id": "fr-card-editor",
+        "version": "1.1.0",
+        "entrypoint": "index.html",
+        "distribution": "local_only_pending_license",
+        "files": {
+          "index.html": {
+            "sha256": "810f6df20310ba6a1edae4ab2e3ab4d80e85d1ad2486c9a38f51e0cd82634143"
+          },
+          "assets/background-fr-hd.png": {
+            "sha256": "012a4eb3c0d76b823b3963292f0d1d8e8e8fbc69c1a4db8f75e78ea6249475bc",
+            "width": 2160,
+            "height": 3840,
+            "mode": "RGB"
+          },
+          "assets/background-fr-source.png": {
+            "sha256": "1203482771fbb70024555ab9cc06c666881494057d7b3d8ddd07000318410ace",
+            "width": 941,
+            "height": 1672,
+            "mode": "RGB"
+          },
+          "assets/background-fr.png": {
+            "sha256": "324a1a2287925a31ffca1f9db1b608a89559688c9d1ce763cab4415a4a4ad8f0",
+            "width": 941,
+            "height": 1672,
+            "mode": "RGB"
+          },
+          "assets/logo-fr.png": {
+            "sha256": "26ad729e8e0c8b32407769d06111e6a11c0bde491556c0d813ef0e17f0c0aaa6",
+            "width": 2048,
+            "height": 2048,
+            "mode": "RGBA"
+          }
+        },
+        "excluded": ["FR_CARD_EDITOR_STANDALONE.html"]
+      }
+    },
+    "default_state": {"$ref": "card_state_v2.schema.json"},
+    "capabilities": {
+      "const": {
+        "formats": ["9:16"],
+        "state_sections": ["assets", "layers", "gridStyle", "fields", "lines"]
+      }
+    }
+  }
+}

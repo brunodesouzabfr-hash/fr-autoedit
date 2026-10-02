@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.0",
+  "decision_id": "ACR-M9-001",
+  "decision_status": "approved",
+  "approved_option": "A",
+  "source_of_truth": "validated_card_definition_and_instance_snapshot",
+  "render_authority": "fr_card_editor_1_1_canvas_export_algorithm",
+  "renderer_routing": {
+    "fr-v4-f1-f6": {
+      "kind": "legacy",
+      "automatic_conversion": false,
+      "behavior_change_in_m9_0": false
+    },
+    "fr-universal-card": {
+      "kind": "universal",
+      "card_definition_schema_version": 2,
+      "card_instance_schema_version": 2,
+      "formats": ["9:16"],
+      "implementation_starts_in": "M9.1"
+    }
+  },
+  "compatibility": {
+    "legacy_plans_remain_readable": true,
+    "title_body_are_compatibility_projection": true,
+    "silent_migration": false,
+    "raw_media_clock": "sequence_order_and_duration",
+    "ready_video_clock": "locked_base_video_start_end",
+    "originals_immutable": true,
+    "ready_video_base_immutable": true
+  },
+  "write_policy": {
+    "validator_before_write": true,
+    "snapshot_before_write": true,
+    "rollback_required": true,
+    "ai_direct_timeline_write": false,
+    "ai_filesystem_access": false
+  },
+  "asset_policy": {
+    "persistent_data_urls": false,
+    "client_supplied_paths": false,
+    "validated_asset_ids_only": true,
+    "external_editor_assets_in_git": false,
+    "external_editor_assets_in_release": false,
+    "publication_requires_license_clearance": true
+  },
+  "m9_0_boundary": {
+    "production_schema_validator": false,
+    "production_renderer": false,
+    "timeline_persistence": false,
+    "studio_mutation": false,
+    "deliverables": [
+      "approved_architecture_record",
+      "machine_readable_editor_contract",
+      "machine_readable_golden_scenarios",
+      "local_only_reproducible_golden_generator",
+      "golden_manifest_with_hashes"
+    ]
+  }
+}

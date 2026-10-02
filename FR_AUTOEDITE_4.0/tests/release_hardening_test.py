@@ -2,6 +2,7 @@
 """Regressões do empacotamento, documentação e instaladores beta-next."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -33,10 +34,19 @@ class ReleasePackagerTest(unittest.TestCase):
         path.write_bytes(data)
 
     def test_archive_contains_only_tracked_permitted_files(self):
+        external_contract = {
+            "component": {
+                "distribution": "local_only_pending_license",
+                "files": {
+                    "assets/original.png": {"sha256": hashlib.sha256(b"external").hexdigest()},
+                },
+            },
+        }
         permitted = {
             "README.md": b"release",
             "app/main.py": b"print('ok')\n",
             "assets/logo.png": b"synthetic-product-asset",
+            "contracts/m9/fr_card_editor_1_1.json": json.dumps(external_contract).encode("utf-8"),
         }
         forbidden = [
             "CODEX_EXECUTION_PACK/00_READ_FIRST.md",
@@ -45,6 +55,7 @@ class ReleasePackagerTest(unittest.TestCase):
             "promptcodexpart2.txt",
             "promptcodexpart3.txt",
             "FR_CARD_EDITOR_UNIVERSAL_v1.1.0/index.html",
+            "local_components/fr-card-editor/1.1.0/index.html",
             "FR_CARD_EDITOR_STANDALONE.html",
             "RELEASE_MANIFEST.json",
             "Studio/projeto/QUESTIONARIO_RESPONDIDO.json",
@@ -70,6 +81,10 @@ class ReleasePackagerTest(unittest.TestCase):
 
         self.assertEqual(manifest, embedded)
         self.assertEqual(manifest["selection"], "git-ls-files-allowlist")
+        self.assertEqual(
+            manifest["external_component_asset_audit"],
+            "passed-by-path-and-sha256",
+        )
         self.assertEqual(len(name_list), len(names))
         self.assertEqual({row["path"] for row in manifest["files"]}, set(permitted))
         self.assertEqual(
@@ -80,6 +95,35 @@ class ReleasePackagerTest(unittest.TestCase):
         self.assertEqual(sum(name.endswith("/RELEASE_MANIFEST.json") for name in name_list), 1)
         for relative in (item for item in forbidden if item != "RELEASE_MANIFEST.json"):
             self.assertFalse(any(name.endswith(relative) for name in names), relative)
+
+    def test_archive_rejects_external_component_bytes_even_if_renamed(self):
+        external = b"synthetic-external-component-asset"
+        self.write("README.md", b"release")
+        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+        target = Path(self.temporary.name) / "blocked.zip"
+        with self.assertRaisesRegex(RuntimeError, "Contrato ausente do componente externo"):
+            packager.create_code_archive(self.root, target)
+
+        contract = {
+            "component": {
+                "distribution": "local_only_pending_license",
+                "files": {
+                    "assets/original.png": {
+                        "sha256": hashlib.sha256(external).hexdigest(),
+                    },
+                },
+            },
+        }
+        self.write(
+            "contracts/m9/fr_card_editor_1_1.json",
+            json.dumps(contract).encode("utf-8"),
+        )
+        self.write("assets/renamed-and-tracked.png", external)
+        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+
+        with self.assertRaisesRegex(RuntimeError, "Assets externos do Card Editor"):
+            packager.create_code_archive(self.root, target)
+        self.assertFalse(target.exists())
 
 
 class ReleaseDocumentationTest(unittest.TestCase):
@@ -130,7 +174,7 @@ class ReleaseDocumentationTest(unittest.TestCase):
 
     def test_installers_derive_supported_version_from_version_file(self):
         self.assertEqual(ROOT.name, "FR_AUTOEDITE_4.0")
-        self.assertEqual((ROOT / "VERSION").read_text(encoding="utf-8").strip(), "4.0.0-candidate")
+        self.assertRegex((ROOT / "VERSION").read_text(encoding="utf-8").strip(), r"^4\.\d+(?:\.\d+)?-candidate$")
         scripts = (
             ROOT / "INSTALAR_EM_OUTRO_COMPUTADOR.sh",
             ROOT / "ATUALIZAR_CORRECAO_CARDS.sh",
@@ -140,13 +184,29 @@ class ReleaseDocumentationTest(unittest.TestCase):
             content = script.read_text(encoding="utf-8")
             with self.subTest(script=script.name):
                 self.assertIn("VERSION", content)
-                self.assertIn("3.4.0|4.0.0-candidate", content)
+                self.assertIn("3.4.0|4.*-candidate", content)
                 self.assertIn("fr_expected_banner", content)
                 self.assertNotIn('!= "FR AutoEdite 3.4.0"', content)
         updater = (ROOT / "ATUALIZAR_FR_AUTOEDITE_3.4.0.sh").read_text(encoding="utf-8")
         self.assertIn("ATUALIZAR_FR_AUTOEDITE_3.3.1.sh", updater)
         v4_installer = (ROOT / "scripts/aplicar_atualizacao_v4.py").read_text(encoding="utf-8")
         self.assertIn("FR_AUTOEDITE_4.0", v4_installer)
+
+    def test_m9_release_gates_are_explicit(self):
+        report = (ROOT / "docs" / "RELATORIO_VALIDACAO_4_0.md").read_text(encoding="utf-8")
+        provenance = (ROOT / "docs" / "CARD_EDITOR_LOCAL_PROVENANCE.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        for item in (
+            "M9.8",
+            "fr-autoedite-card/2",
+            "revisão humana",
+            "licença",
+            "redistribuição",
+        ):
+            with self.subTest(item=item):
+                self.assertIn(item, report + provenance + changelog)
+        self.assertIn("passed-by-path-and-sha256", report)
+        self.assertIn("local_only_pending_license", provenance)
 
 
 if __name__ == "__main__":

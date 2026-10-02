@@ -10,6 +10,8 @@ from types import SimpleNamespace
 
 import project_scope as scope
 from ai_package_v2 import load_v2_response
+from ai_director_v3 import load_v3_response
+import universal_card_runtime
 from balloon_engine import BalloonError, validate_balloon
 from card_timeline import CardTimelineError, validate_raw_card_instance, validate_ready_card_instance
 
@@ -1009,10 +1011,25 @@ def inspect_file(env, project, path):
     c = SimpleNamespace(**env)
     path = Path(path)
     try:
-        is_json = path.read_text(encoding="utf-8").lstrip().startswith("{")
+        text = path.read_text(encoding="utf-8")
+        is_json = text.lstrip().startswith("{")
     except UnicodeDecodeError:
+        text = ""
         is_json = False
-    payload = load_v2_response(Path(project), path) if is_json else c.parse_ai_editing_brief(path)
+    if is_json:
+        try:
+            envelope = json.loads(text)
+        except json.JSONDecodeError as exc:
+            fail(c, f"Resposta JSON inválida: linha {exc.lineno}, coluna {exc.colno}.")
+        version = envelope.get("schema_version") if isinstance(envelope, dict) else None
+        if version == 3:
+            payload = load_v3_response(Path(project), path)
+        elif version == 2:
+            payload = load_v2_response(Path(project), path)
+        else:
+            fail(c, "Resposta JSON exige schema_version=3 (Direção Autônoma) ou 2 (compatibilidade).")
+    else:
+        payload = c.parse_ai_editing_brief(path)
     return prepare_bundle(env, project, payload)
 
 
@@ -1043,9 +1060,19 @@ def apply_file(env, project, path):
                  "social/planos/CARROSSEL_PLAN.json": bundle["carousel"], "social/planos/STORIES_PLAN.json": bundle["stories"],
                  "SOCIAL_PLAN.json": {"enabled": config["social"]["enabled"], "contract_version": 2,
                                      "reel_plans": [f"social/planos/REEL_{key}S.json" for key in bundle["reels"]]}}
-        if path.read_text(encoding="utf-8").lstrip().startswith("{"):
-            files["_ENTRADA/EDIT_PLAN_RESPONSE_V2.json"] = path.read_bytes()
-            files["PACOTE_PARA_IA/V2/EDIT_PLAN_RESPONSE.json"] = path.read_bytes()
+        raw_text = path.read_text(encoding="utf-8")
+        response_version = 0
+        if raw_text.lstrip().startswith("{"):
+            try:
+                response_version = int(json.loads(raw_text).get("schema_version") or 0)
+            except (ValueError, TypeError, json.JSONDecodeError):
+                response_version = 0
+            if response_version == 3:
+                files["_ENTRADA/AI_DIRECTOR_RESPONSE_V3.json"] = path.read_bytes()
+                files["PACOTE_PARA_IA/V3/AI_DIRECTOR_RESPONSE.json"] = path.read_bytes()
+            else:
+                files["_ENTRADA/EDIT_PLAN_RESPONSE_V2.json"] = path.read_bytes()
+                files["PACOTE_PARA_IA/V2/EDIT_PLAN_RESPONSE.json"] = path.read_bytes()
         else:
             files["_ENTRADA/ROTEIRO_MESTRE_RESPONDIDO.md"] = path.read_bytes()
             files["PACOTE_PARA_IA/05_RESPOSTA_DA_IA_IMPORTAR_AQUI.md"] = path.read_bytes()
@@ -1072,6 +1099,33 @@ def apply_file(env, project, path):
         files["RELATORIO_APLICACAO_ROTEIRO_IA.json"] = report
         files["_CONTROLE/REVISAO_ROTEIRO.json"] = report
         scope.publish_files(project, files, delete=deletes)
+        if response_version == 3:
+            try:
+                card_activation = universal_card_runtime.activate_project_cards(
+                    project, app_root=c.APP_ROOT, usage_context="local_authorized", force=True
+                )
+                report["card_activation"] = {
+                    "status": str(card_activation.get("status") or "completed"),
+                    "migration_version": str(card_activation.get("migration_version") or ""),
+                    "counts": copy.deepcopy(card_activation.get("counts") or {}),
+                    "renderer_id": "fr-universal-card",
+                }
+            except Exception as exc:
+                report["card_activation"] = {
+                    "status": "failed",
+                    "renderer_id": "fr-universal-card",
+                    "error": str(exc),
+                }
+                report["status"] = "applied_card_activation_failed"
+                report.setdefault("notices", []).append({
+                    "level": "warning", "block": "cards",
+                    "message": "O roteiro V3 foi aplicado, mas a materialização do CARD_STATE_V2 falhou.",
+                    "effect": "O plano permanece salvo; corrija a dependência indicada e regenere/ative os cards antes do master.",
+                })
+            scope.publish_files(project, {
+                "RELATORIO_APLICACAO_ROTEIRO_IA.json": report,
+                "_CONTROLE/REVISAO_ROTEIRO.json": report,
+            })
         saved = scope.snapshot_decisions(project, meta["id"], roteiro=meta)
         c.info(f"Roteiro validado e aplicado: {meta['id']} · cópia independente {saved.name}")
         return report

@@ -67,6 +67,9 @@ janelas de cena, tipos, valores e recursos disponíveis antes de aplicar o plano
 - entrada alternativa de vídeo já editado, com duração, resolução, FPS, áudio,
   ordem e velocidade bloqueados;
 - overlays temporizados de card, balão, callout, lower third, legenda e logo;
+- Card Editor Universal v2 com estado estruturado por projeto, edição
+  bidirecional `fr-autoedite-card/2`, snapshot/rollback e o mesmo renderer
+  determinístico para preview e master;
 - Style Pack de vídeo pronto `fr_chiaroscuro_vintage_v1` preservado e novo
   sistema de cards `fr_quiet_engineering_atelier_v2`, com famílias F1–F6,
   13 diagramas e cache invalidado quando estilo, serviço ou asset muda;
@@ -115,6 +118,14 @@ sudo apt install -y qrencode espeak-ng libsecret-tools rclone libimage-exiftool-
 O instalador preserva a instalação anterior, copia o programa para
 `~/.local/share/fr-autoedite/` e cria o comando
 `~/.local/bin/fr-autoedite`.
+
+O componente visual externo do Card Editor não integra o Git nem o pacote de
+código. Para habilitá-lo somente na instalação local, informe a fonte recebida
+do proprietário; sua licença continua pendente para distribuição externa:
+
+```bash
+FR_CARD_EDITOR_SOURCE=/caminho/FR_CARD_EDITOR_UNIVERSAL_v1.1.0 ./install.sh
+```
 
 Confirme a instalação:
 
@@ -296,6 +307,7 @@ desenvolvimento já foram revisadas e integradas à `main`.
 ```bash
 python3 -m pip install -r requirements-dev.txt
 python -m pytest tests
+python3 -m unittest discover -s tests -p '*_test.py' -v
 bash tests/smoke_test.sh
 bash tests/smoke_v4_visual.sh
 ```
@@ -314,4 +326,7 @@ O relatório da execução deste candidato está em
 - a aplicação não publica automaticamente em redes sociais;
 - métricas de retenção e conversão dependem dos dados reais da plataforma;
 - música, imagem, marca e depoimentos só podem ser usados com autorização e
-  evidência.
+  evidência;
+- os 21 golden masters do Card Editor têm diferenças medidas em relação ao
+  renderer Pillow e ainda exigem revisão visual humana; o componente externo e
+  seus assets não podem ser redistribuídos enquanto a licença estiver pendente.

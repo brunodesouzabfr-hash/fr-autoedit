@@ -1,0 +1,218 @@
+PROMPT CODEX — PARTE 3
+INTEGRAÇÃO FR CARD EDITOR UNIVERSAL v1.1.0 ↔ FR AUTOEDITE 4.0
+Complemento operacional aos promptcodexpart1 e promptcodexpart2.
+
+═══════════════════════════════════════════════════════════════
+0. CONTEXTO DE EXECUÇÃO
+═══════════════════════════════════════════════════════════════
+Raiz: /home/romeu/FR-AutoEdite/FR_AUTOEDITE_4.0
+(essa pasta já está no GitHub, branch main, commit 915c13c)
+
+Na raiz estarão disponíveis:
+- FR_CARD_EDITOR_UNIVERSAL_v1.1.0/   (aplicação de edição de cards
+  já extraída, enviada como referência concreta)
+- promptcodexpart1.(txt|md)          (instruções anteriores)
+- promptcodexpart2.(txt|md)          (instruções anteriores)
+- este prompt (parte 3)
+
+Os três prompts são complementares. Este NÃO substitui os outros dois;
+ele adiciona o escopo abaixo.
+
+═══════════════════════════════════════════════════════════════
+1. OBJETIVO ÚNICO DESTA PARTE
+═══════════════════════════════════════════════════════════════
+Integrar o FR Card Editor Universal v1.1.0 à FR AutoEdite 4.0 para que
+o usuário e a IA possam editar, gerar, revisar e inserir cards em
+trechos específicos dos vídeos, tudo dentro do fluxo já existente do
+Studio, sem quebrar nenhum modo atual (raw_media ou ready_video).
+
+═══════════════════════════════════════════════════════════════
+2. INTEGRAÇÃO CARD EDITOR ↔ FR AUTOEDITE
+═══════════════════════════════════════════════════════════════
+O FR Card Editor Universal v1.1.0 passa a ser o motor oficial de
+edição de cards da FR AutoEdite 4.0. Não duplicar lógica; portar ou
+embrulhar o que já existe lá.
+
+Requisitos:
+- O Studio deve oferecer uma área "Editor de Cards" que abre a UI do
+  Card Editor (embutida ou em aba própria), alimentada com o estado
+  real do projeto atual (contexto, serviço, style pack, assets).
+- O Card Editor deve ler e escrever o mesmo CARD_STYLE.json e o mesmo
+  contrato de cards usado pelo Studio.
+- Toda alteração salva no Card Editor deve refletir no plano do
+  projeto e invalidar prévias/caches correspondentes.
+- O Card Editor deve funcionar tanto no modo raw_media quanto no modo
+  ready_video.
+- Nenhum card deve ser aplicado em vídeo sem respeitar as regras de
+  janela temporal (start_sec / end_sec / duração do segmento).
+
+═══════════════════════════════════════════════════════════════
+3. EDIÇÃO MANUAL + IA DE CARDS
+═══════════════════════════════════════════════════════════════
+O usuário escolhe por card:
+  (a) editar manualmente todos os campos;
+  (b) pedir para a IA preencher/ajustar com base no contexto do
+      projeto e no roteiro mestre respondido.
+
+A IA não pode inventar dados. Se faltar informação, registrar
+[DADO A CONFIRMAR] apenas em metadado estratégico, nunca no texto
+executável do card.
+
+Fluxo da IA dentro do Card Editor:
+- recebe contexto do projeto + roteiro mestre respondido + manifesto;
+- edita textos, serviço, família, animação, paleta, posição e
+  imagem central de cada card;
+- devolve o mesmo contrato, validado antes de aplicar;
+- alteração só é aplicada após confirmação explícita do usuário
+  quando estiver no modo manual-assistido.
+
+═══════════════════════════════════════════════════════════════
+4. CARD DE SERVIÇO — IMAGEM CENTRAL CIRCULAR
+═══════════════════════════════════════════════════════════════
+- A imagem central do card de serviço é SEMPRE circular.
+- Círculo matematicamente perfeito, sem deformação, sem elipse.
+- Controle de zoom disponível (afastar/aproximar) com limite mínimo
+  e máximo seguros.
+- Enquadramento centralizado; nunca cortar o assunto principal.
+- Máscara circular limpa, borda opcional no ouro da paleta FR.
+- Quando a IA escolher o serviço, ela pode sugerir a imagem central,
+  mas o usuário sempre pode substituir manualmente.
+- Se não houver imagem válida, usar fallback neutro do style pack —
+  nunca deixar círculo vazio, nunca inventar asset.
+
+═══════════════════════════════════════════════════════════════
+5. BALÕES — REDESENHO COMO GRID/LINHAS CONCEITUAIS
+═══════════════════════════════════════════════════════════════
+Substituir o visual atual dos balões do vídeo por um tratamento
+gráfico alinhado ao DNA das cards:
+- linhas e grid minimalistas;
+- gradiente final terminando em transparência (fade-out do traço);
+- sem caixa opaca, sem fundo chapado, sem contorno pesado;
+- tipografia Stardos Stencil preservada (títulos) e Rokkitt no corpo;
+- tamanho do balão deve acompanhar o tamanho do texto — nada de
+  moldura maior do que o conteúdo (sem vazio interno);
+- margem/safe area obrigatórias para não encostar nas bordas do
+  vídeo nem cobrir o ponto focal;
+- posicionamento não pode colidir com outros balões ativos;
+- animação in/out conforme easing do style pack
+  (ex.: cubic-bezier(0.22, 1, 0.36, 1)).
+
+═══════════════════════════════════════════════════════════════
+6. OTIMIZAÇÃO DO ROTEIRO MESTRE (Markdown → IA)
+═══════════════════════════════════════════════════════════════
+O roteiro mestre atual está extenso, a IA demora a depurar e erra
+com frequência. Redesenhar o formato para:
+
+- ser compacto e orientado a ação;
+- conter somente o que a IA precisa decidir;
+- remover campos meramente institucionais ou decorativos que só
+  ocupam espaço;
+- remover textos redundantes que se repetem em vários blocos;
+- usar referências curtas (IDs) em vez de repetir caminhos/nomes;
+- nunca reenviar contexto antigo nem sobras de edições anteriores;
+- permitir que a IA foque em: seleção de trechos, ordem, duração,
+  velocidade, cards, balões, transições, estratégia de retenção;
+- preservar a possibilidade de a IA preencher todos os campos que o
+  contrato suporta, mas exigir preenchimento apenas dos essenciais;
+- documentar cada campo em uma linha, sem ensaio explicativo.
+
+Otimização adicional: melhorar a capacidade da IA de recortar bem
+os segmentos (start_sec, duration_sec, playback_speed) com base nas
+janelas de cena reais do manifesto — hoje ela erra ou ignora.
+
+═══════════════════════════════════════════════════════════════
+7. GARANTIA DE ARQUIVO ZERADO
+═══════════════════════════════════════════════════════════════
+Toda vez que o usuário clicar em "Gerar roteiro mestre para IA":
+- o arquivo gerado deve ser 100% novo, sem resquício de edições
+  anteriores, sem decisões antigas, sem textos antigos;
+- deve conter apenas: contexto factual atual, manifesto atual,
+  referências aos proxies atuais, contrato de campos editáveis;
+- deve incluir TODOS os proxies do projeto, sem faltar nenhum;
+- deve ser determinístico: mesma entrada → mesmo arquivo gerado;
+- deve haver teste automatizado que compare o arquivo gerado com
+  a fonte de verdade do projeto e falhe se houver divergência.
+
+═══════════════════════════════════════════════════════════════
+8. PROXIES COMPLETOS
+═══════════════════════════════════════════════════════════════
+- Os proxies enviados à IA devem cobrir integralmente os vídeos
+  originais, sem trechos faltando.
+- Cada proxy deve ter hash registrado no manifesto e ser verificável.
+- Se um proxy estiver truncado, corrompido ou faltando em relação
+  ao original, a geração do pacote deve falhar com erro claro.
+- O lote final para a IA continua abaixo de 150 MB por ZIP.
+
+═══════════════════════════════════════════════════════════════
+9. MODO AUTOMÁTICO SEM IA OBRIGATÓRIA
+═══════════════════════════════════════════════════════════════
+O modo automático da FR AutoEdite 4.0 deve conseguir produzir uma
+edição autônoma completa usando apenas:
+- regras determinísticas (FFmpeg + Python);
+- análise local (OpenCV / PySceneDetect quando disponíveis);
+- manifesto + contexto + style pack.
+
+Sem depender de IA externa. A IA continua opcional e desligada por
+padrão. Se a IA estiver desligada, o modo automático entrega:
+- seleção de trechos por fase;
+- cards por serviço com base no catálogo;
+- balões conforme as novas regras do item 5;
+- transições e animações do style pack;
+- Reels / Stories / carrossel conforme plano social.
+
+═══════════════════════════════════════════════════════════════
+10. RESTRIÇÕES INVIOLÁVEIS
+═══════════════════════════════════════════════════════════════
+- Não quebrar raw_media nem ready_video existentes.
+- Não alterar o original do usuário.
+- Não publicar mídia, Studio/ ou credenciais no Git.
+- Não introduzir dependência obrigatória de IA, Whisper ou nuvem.
+- Não desenhar arte final genérica — apenas slots, contratos e
+  fallbacks.
+- Não prometer viralização, métrica, prova social ou urgência.
+- Manter DNA Franco Romeu: Stardos Stencil, Rokkitt, Share Tech
+  Mono, Cormorant Garamond apenas em acento; paleta verde petróleo,
+  bordô, laranja, ouro, osso; chiaroscuro e quiet luxury.
+
+═══════════════════════════════════════════════════════════════
+11. ENTREGÁVEIS DESTA PARTE 3
+═══════════════════════════════════════════════════════════════
+1. Relatório curto: como o Card Editor foi integrado (portado,
+   embutido ou embrulhado) e por quê.
+2. Lista de arquivos criados/alterados.
+3. Schema atualizado do card no CARD_STYLE.json e no contrato.
+4. Novo schema otimizado do roteiro mestre (Markdown → IA).
+5. Regras do balão em grid/linhas com fade-out em transparência.
+6. Regra do círculo do card de serviço + controles de zoom.
+7. Testes novos (ver item 12).
+8. Limitações reais e o que ficou fora do escopo desta fase.
+
+═══════════════════════════════════════════════════════════════
+12. TESTES OBRIGATÓRIOS
+═══════════════════════════════════════════════════════════════
+- Abrir Card Editor no Studio com projeto real (mock).
+- Salvar card no Card Editor → estado do projeto muda.
+- Alterar card → assinatura de prévia muda → galeria atualiza.
+- Card de serviço sempre circular, sem deformação, zoom funcional.
+- Balão redimensiona conforme texto, sem vazio interno.
+- Balão não colide com outro balão ativo nem com safe area.
+- "Gerar roteiro mestre para IA" produz arquivo sempre limpo,
+  mesmo após várias gerações seguidas.
+- Proxy truncado faz a geração falhar com erro claro.
+- Modo automático sem IA produz entrega válida (draft passa ffprobe).
+- raw_media e ready_video continuam passando a suíte de regressão.
+- Nenhum teste acessa Studio/ nem mídias reais do usuário.
+
+Rodar antes de encerrar:
+    git diff --check
+    python -m pytest tests
+    bash tests/smoke_test.sh
+
+═══════════════════════════════════════════════════════════════
+13. AÇÃO
+═══════════════════════════════════════════════════════════════
+Execute esta parte 3 em conjunto com promptcodexpart1 e
+promptcodexpart2. Onde houver conflito, prevalece o pedido mais
+específico desta parte. Não peça esclarecimentos: quando faltar
+dado, registre a suposição e siga. Não faça commit, push, merge ou
+deploy. Não altere a pasta Studio/ nem mídias pessoais.

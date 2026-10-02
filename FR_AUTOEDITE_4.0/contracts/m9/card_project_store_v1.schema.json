@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FR AutoEdite Project Card State Store v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "store_id",
+    "project_id",
+    "source",
+    "definitions",
+    "instances",
+    "snapshots",
+    "revision"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "store_id": {"const": "fr-card-state-project/1"},
+    "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_mode",
+        "plan_path",
+        "plan_revision",
+        "manifest_path",
+        "manifest_revision",
+        "base_video_id",
+        "timeline_locked"
+      ],
+      "properties": {
+        "input_mode": {"enum": ["raw_media", "ready_video"]},
+        "plan_path": {"enum": ["EDIT_PLAN.json", "READY_VIDEO_PLAN.json"]},
+        "plan_revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "manifest_path": {"const": "MANIFESTO_MEDIA.json"},
+        "manifest_revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "base_video_id": {"type": "string"},
+        "timeline_locked": {"type": "boolean"}
+      }
+    },
+    "definitions": {
+      "type": "array",
+      "items": {"$ref": "card_definition_v2.schema.json"}
+    },
+    "instances": {
+      "type": "array",
+      "items": {"$ref": "card_instance_v2.schema.json"}
+    },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "snapshot_version",
+          "definition",
+          "instance",
+          "revision",
+          "snapshot_digest"
+        ],
+        "properties": {
+          "snapshot_version": {"const": 1},
+          "definition": {"$ref": "card_definition_v2.schema.json"},
+          "instance": {"$ref": "card_instance_v2.schema.json"},
+          "revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "snapshot_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$comment": "O validator produtivo também exige IDs únicos, refs de definição resolvidas, vínculo com o relógio raw/ready atual, manifesto atual, project_id atual e digest canônico."
+}

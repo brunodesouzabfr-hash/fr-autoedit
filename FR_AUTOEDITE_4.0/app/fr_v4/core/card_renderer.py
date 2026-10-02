@@ -24,10 +24,6 @@ class CardSpec:
     media_status: str | None = None
     image: Path | None = None
     comparison_image: Path | None = None
-    central_image: Path | None = None
-    central_zoom: float = 1.0
-    central_focal_x: float = 0.5
-    central_focal_y: float = 0.5
     contacts: tuple[str, ...] = ()
     evidence: tuple[dict, ...] = ()
     stage_number: str = ''
@@ -143,44 +139,16 @@ def compose(spec: CardSpec, size: tuple[int,int], app_root: Path) -> Composition
         diameter=round(min(size)*.58)
         b=box('medallion',(size[0]-diameter)/2,k.y+176*unit,diameter,diameter)
         asset_id='medallion_'+service.key
-        asset=None
-        central_rendered=False
-        if spec.central_image is not None:
-            try:
-                from card_media import circle_crop
-                with Image.open(spec.central_image) as opened:
-                    asset=circle_crop(
-                        opened,diameter,zoom=spec.central_zoom,
-                        focal_x=spec.central_focal_x,focal_y=spec.central_focal_y,
-                    )
-                central_rendered=True
-            except (OSError,ValueError) as exc:
-                result.warnings.append(
-                    'central_media: mídia não pôde ser composta no renderer v2; '
-                    'usando medalhão do serviço: '+str(exc)
-                )
-        if asset is None:
-            path,entry=resolve(app_root,asset_id)
-            if path is None:
-                asset=placeholder(diameter,service.code,fonts);result.pending_assets.append(asset_id)
-            else:
-                with Image.open(path) as opened:
-                    raw=opened.convert('RGBA');bbox=raw.getchannel('A').getbbox()
-                    asset=ImageOps.contain(raw.crop(bbox),(diameter,diameter),Image.Resampling.LANCZOS)
-                if entry.get('normalized',{}).get('opaque_background_preserved'):
-                    result.warnings.append(asset_id+': fundo opaco preservado; conferir diâmetro aparente.')
+        path,entry=resolve(app_root,asset_id)
+        if path is None:
+            asset=placeholder(diameter,service.code,fonts);result.pending_assets.append(asset_id)
+        else:
+            with Image.open(path) as opened:
+                raw=opened.convert('RGBA');bbox=raw.getchannel('A').getbbox()
+                asset=ImageOps.contain(raw.crop(bbox),(diameter,diameter),Image.Resampling.LANCZOS)
+            if entry.get('normalized',{}).get('opaque_background_preserved'):
+                result.warnings.append(asset_id+': fundo opaco preservado; conferir diâmetro aparente.')
         layers['medallion'].alpha_composite(asset,(round(b.x+(b.width-asset.width)/2),round(b.y+(b.height-asset.height)/2)))
-        if central_rendered:
-            ring=ImageDraw.Draw(layers['medallion'],'RGBA')
-            ring_width=max(2,round(3*unit))
-            ring.ellipse(
-                (round(b.x),round(b.y),round(b.right),round(b.bottom)),
-                outline=palette_rgba('gold',190),width=ring_width,
-            )
-            ring.arc(
-                (round(b.x+5*unit),round(b.y+5*unit),round(b.right-5*unit),round(b.bottom-5*unit)),
-                205,335,fill=TOKENS['orange'],width=ring_width,
-            )
         text('body',spec.body,box('body',k.x,k.bottom-116*unit,k.width-96*unit,48*unit),'body',27,1)
         index=next(i for i,s in enumerate(SERVICES,1) if s.key==service.key)
         text('code',f'{service.code} · SERVIÇO {index:02d}/13',box('code',k.x,k.bottom-56*unit,k.width-88*unit,40*unit),'technical',23,1,layer='footer',color='gold')

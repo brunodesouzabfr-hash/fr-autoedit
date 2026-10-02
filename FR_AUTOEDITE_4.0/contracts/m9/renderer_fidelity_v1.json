@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.3",
+  "renderer_id": "fr-universal-card",
+  "renderer_version": "1.0.0",
+  "reference_suite": "fr-card-editor-1.1-m9.0",
+  "reference_renderer": "fr_card_editor_1_1_canvas_export_algorithm",
+  "comparison_resolution": [941, 1672],
+  "artifact_count": 21,
+  "scenarios": [
+    "baseline",
+    "typography_geometry",
+    "visual_circle",
+    "visual_square",
+    "visual_rounded",
+    "visual_full",
+    "service_alvenaria",
+    "service_criacoes",
+    "service_eletrica",
+    "service_hidraulica",
+    "service_iluminacao",
+    "service_instalacao",
+    "service_manutencao",
+    "service_moveis",
+    "service_pintura",
+    "service_producoes",
+    "service_projetos_3d",
+    "service_revestimentos",
+    "service_textura"
+  ],
+  "acceptance": {
+    "backend_repeat_sha256_must_match": true,
+    "golden_sha256_equality_required": false,
+    "maximum_mean_absolute_error": 5.0,
+    "maximum_root_mean_square_error_941x1672": 22.0,
+    "maximum_root_mean_square_error_scaled": 24.0,
+    "changed_pixel_ratio_is_report_only": true
+  },
+  "first_measurement": {
+    "baseline": {
+      "mean_absolute_error": 4.354365075329615,
+      "root_mean_square_error": 19.67799947241078,
+      "changed_pixel_ratio": 0.8927652553274792
+    },
+    "baseline_1080x1920": {
+      "mean_absolute_error": 4.874001253858025,
+      "root_mean_square_error": 23.5058748901873,
+      "changed_pixel_ratio": 0.7160513117283951
+    },
+    "baseline_2160x3840": {
+      "mean_absolute_error": 3.636478547775206,
+      "root_mean_square_error": 22.77005515063197,
+      "changed_pixel_ratio": 0.057293113425925926
+    },
+    "typography_geometry": {
+      "mean_absolute_error": 3.591933231300646,
+      "root_mean_square_error": 16.19528975194242,
+      "changed_pixel_ratio": 0.8910046829952865
+    },
+    "visual_circle": {
+      "mean_absolute_error": 4.099576360958429,
+      "root_mean_square_error": 18.76302188009701,
+      "changed_pixel_ratio": 0.8984861620285861
+    },
+    "visual_square": {
+      "mean_absolute_error": 3.9424320389419107,
+      "root_mean_square_error": 18.624645639128037,
+      "changed_pixel_ratio": 0.8026665361597405
+    },
+    "visual_rounded": {
+      "mean_absolute_error": 4.269214390676721,
+      "root_mean_square_error": 19.23252828704139,
+      "changed_pixel_ratio": 0.8982478173987766
+    },
+    "visual_full": {
+      "mean_absolute_error": 4.130915184057138,
+      "root_mean_square_error": 18.615298049565364,
+      "changed_pixel_ratio": 0.9267074373693871
+    }
+  },
+  "interpretation": [
+    "Hashes backend e browser são distintos e continuam reportados como divergent.",
+    "MAE e RMSE medem diferenças brutas por canal entre Pillow/FreeType e Chromium/Canvas.",
+    "O limite RMSE das saídas escaladas foi fixado após a primeira medição dos goldens 1080x1920 e 2160x3840.",
+    "Changed pixel ratio não é gate porque o redimensionamento independente do fundo afeta pixels por diferenças pequenas.",
+    "Os 21 PNGs M9.0 são medidos; os bindings SERVICE usados no teste vêm do manifesto existente, sem antecipar o resolver produtivo M9.4."
+  ]
+}

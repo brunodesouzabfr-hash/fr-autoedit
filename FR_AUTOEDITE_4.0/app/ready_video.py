@@ -234,6 +234,34 @@ def overlay_image(
 
     kind = str(overlay.get("kind") or "")
     if kind in {"service_card", "common_card"}:
+        full = target.with_name(target.stem + ".card.png")
+        from universal_card_runtime import render_timeline_card
+        rendered_universal = render_timeline_card(
+            project,
+            str(overlay.get("overlay_id") or ""),
+            full,
+            (width, height),
+            app_root=c.APP_ROOT,
+        )
+        if rendered_universal:
+            if external_layer is not None:
+                full.unlink(missing_ok=True)
+                raise c.AutoEditeError(
+                    "Card universal não pode receber asset legado adicional; edite a mídia no estado v2."
+                )
+            with Image.open(full) as opened:
+                layer = opened.convert("RGBA")
+            full.unlink(missing_ok=True)
+            if overlay.get("presentation") == "full_frame":
+                canvas = _apply_opacity(layer, opacity)
+            else:
+                layer.thumbnail((int(width * 0.58), int(height * 0.54)), Image.Resampling.LANCZOS)
+                _place_layer(
+                    canvas, _apply_opacity(layer, opacity),
+                    str(overlay.get("position") or "bottom_left"), safe_margin,
+                )
+            canvas.save(target)
+            return target
         service_key = str(overlay.get("service_key") or "")
         service = c.load_service_catalog().get(service_key, {})
         card_segment = {
@@ -247,7 +275,6 @@ def overlay_image(
             "balloon_family": service.get("balloon_family", ""),
             "card_instance": copy.deepcopy(overlay.get("card_instance") or {}),
         }
-        full = target.with_name(target.stem + ".card.png")
         c.card_image(
             full, card_segment,
             {"output": {"width": width, "height": height}, "style_pack_id": style_pack_id},
@@ -510,6 +537,14 @@ def render(
     manifest = c.read_json(project / "MANIFESTO_MEDIA.json")
     from master_contract import validate_ready_video_contract
     validated, notices = validate_ready_video_contract(c, ready_plan, manifest)
+    # Ativa M9.9 antes de calcular assinaturas de camada. Assim o primeiro
+    # preview e o master usam o mesmo digest universal; nenhuma camada de card
+    # passa primeiro pelo F1--F6 para só depois ser migrada.
+    from universal_card_runtime import UniversalCardRuntimeError, activate_project_cards
+    try:
+        activate_project_cards(project, app_root=c.APP_ROOT)
+    except UniversalCardRuntimeError as exc:
+        raise c.AutoEditeError(str(exc)) from exc
     row = next(item for item in manifest.get("media", []) if item.get("id") == validated["base_video_id"])
     base = project / str(row["source_path"])
     if not base.is_file():
@@ -554,8 +589,28 @@ def render(
         instance = overlay.get("card_instance")
         if isinstance(instance, dict) and "central_media" in instance:
             visual_overlay["central_media"] = copy.deepcopy(instance["central_media"])
+        from universal_card_runtime import universal_state_digest
+        universal_state = universal_state_digest(
+            project, str(overlay.get("overlay_id") or ""),
+        )
+        if universal_state is not None:
+            # Texto, service_key e card_instance do plano são apenas projeções
+            # legadas para cards v2. A camada muda somente com o estado
+            # universal ou com as propriedades reais de composição abaixo.
+            visual_overlay = {
+                key: copy.deepcopy(overlay.get(key))
+                for key in (
+                    "presentation", "position", "safe_area", "opacity",
+                    "asset_id", "external_asset",
+                )
+                if key in overlay
+            }
         layer_signature = hashlib.sha256(json.dumps(
-            {"shared": shared_layer_state, "overlay": visual_overlay},
+            {
+                "shared": shared_layer_state,
+                "overlay": visual_overlay,
+                "universal_state_digest": universal_state,
+            },
             ensure_ascii=False, sort_keys=True, allow_nan=False,
         ).encode("utf-8")).hexdigest()
         cached = cached_layers.get(overlay["overlay_id"], {})

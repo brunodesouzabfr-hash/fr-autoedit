@@ -20,6 +20,17 @@ código anterior para um backup datado e recria o comando em
 `~/.local/bin/fr-autoedite`. A pasta de projetos
 `~/FR-AutoEdite/Studio/` não é movida nem apagada.
 
+O ZIP de código não contém o Card Editor externo. Quando a fonte modular tiver
+sido fornecida pelo proprietário para uso local, instale-a explicitamente:
+
+```bash
+FR_CARD_EDITOR_SOURCE=/caminho/FR_CARD_EDITOR_UNIVERSAL_v1.1.0 ./install.sh
+```
+
+O componente é instalado em `local_components/fr-card-editor/1.1.0` somente na
+instalação local. A licença/procedência deve ser resolvida antes de qualquer
+publicação ou redistribuição de seus arquivos.
+
 Se você recebeu `FR_AUTOEDITE_4.0.0_CANDIDATO.zip`, primeiro confira o hash
 publicado em `SHA256SUMS.txt`, extraia em uma pasta nova e só então execute o
 instalador. Não extraia por cima da pasta antiga.

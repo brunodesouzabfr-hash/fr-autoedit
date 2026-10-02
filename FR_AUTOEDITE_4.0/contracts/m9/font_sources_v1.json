@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "purpose": "local_golden_generation_only",
+  "repository": "https://github.com/google/fonts",
+  "commit": "23e54b51ddffbc7713c583748e3bd86f62b1fa4a",
+  "redistribution_in_fr_autoedite": false,
+  "runtime_dependency": false,
+  "fonts": [
+    {
+      "file": "CormorantGaramond.ttf",
+      "family": "Cormorant Garamond",
+      "weight": "300 700",
+      "source_path": "ofl/cormorantgaramond/CormorantGaramond[wght].ttf",
+      "sha256": "b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0",
+      "license_id": "OFL-1.1",
+      "license_path": "ofl/cormorantgaramond/OFL.txt"
+    },
+    {
+      "file": "Rokkitt.ttf",
+      "family": "Rokkitt",
+      "weight": "100 900",
+      "source_path": "ofl/rokkitt/Rokkitt[wght].ttf",
+      "sha256": "737b2881d2e98f85424b473ab049da3216289a1f84266becb972c87664de2b40",
+      "license_id": "OFL-1.1",
+      "license_path": "ofl/rokkitt/OFL.txt"
+    },
+    {
+      "file": "ShareTechMono-Regular.ttf",
+      "family": "Share Tech Mono",
+      "weight": "400",
+      "source_path": "ofl/sharetechmono/ShareTechMono-Regular.ttf",
+      "sha256": "9ceab1f87414829af259c0f537573ae03ef7dd3147c0b27a36a1a0beb6732677",
+      "license_id": "OFL-1.1",
+      "license_path": "ofl/sharetechmono/OFL.txt"
+    },
+    {
+      "file": "StardosStencil-Regular.ttf",
+      "family": "Stardos Stencil",
+      "weight": "400",
+      "source_path": "ofl/stardosstencil/StardosStencil-Regular.ttf",
+      "sha256": "208b13d15387c282a1c0c439a8e4c38809243d15c361b31da440b25a7e4f39ae",
+      "license_id": "OFL-1.1",
+      "license_path": "ofl/stardosstencil/OFL.txt"
+    },
+    {
+      "file": "StardosStencil-Bold.ttf",
+      "family": "Stardos Stencil",
+      "weight": "700",
+      "source_path": "ofl/stardosstencil/StardosStencil-Bold.ttf",
+      "sha256": "6b15f50b1b358512d922b5f11937af17e90704587e1d7fb009f1715d2d5dfa74",
+      "license_id": "OFL-1.1",
+      "license_path": "ofl/stardosstencil/OFL.txt"
+    }
+  ]
+}

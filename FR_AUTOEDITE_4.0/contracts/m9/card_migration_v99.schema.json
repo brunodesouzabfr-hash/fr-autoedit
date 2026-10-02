@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FR AutoEdite M9.9 Universal Card Activation Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "migration_id", "migration_version", "project_id",
+    "input_mode", "source_fingerprint", "source", "status", "counts",
+    "cards", "raw_media_and_ready_video_unchanged", "previews",
+    "rollback_version", "store_revision", "asset_provenance", "revision"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "migration_id": {"const": "fr-universal-card-activation/1"},
+    "migration_version": {"const": "9.9.0"},
+    "project_id": {"type": "string", "minLength": 1},
+    "input_mode": {"enum": ["raw_media", "ready_video"]},
+    "source_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_revision", "manifest_revision"],
+      "properties": {
+        "plan_revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "manifest_revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "status": {"enum": ["completed", "completed_with_explicit_fallback"]},
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discovered", "migrated", "fallback"],
+      "properties": {
+        "discovered": {"type": "integer", "minimum": 0},
+        "migrated": {"type": "integer", "minimum": 0},
+        "fallback": {"type": "integer", "minimum": 0}
+      }
+    },
+    "cards": {"type": "array", "items": {"type": "object"}},
+    "raw_media_and_ready_video_unchanged": {"const": true},
+    "previews": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invalidated", "regenerated"],
+      "properties": {
+        "invalidated": {"type": "array", "items": {"type": "string"}},
+        "regenerated": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "rollback_version": {"type": "string", "minLength": 1},
+    "store_revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "asset_provenance": {"type": "object"},
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

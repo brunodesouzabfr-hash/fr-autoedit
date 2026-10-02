@@ -10,11 +10,63 @@ from __future__ import annotations
 
 import math
 import importlib.util
+import os
 import re
 import shutil
+import signal
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
+
+from runtime_control import SkipCurrentItem, checkpoint as skip_checkpoint, consume_skip
+
+
+
+def _run_media_command(
+    command: list[str], *, item_id: str = "", timeout: float = 45.0,
+    stdout: Any = subprocess.PIPE, stderr: Any = subprocess.PIPE, text: bool = False,
+) -> subprocess.CompletedProcess:
+    """Executa análise local permitindo pular somente a mídia atual."""
+    process = subprocess.Popen(
+        command, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, text=text,
+        start_new_session=True,
+    )
+    started = time.monotonic()
+    try:
+        while True:
+            try:
+                out, err = process.communicate(timeout=0.5)
+                return subprocess.CompletedProcess(command, process.returncode, out, err)
+            except subprocess.TimeoutExpired:
+                payload = consume_skip(item_id=item_id) if item_id else None
+                if payload is not None:
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        process.communicate(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        process.communicate()
+                    raise SkipCurrentItem(f"{payload.get('target_item') or item_id}: item pulado manualmente pelo usuário.")
+                if time.monotonic() - started >= timeout:
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    process.communicate()
+                    raise subprocess.TimeoutExpired(command, timeout)
+    finally:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
 
 
 def compositor_capabilities() -> dict[str, Any]:
@@ -75,19 +127,15 @@ def _laplacian_variance(pixels: bytes, width: int, height: int) -> float:
     return sum((value - mean) ** 2 for value in values) / len(values)
 
 
-def _gray_frame(path: Path, seek: float, width: int = 160, height: int = 90) -> bytes:
+def _gray_frame(path: Path, seek: float, width: int = 160, height: int = 90, item_id: str = "") -> bytes:
     try:
-        result = subprocess.run(
+        result = _run_media_command(
             [
                 "ffmpeg", "-nostdin", "-v", "error", "-ss", f"{max(0.0, seek):.3f}",
                 "-i", str(path), "-vf", f"scale={width}:{height},format=gray",
                 "-frames:v", "1", "-f", "rawvideo", "-",
             ],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=45,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45, item_id=item_id,
         )
     except subprocess.TimeoutExpired:
         return b""
@@ -96,21 +144,17 @@ def _gray_frame(path: Path, seek: float, width: int = 160, height: int = 90) -> 
 
 def _gray_sequence(
     path: Path, seek: float, seconds: float = 2.0, fps: int = 4,
-    width: int = 160, height: int = 90,
+    width: int = 160, height: int = 90, item_id: str = "",
 ) -> list[bytes]:
     try:
-        result = subprocess.run(
+        result = _run_media_command(
             [
                 "ffmpeg", "-nostdin", "-v", "error", "-ss", f"{max(0.0, seek):.3f}",
                 "-t", f"{max(0.5, seconds):.3f}", "-i", str(path),
                 "-vf", f"fps={fps},scale={width}:{height},format=gray",
                 "-frames:v", str(max(2, round(seconds * fps))), "-f", "rawvideo", "-",
             ],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=45,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45, item_id=item_id,
         )
     except subprocess.TimeoutExpired:
         return []
@@ -134,22 +178,17 @@ def _frame_change(frames: list[bytes]) -> float:
     return sum(scores) / len(scores) if scores else 0.0
 
 
-def _crop_border_ratio(path: Path, seek: float) -> float:
+def _crop_border_ratio(path: Path, seek: float, item_id: str = "") -> float:
     """Amostra bordas persistentes; valor baixo pode indicar recorte/estabilização prévia."""
     try:
-        result = subprocess.run(
+        result = _run_media_command(
             [
                 "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "info",
                 "-ss", f"{max(0.0, seek):.3f}", "-t", "2", "-i", str(path),
                 "-vf", "scale=160:90,cropdetect=limit=20:round=2:reset=12",
                 "-an", "-f", "null", "-",
             ],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-            timeout=45,
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=45, item_id=item_id,
         )
     except subprocess.TimeoutExpired:
         return 1.0
@@ -160,7 +199,7 @@ def _crop_border_ratio(path: Path, seek: float) -> float:
     return max(0.0, min(1.0, sum(ratios) / len(ratios)))
 
 
-def video_quality_signals(path: Path, duration: float) -> dict[str, Any]:
+def video_quality_signals(path: Path, duration: float, item_id: str = "") -> dict[str, Any]:
     """Mede amostras curtas; nunca afirma que o vídeo está ruim sozinho."""
     if not path.is_file() or duration <= 0:
         return {
@@ -174,12 +213,12 @@ def video_quality_signals(path: Path, duration: float) -> dict[str, Any]:
     seeks = [duration * 0.18, duration * 0.50, duration * 0.82]
     sharpness = []
     for seek in seeks:
-        frame = _gray_frame(path, seek)
+        frame = _gray_frame(path, seek, item_id=item_id)
         if frame:
             sharpness.append(_laplacian_variance(frame, 160, 90))
     middle = max(0.0, duration * 0.50 - 1.0)
-    change = _frame_change(_gray_sequence(path, middle))
-    crop_ratio = _crop_border_ratio(path, middle)
+    change = _frame_change(_gray_sequence(path, middle, item_id=item_id))
+    crop_ratio = _crop_border_ratio(path, middle, item_id=item_id)
     mean_sharpness = sum(sharpness) / len(sharpness) if sharpness else 0.0
     # É um alerta conservador: movimento alto + baixa definição. Pode ser ação
     # real da obra; por isso a confirmação visual continua obrigatória.
@@ -274,7 +313,7 @@ def mark_burst_duplicates(
 
 def scene_boundaries(
     path: Path, duration: float, threshold: float = 0.34,
-    max_scan_seconds: float = 180.0,
+    max_scan_seconds: float = 180.0, item_id: str = "",
 ) -> list[float]:
     """Localiza mudanças de cena com FFmpeg em janelas curtas."""
     if not path.is_file() or duration <= 0 or shutil.which("ffmpeg") is None:
@@ -284,6 +323,8 @@ def scene_boundaries(
     # volta silenciosamente ao FFmpeg amostral abaixo.
     if duration <= max_scan_seconds:
         try:
+            if item_id:
+                skip_checkpoint(item_id)
             from scenedetect import ContentDetector, detect  # type: ignore
 
             scenes = detect(
@@ -291,6 +332,8 @@ def scene_boundaries(
                 ContentDetector(threshold=max(8.0, min(60.0, threshold * 80.0))),
                 show_progress=False,
             )
+            if item_id:
+                skip_checkpoint(item_id)
             boundaries = sorted({round(start.get_seconds(), 3) for start, _ in scenes[1:]})
             if boundaries:
                 return [value for value in boundaries if 0.5 < value < duration - 0.5]
@@ -309,18 +352,14 @@ def scene_boundaries(
     pattern = re.compile(r"pts_time:([0-9.]+)")
     for offset, length in windows:
         try:
-            result = subprocess.run(
+            result = _run_media_command(
                 [
                     "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "info",
                     "-ss", f"{offset:.3f}", "-t", f"{length:.3f}", "-i", str(path),
                     "-vf", f"select='gt(scene,{threshold:.3f})',showinfo", "-an", "-f", "null", "-",
                 ],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=False,
-                timeout=max(60.0, min(900.0, length * 8.0)),
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                timeout=max(60.0, min(900.0, length * 8.0)), item_id=item_id,
             )
         except subprocess.TimeoutExpired:
             continue
@@ -334,11 +373,12 @@ def scene_boundaries(
 def scene_ranges(
     path: Path, duration: float, *, minimum: float = 3.0, maximum: float = 8.0,
     threshold: float = 0.34, max_scan_seconds: float = 180.0, max_clips: int = 18,
+    item_id: str = "",
 ) -> list[tuple[float, float]]:
     """Converte mudanças de cena em trechos virtuais de 3–8 segundos."""
     if duration <= 30.0:
         return []
-    cuts = [0.0, *scene_boundaries(path, duration, threshold, max_scan_seconds), duration]
+    cuts = [0.0, *scene_boundaries(path, duration, threshold, max_scan_seconds, item_id=item_id), duration]
     candidates: list[tuple[float, float]] = []
     for start, end in zip(cuts, cuts[1:]):
         length = end - start

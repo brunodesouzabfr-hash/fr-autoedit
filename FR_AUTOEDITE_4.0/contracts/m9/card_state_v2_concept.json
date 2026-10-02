@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "status": "reference_only_until_m9_1",
+  "card_definition": {
+    "schema_version": 2,
+    "required": [
+      "schema_version",
+      "definition_id",
+      "definition_version",
+      "editor_schema",
+      "renderer_id",
+      "renderer_version",
+      "canvas",
+      "component",
+      "default_state",
+      "capabilities"
+    ],
+    "renderer_id": "fr-universal-card",
+    "editor_schema": "fr-card-editor/1.1",
+    "formats": ["9:16"],
+    "state_sections": ["assets", "layers", "gridStyle", "fields", "lines"]
+  },
+  "card_instance": {
+    "schema_version": 2,
+    "required": [
+      "schema_version",
+      "instance_id",
+      "definition_ref",
+      "edit_origin",
+      "placement",
+      "state",
+      "state_digest"
+    ],
+    "edit_origins": ["manual", "ai_assisted", "deterministic_auto"],
+    "state_sections": ["assets", "layers", "gridStyle", "fields", "lines"],
+    "optional": ["service_key"]
+  },
+  "asset_ref": {
+    "required": ["scope", "asset_id", "sha256"],
+    "scopes": ["component", "service_catalog", "project_media", "project_asset"],
+    "optional": ["frame_time_sec"],
+    "forbidden": ["absolute_path", "client_path", "data_url"]
+  },
+  "placement": {
+    "raw_media": {
+      "timebase": "raw_sequence",
+      "required": ["sequence_index", "duration_sec"]
+    },
+    "ready_video": {
+      "timebase": "ready_video_base",
+      "required": ["start_sec", "end_sec"],
+      "timeline_locked": true
+    }
+  },
+  "compatibility_projection": {
+    "title": "state.fields[id=title].text",
+    "body": "state.fields[id=subtitle].text",
+    "projection_must_match": true,
+    "projection_is_not_second_source_of_truth": true
+  },
+  "write_gate": {
+    "validator": "required",
+    "snapshot": "required",
+    "rollback": "required",
+    "stale_revision_rejected": true,
+    "unknown_fields_rejected": true
+  }
+}

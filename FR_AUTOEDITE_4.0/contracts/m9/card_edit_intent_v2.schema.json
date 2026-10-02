@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FR AutoEdite CARD_EDIT_INTENT v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "intent_id", "origin", "project_id",
+    "target_id", "input_mode", "base_plan_revision", "base_store_revision",
+    "base_instance_revision", "operations", "provenance"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "kind": {"const": "CARD_EDIT_INTENT"},
+    "intent_id": {"$ref": "#/$defs/id"},
+    "origin": {"const": "ai_assisted"},
+    "project_id": {"$ref": "#/$defs/id"},
+    "target_id": {"$ref": "#/$defs/id"},
+    "input_mode": {"enum": ["raw_media", "ready_video"]},
+    "base_plan_revision": {"$ref": "#/$defs/sha256"},
+    "base_store_revision": {"$ref": "#/$defs/sha256"},
+    "base_instance_revision": {"$ref": "#/$defs/sha256"},
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/operation"}
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "request_id"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1, "maxLength": 300},
+        "model": {"type": "string", "minLength": 1, "maxLength": 300},
+        "request_id": {"type": "string", "minLength": 1, "maxLength": 300}
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "op", "changes"],
+      "properties": {
+        "operation_id": {"$ref": "#/$defs/id"},
+        "op": {
+          "enum": ["set_field", "set_line", "set_assets", "set_layers", "set_grid_style"]
+        },
+        "target_id": {"$ref": "#/$defs/id"},
+        "changes": {"type": "object", "minProperties": 1}
+      },
+      "$comment": "As propriedades específicas de changes e a presença de target_id são gates semânticos do validator produtivo."
+    }
+  }
+}

@@ -215,6 +215,9 @@ class ReadyVideoFlow(unittest.TestCase):
 
     def test_preview_signature_changes_when_card_style_changes_and_uses_cache_busting_record(self):
         self.plan["overlays"] = [self.overlay(kind="service_card", text="ELÉTRICA", position="bottom_left")]
+        # M9.9 discovers only cards that are part of the persisted project. The
+        # renderer must never invent a legacy route for an in-memory-only row.
+        project_scope.write(self.project / "READY_VIDEO_PLAN.json", self.plan)
         with patch("ready_video.choose_preview_backend", return_value="ffmpeg"):
             first = ready_video.render(vars(fr), self.project, self.plan, preview=True)
             style = fr.load_card_style(self.project)
@@ -234,6 +237,7 @@ class ReadyVideoFlow(unittest.TestCase):
         )
         overlay["card_instance"] = card_timeline.build_ready_card_instance(overlay)
         self.plan["overlays"] = [overlay]
+        project_scope.write(self.project / "READY_VIDEO_PLAN.json", self.plan)
         with patch("ready_video.choose_preview_backend", return_value="ffmpeg"):
             ready_video.render(vars(fr), self.project, self.plan, preview=True)
         layer = self.project / "_CACHE_RENDER" / "ready_video_overlays" / "OV0001.png"
